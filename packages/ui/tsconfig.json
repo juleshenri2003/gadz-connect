@@ -1,0 +1,11 @@
+{
+  "extends": "@gadz-connect/config/tsconfig/react",
+  "compilerOptions": {
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

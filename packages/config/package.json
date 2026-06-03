@@ -1,0 +1,16 @@
+{
+  "name": "@gadz-connect/config",
+  "version": "0.1.0",
+  "private": true,
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "typescript-eslint": "^8.18.2"
+  },
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./tsconfig/base": "./tsconfig.base.json",
+    "./tsconfig/node": "./tsconfig.node.json",
+    "./tsconfig/react": "./tsconfig.react.json"
+  }
+}
