@@ -1,0 +1,12 @@
+---
+description: /push commit et push automatique sur origin/main
+alwaysApply: false
+---
+
+# /push
+
+Quand l'utilisateur tape **`/push`** (ou « push », « commit et push ») :
+
+1. Exécuter **tout de suite** sans demander confirmation
+2. Suivre `.cursor/commands/push.md` ou `.cursor/skills/push/SKILL.md`
+3. Terminer par `./.cursor/skills/push/scripts/push.sh` — **jamais** `git push` seul
