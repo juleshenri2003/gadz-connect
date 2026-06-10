@@ -7,14 +7,11 @@ export const URSSAF_PORTAL_URL =
   "https://www.autoentrepreneur.urssaf.fr/portail/accueil.html";
 
 export const PLATFORM_CONTACTS = {
-  toscan: {
-    name: "Toscan Gaven",
-    role: "Manager des professeurs — Namek 58-10",
-    phone: "06 98 45 53 39",
-    phoneHref: "tel:+33698455339",
-  },
-  rh: {
-    name: "Équipe RH Gadz'Connect",
+  responsable: {
+    name: "Jules Henri",
+    role: "Responsable Gadz'Connect",
+    phone: "07 82 01 96 76",
+    phoneHref: "tel:+33782019676",
     email: "jules.henri@ensam.eu",
     emailHref: "mailto:jules.henri@ensam.eu",
   },
@@ -84,7 +81,7 @@ export const INPI_STEPS = [
       "Utilisez **FranceConnect** si le site vous y invite (compte existant ou création).",
       "À la question **« Devenir compte administrateur de mon entreprise »**, répondez **NON**.",
       "Le « nom de dossier » est un libellé interne : il n'a aucun impact une fois l'inscription terminée.",
-      "En cas de doute sur une case, contactez un chticop' tuyssé ou Toscan.",
+      "En cas de doute sur une case, contactez le responsable Gadz'Connect.",
     ],
     alert:
       "Réponse obligatoire : NON à « compte administrateur » — sauf besoin spécifique que personne n'a ici.",
@@ -156,7 +153,7 @@ export const CFE_GUIDE = {
     "Indiquer **0 salarié**.",
     "Déclarer votre **adresse de domicile** (résidence personnelle).",
     "Cocher le **régime micro-social** / micro-entreprise.",
-    "Remplir le reste selon les cases du formulaire reçu — en cas de doute, contactez Toscan ou les RH avant d'envoyer quoi que ce soit.",
+    "Remplir le reste selon les cases du formulaire reçu — en cas de doute, contactez le responsable avant d'envoyer quoi que ce soit.",
   ],
   reminder:
     "Ne payez aucun chèque ni mandat joint à un courrier « CFE payante » ou « affichage obligatoire » : c'est une arnaque courante.",

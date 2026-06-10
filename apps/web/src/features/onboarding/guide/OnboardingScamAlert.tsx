@@ -31,19 +31,12 @@ export function OnboardingScamAlert() {
             ))}
           </ul>
           <p className="text-sm font-semibold text-red-950">
-            Dans le doute, contactez{" "}
+            Dans le doute, contactez le responsable au{" "}
             <a
-              href={PLATFORM_CONTACTS.toscan.phoneHref}
+              href={PLATFORM_CONTACTS.responsable.phoneHref}
               className="underline underline-offset-2"
             >
-              Toscan ({PLATFORM_CONTACTS.toscan.phone})
-            </a>{" "}
-            ou{" "}
-            <a
-              href={PLATFORM_CONTACTS.rh.emailHref}
-              className="underline underline-offset-2"
-            >
-              les RH
+              {PLATFORM_CONTACTS.responsable.phone}
             </a>{" "}
             avant tout paiement.
           </p>

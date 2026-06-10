@@ -68,7 +68,7 @@ export function OnboardingDocumentsPanel() {
           disabled={loading !== null}
           onClick={() => void handleDownload("guide")}
         >
-          {loading === "guide" ? "Génération…" : "Récap PDF Gadz'Connect"}
+          {loading === "guide" ? "Génération…" : "Guide PDF complet (tuyss)"}
         </Button>
         <Button
           type="button"

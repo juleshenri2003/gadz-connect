@@ -1,7 +1,6 @@
 import { Button } from "@gadz-connect/ui";
 import {
   ACTIVITY_PATH_COPY,
-  ACTIVITY_PATH_LABELS,
   ID_CONFORMITY_MENTION,
   INPI_STEPS,
   INPI_URL,

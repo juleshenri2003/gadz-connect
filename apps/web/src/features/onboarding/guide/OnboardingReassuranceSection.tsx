@@ -30,30 +30,24 @@ export function OnboardingReassuranceSection() {
           <p className="text-sm font-semibold text-slate-900">
             Un doute ? Contactez-nous avant de payer quoi que ce soit
           </p>
-          <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-6">
-            <div>
-              <p className="font-medium text-slate-800">
-                {PLATFORM_CONTACTS.toscan.name}
-              </p>
-              <p className="text-slate-500">{PLATFORM_CONTACTS.toscan.role}</p>
-              <a
-                href={PLATFORM_CONTACTS.toscan.phoneHref}
-                className="mt-1 inline-block font-semibold text-indigo-700 hover:underline"
-              >
-                {PLATFORM_CONTACTS.toscan.phone}
-              </a>
-            </div>
-            <div>
-              <p className="font-medium text-slate-800">
-                {PLATFORM_CONTACTS.rh.name}
-              </p>
-              <a
-                href={PLATFORM_CONTACTS.rh.emailHref}
-                className="mt-1 inline-block font-semibold text-indigo-700 hover:underline"
-              >
-                {PLATFORM_CONTACTS.rh.email}
-              </a>
-            </div>
+          <div className="mt-3 text-sm">
+            <p className="font-medium text-slate-800">
+              {PLATFORM_CONTACTS.responsable.name}
+            </p>
+            <p className="text-slate-500">{PLATFORM_CONTACTS.responsable.role}</p>
+            <a
+              href={PLATFORM_CONTACTS.responsable.phoneHref}
+              className="mt-1 inline-block font-semibold text-indigo-700 hover:underline"
+            >
+              {PLATFORM_CONTACTS.responsable.phone}
+            </a>
+            <span className="mx-2 text-slate-400">·</span>
+            <a
+              href={PLATFORM_CONTACTS.responsable.emailHref}
+              className="font-semibold text-indigo-700 hover:underline"
+            >
+              {PLATFORM_CONTACTS.responsable.email}
+            </a>
           </div>
         </div>
       </CardContent>
