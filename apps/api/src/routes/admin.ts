@@ -310,6 +310,74 @@ adminRouter.get("/dashboard", async (req: AdminRequest, res) => {
 });
 
 /**
+ * GET /api/admin/schedule
+ * Emploi du temps campus (cours planifiés).
+ */
+adminRouter.get("/schedule", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const campusId = campusFilter?.campusId;
+
+  let query = supabaseAdmin
+    .from("courses")
+    .select(
+      `
+      id, title, subject, status, scheduled_at, campus_id,
+      provider:provider_id ( first_name, last_name ),
+      client:client_id ( first_name, last_name ),
+      campus:campus_id ( name )
+    `,
+    )
+    .not("scheduled_at", "is", null)
+    .order("scheduled_at");
+
+  if (campusId) {
+    query = query.eq("campus_id", campusId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[admin] schedule:", error.message);
+    res.status(500).json({ error: "Impossible de charger le planning" });
+    return;
+  }
+
+  const pickOne = <T,>(value: unknown): T | null => {
+    if (!value) return null;
+    return (Array.isArray(value) ? value[0] : value) as T;
+  };
+
+  const events = (data ?? []).map((course) => {
+    const provider = pickOne<{ first_name: string; last_name: string }>(
+      course.provider,
+    );
+    const client = pickOne<{ first_name: string; last_name: string }>(
+      course.client,
+    );
+    const campus = pickOne<{ name: string }>(course.campus);
+    const scheduledAt = course.scheduled_at as string;
+
+    return {
+      id: course.id as string,
+      title: (course.subject as string) || (course.title as string),
+      startsAt: scheduledAt,
+      endsAt: scheduledAt,
+      kind: "course" as const,
+      status: course.status as string,
+      providerName: provider
+        ? `${provider.first_name} ${provider.last_name}`.trim()
+        : undefined,
+      clientName: client
+        ? `${client.first_name} ${client.last_name}`.trim()
+        : undefined,
+      campusName: campus?.name,
+    };
+  });
+
+  res.json({ data: { events } });
+});
+
+/**
  * GET /api/admin/me
  * Vérifie le rôle admin de l'utilisateur connecté.
  */

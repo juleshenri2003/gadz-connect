@@ -11,6 +11,7 @@ import { onboardingDocsRouter } from "./routes/onboarding-docs.js";
 import { profileRouter } from "./routes/profile.js";
 import { healthRouter } from "./routes/health.js";
 import { stripeRouter } from "./routes/stripe.js";
+import { scheduleRouter } from "./routes/schedule.js";
 import { tutorsRouter } from "./routes/tutors.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 
@@ -42,6 +43,7 @@ app.use("/api/campus", campusRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/onboarding/documents", onboardingDocsRouter);
 app.use("/api/fiscal", fiscalRouter);
+app.use("/api/schedule", scheduleRouter);
 app.use("/api/tutors", tutorsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/stripe", stripeRouter);

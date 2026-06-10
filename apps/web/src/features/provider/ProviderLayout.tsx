@@ -8,6 +8,7 @@ import { AppShell, type AppNavItem } from "@/features/layout/AppShell";
 function buildStudentNav(): AppNavItem[] {
   return [
     { to: "/app", label: "Vue d'ensemble", end: true },
+    { to: "/app/planning", label: "Emploi du temps" },
     { to: "/app/cours", label: "Tutorat" },
     { to: "/app/profil", label: "Mon profil" },
   ];
@@ -16,6 +17,7 @@ function buildStudentNav(): AppNavItem[] {
 function buildTutorNav(): AppNavItem[] {
   return [
     { to: "/app", label: "Vue d'ensemble", end: true },
+    { to: "/app/planning", label: "Emploi du temps" },
     { to: "/app/cours", label: "Mes cours" },
     { to: "/app/micro-entreprise", label: "Micro-entreprise" },
     { to: "/app/paiements", label: "Paiements" },

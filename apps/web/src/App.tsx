@@ -13,6 +13,7 @@ import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
 import { AdminMembersPage } from "@/pages/admin/AdminMembersPage";
 import { AdminBudgetsPage } from "@/pages/admin/AdminBudgetsPage";
 import { AdminCoursesPage } from "@/pages/admin/AdminCoursesPage";
+import { AdminSchedulePage } from "@/pages/admin/AdminSchedulePage";
 import { ProfileSetupPage } from "@/pages/provider/ProfileSetupPage";
 import { ProviderOverviewPage } from "@/pages/provider/ProviderOverviewPage";
 import { ProviderCoursesPage } from "@/pages/provider/ProviderCoursesPage";
@@ -20,6 +21,7 @@ import { ProviderOnboardingPage } from "@/pages/provider/ProviderOnboardingPage"
 import { ProviderPaymentsPage } from "@/pages/provider/ProviderPaymentsPage";
 import { ProviderProfilePage } from "@/pages/provider/ProviderProfilePage";
 import { TutorDetailPage } from "@/pages/provider/TutorDetailPage";
+import { SchedulePage } from "@/pages/provider/SchedulePage";
 import { TutorOnlyRoute } from "@/pages/provider/TutorOnlyRoute";
 
 export default function App() {
@@ -52,6 +54,7 @@ export default function App() {
         <Route element={<ProviderLayout />}>
         <Route path="setup" element={<ProfileSetupPage />} />
         <Route index element={<ProviderOverviewPage />} />
+        <Route path="planning" element={<SchedulePage />} />
         <Route path="cours" element={<ProviderCoursesPage />} />
         <Route path="cours/:id" element={<TutorDetailPage />} />
         <Route
@@ -82,6 +85,7 @@ export default function App() {
         }
       >
         <Route index element={<AdminOverviewPage />} />
+        <Route path="planning" element={<AdminSchedulePage />} />
         <Route path="membres" element={<AdminMembersPage />} />
         <Route path="budgets" element={<AdminBudgetsPage />} />
         <Route path="cours" element={<AdminCoursesPage />} />

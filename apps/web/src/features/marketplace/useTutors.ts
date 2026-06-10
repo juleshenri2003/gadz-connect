@@ -155,6 +155,7 @@ export function useCreateSlot() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
     },
   });
 }
@@ -185,6 +186,8 @@ export function useBookSlot() {
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: ["tutor-slots"] });
       void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-admin"] });
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
       void queryClient.invalidateQueries({ queryKey: ["tutor-slots", vars.slotId] });
     },

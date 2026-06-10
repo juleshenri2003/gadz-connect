@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build shared types
+        run: pnpm --filter @gadz-connect/types build
+
       - name: Lint
         run: pnpm lint
 

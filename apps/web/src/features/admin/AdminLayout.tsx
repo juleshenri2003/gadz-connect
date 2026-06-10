@@ -6,6 +6,7 @@ import { ROLE_LABELS } from "./format";
 
 const NAV = [
   { to: "/admin", label: "Vue d'ensemble", end: true },
+  { to: "/admin/planning", label: "Emploi du temps", end: false },
   { to: "/admin/membres", label: "Membres", end: false },
   { to: "/admin/budgets", label: "Budgets", end: false },
   { to: "/admin/cours", label: "Cours", end: false },
