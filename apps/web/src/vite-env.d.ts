@@ -1,8 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string;
-  readonly VITE_SUPABASE_ANON_KEY: string;
+  /** Laisser vide en dev — proxy Vite /api → :3001 */
   readonly VITE_API_URL: string;
 }
 

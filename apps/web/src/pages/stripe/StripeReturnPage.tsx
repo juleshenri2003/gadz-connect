@@ -29,7 +29,7 @@ export function StripeReturnPage() {
               Actualiser
             </Button>
             <Button asChild>
-              <Link to="/onboarding/micro-entreprise">Retour onboarding</Link>
+              <Link to="/app/paiements">Retour espace prestataire</Link>
             </Button>
           </div>
         </CardContent>

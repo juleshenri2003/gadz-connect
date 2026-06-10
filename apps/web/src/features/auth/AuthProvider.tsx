@@ -1,4 +1,3 @@
-import type { Session, User } from "@supabase/supabase-js";
 import {
   createContext,
   useCallback,
@@ -8,53 +7,121 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
+import {
+  clearStoredSession,
+  getStoredSession,
+  setStoredSession,
+  type AuthUser,
+  type StoredSession,
+} from "@/lib/session";
 
 interface AuthContextValue {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: StoredSession | null;
   loading: boolean;
   signInWithMagicLink: (email: string) => Promise<{ error: string | null }>;
+  emailLogin: (email: string) => Promise<{
+    error: string | null;
+    accessToken?: string;
+    profileSetupComplete?: boolean;
+  }>;
+  /** @deprecated Utiliser emailLogin */
+  devLogin: (
+    email: string,
+  ) => Promise<{
+    error: string | null;
+    accessToken?: string;
+    profileSetupComplete?: boolean;
+  }>;
   signOut: () => Promise<void>;
   getAccessToken: () => string | undefined;
+  setSession: (session: StoredSession) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSessionState] = useState<StoredSession | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const setSession = useCallback((next: StoredSession) => {
+    setStoredSession(next);
+    setSessionState(next);
+  }, []);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    async function restore() {
+      const stored = getStoredSession();
+      if (!stored?.access_token) {
+        setLoading(false);
+        return;
+      }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setLoading(false);
-    });
+      try {
+        await apiFetch<{ data: { user: AuthUser } }>("/api/auth/me", {
+          token: stored.access_token,
+        });
+        setSessionState(stored);
+      } catch {
+        clearStoredSession();
+        setSessionState(null);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    return () => subscription.unsubscribe();
+    void restore();
   }, []);
 
   const signInWithMagicLink = useCallback(async (email: string) => {
     const redirectTo = `${window.location.origin}/auth/callback`;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo,
-        shouldCreateUser: true,
-      },
-    });
-    return { error: error?.message ?? null };
+    try {
+      await apiFetch<{ data: { sent: boolean } }>("/api/auth/magic-link", {
+        method: "POST",
+        body: JSON.stringify({ email, redirectTo }),
+      });
+      return { error: null };
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
   }, []);
 
+  const emailLogin = useCallback(
+    async (email: string) => {
+      try {
+        const res = await apiFetch<{
+          data: { session: StoredSession; profileSetupComplete: boolean };
+        }>("/api/auth/email-login", {
+          method: "POST",
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        });
+        setSession(res.data.session);
+        return {
+          error: null,
+          accessToken: res.data.session.access_token,
+          profileSetupComplete: res.data.profileSetupComplete,
+        };
+      } catch (err) {
+        return { error: (err as Error).message };
+      }
+    },
+    [setSession],
+  );
+
+  const devLogin = emailLogin;
+
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    const token = getStoredSession()?.access_token;
+    try {
+      if (token) {
+        await apiFetch("/api/auth/logout", { method: "POST", token });
+      }
+    } catch {
+      /* session stateless côté serveur */
+    }
+    clearStoredSession();
+    setSessionState(null);
   }, []);
 
   const getAccessToken = useCallback(
@@ -68,10 +135,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       loading,
       signInWithMagicLink,
+      emailLogin,
+      devLogin,
       signOut,
       getAccessToken,
+      setSession,
     }),
-    [session, loading, signInWithMagicLink, signOut, getAccessToken],
+    [
+      session,
+      loading,
+      signInWithMagicLink,
+      emailLogin,
+      devLogin,
+      signOut,
+      getAccessToken,
+      setSession,
+    ],
   );
 
   return (

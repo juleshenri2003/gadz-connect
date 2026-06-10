@@ -1,10 +1,23 @@
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@gadz-connect/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
+
+const USE_EMAIL_LOGIN =
+  import.meta.env.DEV || import.meta.env.VITE_USE_EMAIL_LOGIN === "true";
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -13,13 +26,15 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-  const { signInWithMagicLink } = useAuth();
+  const { signInWithMagicLink, emailLogin } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname
-    ?? "/onboarding/micro-entreprise";
+    ?? "/app";
 
   const [sent, setSent] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const {
     register,
@@ -27,9 +42,29 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { email: import.meta.env.DEV ? "prof.enattente@ensam.eu" : "" },
   });
 
-  async function onSubmit({ email }: LoginForm) {
+  async function onEmailLogin({ email }: LoginForm) {
+    setServerError(null);
+    setLoading(true);
+    const { error, accessToken, profileSetupComplete } = await emailLogin(email);
+    setLoading(false);
+    if (error) {
+      setServerError(error);
+      return;
+    }
+    if (!profileSetupComplete) {
+      navigate("/app/setup", { replace: true });
+      return;
+    }
+    const path = accessToken
+      ? await resolvePostLoginPath(accessToken)
+      : from;
+    navigate(path, { replace: true });
+  }
+
+  async function onMagicLink({ email }: LoginForm) {
     setServerError(null);
     const { error } = await signInWithMagicLink(email);
     if (error) {
@@ -47,15 +82,9 @@ export function LoginPage() {
           <CardHeader>
             <CardTitle>Vérifiez votre boîte mail</CardTitle>
             <CardDescription>
-              Un lien de connexion Magic Link a été envoyé. Cliquez dessus pour
-              accéder à Gadz&apos;Connect.
+              Un lien de connexion a été envoyé à votre adresse e-mail.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-600">
-              Après connexion, vous serez redirigé vers votre parcours.
-            </p>
-          </CardContent>
         </Card>
       </main>
     );
@@ -68,15 +97,22 @@ export function LoginPage() {
       </Link>
       <Card>
         <CardHeader>
-          <CardTitle>Connexion</CardTitle>
+          <CardTitle>Accéder à Gadz&apos;Connect</CardTitle>
           <CardDescription>
-            Magic Link — sans mot de passe (Supabase Auth)
+            {USE_EMAIL_LOGIN
+              ? "Saisissez votre e-mail école — accès direct à votre espace ou inscription."
+              : "Magic Link — sans mot de passe"}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <CardContent className="space-y-4">
+          <form
+            onSubmit={handleSubmit(
+              USE_EMAIL_LOGIN ? onEmailLogin : onMagicLink,
+            )}
+            className="space-y-4"
+          >
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">E-mail Arts et Métiers</Label>
               <Input
                 id="email"
                 type="email"
@@ -84,17 +120,28 @@ export function LoginPage() {
                 autoComplete="email"
                 {...register("email")}
               />
-              {errors.email && (
+              {errors.email ? (
                 <p className="text-sm text-red-600">{errors.email.message}</p>
-              )}
+              ) : null}
             </div>
-            {serverError && (
+            {serverError ? (
               <p className="text-sm text-red-600">{serverError}</p>
-            )}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              Recevoir le lien magique
+            ) : null}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || isSubmitting}
+            >
+              {loading ? "Connexion…" : "Continuer →"}
             </Button>
           </form>
+          {USE_EMAIL_LOGIN ? (
+            <p className="text-xs text-slate-500">
+              Compte connu → votre interface (élève, prof ou RH).
+              <br />
+              Nouveau → choix du parcours (élève, micro-entreprise, SIRET).
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </main>

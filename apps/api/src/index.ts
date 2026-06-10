@@ -3,9 +3,15 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { errorHandler } from "./middleware/error-handler.js";
+import { adminRouter } from "./routes/admin.js";
+import { authRouter } from "./routes/auth.js";
+import { campusRouter } from "./routes/campus.js";
 import { fiscalRouter } from "./routes/fiscal.js";
+import { onboardingDocsRouter } from "./routes/onboarding-docs.js";
+import { profileRouter } from "./routes/profile.js";
 import { healthRouter } from "./routes/health.js";
 import { stripeRouter } from "./routes/stripe.js";
+import { tutorsRouter } from "./routes/tutors.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -31,7 +37,13 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 
 app.use("/health", healthRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/campus", campusRouter);
+app.use("/api/profile", profileRouter);
+app.use("/api/onboarding/documents", onboardingDocsRouter);
 app.use("/api/fiscal", fiscalRouter);
+app.use("/api/tutors", tutorsRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/stripe", stripeRouter);
 
 app.use((_req, res) => {

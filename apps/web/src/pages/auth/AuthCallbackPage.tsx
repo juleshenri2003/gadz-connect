@@ -1,28 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
+import { apiFetch } from "@/lib/api";
+import type { StoredSession } from "@/lib/session";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
+  const { setSession } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function handleCallback() {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        setError(sessionError.message);
-        return;
-      }
-
-      if (data.session) {
-        const redirect =
-          sessionStorage.getItem("gadz_auth_redirect")
-          ?? "/onboarding/micro-entreprise";
-        sessionStorage.removeItem("gadz_auth_redirect");
-        navigate(redirect, { replace: true });
-        return;
-      }
+      const code = new URLSearchParams(window.location.search).get("code");
 
       const hashParams = new URLSearchParams(
         window.location.hash.replace(/^#/, ""),
@@ -30,44 +20,34 @@ export function AuthCallbackPage() {
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
 
-      if (accessToken && refreshToken) {
-        const { error: setError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        if (setError) {
-          setError(setError.message);
-          return;
-        }
-        const redirect =
-          sessionStorage.getItem("gadz_auth_redirect")
-          ?? "/onboarding/micro-entreprise";
-        sessionStorage.removeItem("gadz_auth_redirect");
-        navigate(redirect, { replace: true });
-        return;
-      }
-
-      const code = new URLSearchParams(window.location.search).get("code");
+      let body: Record<string, string>;
       if (code) {
-        const { error: exchangeError } =
-          await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) {
-          setError(exchangeError.message);
-          return;
-        }
-        const redirect =
-          sessionStorage.getItem("gadz_auth_redirect")
-          ?? "/onboarding/micro-entreprise";
-        sessionStorage.removeItem("gadz_auth_redirect");
-        navigate(redirect, { replace: true });
+        body = { code };
+      } else if (accessToken && refreshToken) {
+        body = { access_token: accessToken, refresh_token: refreshToken };
+      } else {
+        setError("Lien de connexion invalide ou expiré.");
         return;
       }
 
-      setError("Lien de connexion invalide ou expiré.");
+      try {
+        const res = await apiFetch<{ data: { session: StoredSession } }>(
+          "/api/auth/session",
+          { method: "POST", body: JSON.stringify(body) },
+        );
+
+        setSession(res.data.session);
+        const redirect = await resolvePostLoginPath(
+          res.data.session.access_token,
+        );
+        navigate(redirect, { replace: true });
+      } catch (err) {
+        setError((err as Error).message);
+      }
     }
 
     void handleCallback();
-  }, [navigate]);
+  }, [navigate, setSession]);
 
   if (error) {
     return (

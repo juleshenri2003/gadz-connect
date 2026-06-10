@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "";
+/** Vide en dev → requêtes relatives /api via proxy Vite (évite les soucis CORS). */
+export const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 export async function apiFetch<T>(
   path: string,

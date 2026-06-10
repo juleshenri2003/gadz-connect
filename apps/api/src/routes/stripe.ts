@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ensureProfileForUser } from "../lib/profiles.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import {
   stripe,
@@ -19,15 +20,25 @@ stripeRouter.use(requireAuth);
  */
 stripeRouter.post("/connect/account", async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
-    res.status(503).json({ error: "Stripe non configuré" });
+    res.status(503).json({
+      error:
+        "Stripe non configuré — ajoutez STRIPE_SECRET_KEY (sk_test_…) dans apps/api/.env",
+    });
     return;
   }
 
-  const userId = req.user!.id;
-  const email = req.user!.email;
+  const user = req.user!;
+  const userId = user.id;
+  const email = user.email;
 
   if (!email) {
     res.status(400).json({ error: "E-mail utilisateur requis" });
+    return;
+  }
+
+  const ensured = await ensureProfileForUser(user);
+  if (!ensured.ok) {
+    res.status(500).json({ error: ensured.message });
     return;
   }
 
@@ -35,9 +46,10 @@ stripeRouter.post("/connect/account", async (req: AuthenticatedRequest, res) => 
     .from("profiles")
     .select("stripe_connect_account_id, first_name, last_name")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (profileError || !profile) {
+    console.error("[stripe] profil après ensure:", profileError?.message);
     res.status(404).json({ error: "Profil introuvable" });
     return;
   }
@@ -88,7 +100,10 @@ const onboardingLinkSchema = z.object({
  */
 stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
-    res.status(503).json({ error: "Stripe non configuré" });
+    res.status(503).json({
+      error:
+        "Stripe non configuré — ajoutez STRIPE_SECRET_KEY (sk_test_…) dans apps/api/.env",
+    });
     return;
   }
 
@@ -98,14 +113,21 @@ stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, 
     return;
   }
 
-  const userId = req.user!.id;
+  const user = req.user!;
+  const userId = user.id;
   const { accountId } = parsed.data;
+
+  const ensured = await ensureProfileForUser(user);
+  if (!ensured.ok) {
+    res.status(500).json({ error: ensured.message });
+    return;
+  }
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("stripe_connect_account_id")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (profile?.stripe_connect_account_id !== accountId) {
     res.status(403).json({ error: "Compte Stripe non associé à cet utilisateur" });
@@ -128,17 +150,23 @@ stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, 
  */
 stripeRouter.get("/connect/status", async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
-    res.status(503).json({ error: "Stripe non configuré" });
+    res.status(503).json({
+      error:
+        "Stripe non configuré — ajoutez STRIPE_SECRET_KEY (sk_test_…) dans apps/api/.env",
+    });
     return;
   }
 
-  const userId = req.user!.id;
+  const user = req.user!;
+  const userId = user.id;
+
+  await ensureProfileForUser(user);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("stripe_connect_account_id, stripe_connect_onboarding_complete")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (!profile?.stripe_connect_account_id) {
     res.json({

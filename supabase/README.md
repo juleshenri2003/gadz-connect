@@ -49,7 +49,17 @@ En local avec Stripe CLI :
 stripe listen --forward-to localhost:3001/api/webhooks/stripe
 ```
 
-## 5. Test du parcours
+## 5. Flux SIRET professeur
+
+1. Onboarding micro-entreprise (statut `pending_siret` si attente INPI)
+2. Téléchargement PDF + Guichet Unique
+3. Déclaration SIRET par le prof (`PATCH /api/profile/siret`)
+4. Validation RH (`/admin/membres` → Valider SIRET)
+5. Compte `active` → marketplace + Stripe
+
+Seed test : `pnpm --filter @gadz-connect/api seed-professor-pending` → `prof.enattente@ensam.eu`
+
+## 6. Test du parcours
 
 1. `pnpm dev`
 2. Connexion Magic Link → `/auth/login`

@@ -10,20 +10,19 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   );
 }
 
-/** Client admin (bypass RLS) — webhooks Stripe, jobs serveur */
+/** Client admin (service_role) — toutes les lectures/écritures métier */
 export const supabaseAdmin = createClient(
   supabaseUrl ?? "https://placeholder.supabase.co",
   supabaseServiceRoleKey ?? "placeholder-service-role",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
-export function createSupabaseUserClient(accessToken: string) {
-  return createClient(
-    supabaseUrl ?? "https://placeholder.supabase.co",
-    supabaseAnonKey ?? "placeholder-anon",
-    {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+/**
+ * Client auth (anon) — uniquement côté serveur pour Magic Link et échange de session.
+ * Jamais exposé au frontend.
+ */
+export const supabaseAuth = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
-    },
-  );
-}
+    })
+  : null;

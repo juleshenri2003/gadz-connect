@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+const siretRegex = /^\d{14}$/;
+
+export const onboardingStep0Schema = z.object({
+  registrationStatus: z.enum(["already_registered", "awaiting_registration"], {
+    required_error: "Indiquez votre situation",
+  }),
+  siret: z.string().optional(),
+});
+
 export const onboardingStep1Schema = z.object({
   activity: z.enum(["enseignement", "conseil", "prestation_intellectuelle"], {
     required_error: "Sélectionnez une activité",
@@ -16,8 +25,21 @@ export const onboardingStep3Schema = z.object({
   versementLiberatoire: z.boolean(),
 });
 
-export const onboardingFullSchema = onboardingStep1Schema
+export const onboardingFullSchema = onboardingStep0Schema
+  .merge(onboardingStep1Schema)
   .merge(onboardingStep2Schema)
-  .merge(onboardingStep3Schema);
+  .merge(onboardingStep3Schema)
+  .superRefine((data, ctx) => {
+    if (data.registrationStatus === "already_registered") {
+      const normalized = data.siret?.replace(/\s/g, "") ?? "";
+      if (!siretRegex.test(normalized)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SIRET invalide — 14 chiffres requis",
+          path: ["siret"],
+        });
+      }
+    }
+  });
 
 export type OnboardingFormValues = z.infer<typeof onboardingFullSchema>;
