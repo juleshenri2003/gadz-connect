@@ -6,7 +6,6 @@ import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { ProviderTaskBanner } from "@/features/dashboard/ProviderTaskBanner";
 import { TeacherOnboardingDashboard } from "@/features/onboarding/progress/TeacherOnboardingDashboard";
-import { useMySlots } from "@/features/marketplace/useTutors";
 import { useStripeConnectStatus } from "@/features/stripe/useStripeConnect";
 import { StudentOverviewPage } from "@/pages/provider/StudentOverviewPage";
 
