@@ -71,7 +71,7 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const rows = (data ?? []).map((row) => {
-    const raw = row.notification as Record<string, unknown> | null;
+    const raw = row.notification as unknown as Record<string, unknown> | null;
     if (!raw) return row;
 
     const course = Array.isArray(raw.course) ? raw.course[0] : raw.course;

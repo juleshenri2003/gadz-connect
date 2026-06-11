@@ -1,10 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClientOptions } from "@supabase/supabase-js";
 import ws from "ws";
 
-const serverSupabaseOptions = {
+type ServerSupabaseOptions = SupabaseClientOptions<"public">;
+type RealtimeTransport = NonNullable<
+  NonNullable<ServerSupabaseOptions["realtime"]>["transport"]
+>;
+
+const serverSupabaseOptions: ServerSupabaseOptions = {
   auth: { autoRefreshToken: false, persistSession: false },
-  realtime: { transport: ws },
-} as const;
+  realtime: { transport: ws as unknown as RealtimeTransport },
+};
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
