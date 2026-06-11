@@ -1,4 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
+
+const serverSupabaseOptions = {
+  auth: { autoRefreshToken: false, persistSession: false },
+  realtime: { transport: ws },
+} as const;
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -14,7 +20,7 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 export const supabaseAdmin = createClient(
   supabaseUrl ?? "https://placeholder.supabase.co",
   supabaseServiceRoleKey ?? "placeholder-service-role",
-  { auth: { autoRefreshToken: false, persistSession: false } },
+  serverSupabaseOptions,
 );
 
 /**
@@ -22,7 +28,5 @@ export const supabaseAdmin = createClient(
  * Jamais exposé au frontend.
  */
 export const supabaseAuth = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
+  ? createClient(supabaseUrl, supabaseAnonKey, serverSupabaseOptions)
   : null;
