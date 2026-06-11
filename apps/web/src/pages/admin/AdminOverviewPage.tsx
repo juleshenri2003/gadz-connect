@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@gadz-connect/ui";
+import { AdminTaskBanner } from "@/features/dashboard/AdminTaskBanner";
 import { StatCard } from "@/features/admin/StatCard";
 import { formatEuro } from "@/features/admin/format";
 import { useAdminDashboard } from "@/features/admin/useAdmin";
@@ -21,6 +22,8 @@ export function AdminOverviewPage() {
 
   return (
     <div className="space-y-8">
+      <AdminTaskBanner />
+
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Vue d&apos;ensemble</h2>
         <p className="mt-1 text-sm text-slate-600">

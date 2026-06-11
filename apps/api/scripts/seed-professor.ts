@@ -8,6 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 const PROF_EMAIL = "prof.martin@ensam.eu";
 const FAKE_SIRET = "12345678901234";
 
+import { getDemoCampusId } from "./lib/demo-campus.js";
+
 const admin = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -15,14 +17,8 @@ const admin = createClient(
 );
 
 async function main() {
-  const { data: campus } = await admin
-    .from("campus")
-    .select("id")
-    .eq("name", "Paris")
-    .maybeSingle();
-
-  if (!campus) {
-    console.error("Campus Paris introuvable");
+  const campusId = await getDemoCampusId(admin);
+  if (!campusId) {
     process.exit(1);
   }
 
@@ -58,7 +54,7 @@ async function main() {
     first_name: "Marie",
     last_name: "Martin",
     role: "teacher" as const,
-    campus_id: campus.id,
+    campus_id: campusId,
     siret: FAKE_SIRET,
     account_status: "active" as const,
     micro_enterprise_activity: "enseignement" as const,
@@ -66,6 +62,7 @@ async function main() {
     versement_liberatoire: false,
     profile_setup_complete: true,
     bio: "Professeure SolidWorks et conception mécanique — 8 ans d'expérience.",
+    cv: "Formation : Arts et Métiers — diplôme d'ingénieur mécanique.\nExpériences : 8 ans en industrie, 4 ans de tutorat.\nCompétences : SolidWorks, CAO, RDM, accompagnement projets.",
     hourly_rate: 45,
     subjects: ["SolidWorks", "CAO", "Résistance des matériaux"],
   };

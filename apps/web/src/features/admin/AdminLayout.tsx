@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { NotificationNavBadge } from "@/features/notifications/NotificationNavBadge";
 import { AppShell } from "@/features/layout/AppShell";
 import { useAdminMe } from "./useAdmin";
 import { ROLE_LABELS } from "./format";
@@ -7,6 +8,7 @@ import { ROLE_LABELS } from "./format";
 const NAV = [
   { to: "/admin", label: "Vue d'ensemble", end: true },
   { to: "/admin/planning", label: "Emploi du temps", end: false },
+  { to: "/admin/alertes", label: "Alertes campus", end: false },
   { to: "/admin/membres", label: "Membres", end: false },
   { to: "/admin/budgets", label: "Budgets", end: false },
   { to: "/admin/cours", label: "Cours", end: false },
@@ -39,6 +41,7 @@ export function AdminLayout() {
       headerHint="Console d'administration — données Supabase en temps réel"
       footerLabel="Quitter le pilotage"
       onFooterClick={() => void handleLeave()}
+      headerExtra={<NotificationNavBadge to="/admin/alertes" />}
     />
   );
 }

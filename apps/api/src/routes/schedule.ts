@@ -9,6 +9,7 @@ scheduleRouter.use(requireAuth);
 
 export interface ScheduleEventPayload {
   id: string;
+  courseId?: string;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -89,14 +90,46 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       }
     }
 
+    const bookedSlotIds = (slots ?? [])
+      .filter((s) => s.booked)
+      .map((s) => s.id as string);
+
+    const courseBySlotId = new Map<
+      string,
+      { id: string; status: string; subject: string | null; title: string }
+    >();
+
+    if (bookedSlotIds.length > 0) {
+      const { data: slotCourses } = await supabaseAdmin
+        .from("courses")
+        .select("id, slot_id, status, subject, title")
+        .in("slot_id", bookedSlotIds);
+
+      for (const c of slotCourses ?? []) {
+        if (c.slot_id) {
+          courseBySlotId.set(c.slot_id as string, {
+            id: c.id as string,
+            status: c.status as string,
+            subject: c.subject as string | null,
+            title: c.title as string,
+          });
+        }
+      }
+    }
+
     for (const slot of slots ?? []) {
       const booked = Boolean(slot.booked);
+      const linked = courseBySlotId.get(slot.id as string);
       events.push({
         id: slot.id as string,
-        title: booked ? "Cours réservé" : "Créneau disponible",
+        courseId: linked?.id,
+        title: booked
+          ? linked?.subject || linked?.title || "Cours réservé"
+          : "Créneau disponible",
         startsAt: slot.starts_at as string,
         endsAt: slotEnd(slot.starts_at as string, slot.ends_at as string),
         kind: booked ? "slot_booked" : "slot_available",
+        status: linked?.status,
         counterpartName: slot.booked_by
           ? bookerNames.get(slot.booked_by as string)
           : undefined,
@@ -127,6 +160,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       const scheduledAt = course.scheduled_at as string;
       events.push({
         id: course.id as string,
+        courseId: course.id as string,
         title: (course.subject as string) || (course.title as string),
         startsAt: scheduledAt,
         endsAt: scheduledAt,
@@ -142,12 +176,14 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       .from("courses")
       .select(
         `
-        id, title, subject, status, scheduled_at,
-        provider:provider_id ( first_name, last_name )
+        id, title, subject, status, scheduled_at, slot_id,
+        provider:provider_id ( first_name, last_name ),
+        slot:slot_id ( starts_at, ends_at )
       `,
       )
       .eq("client_id", userId)
       .not("scheduled_at", "is", null)
+      .neq("status", "cancelled")
       .order("scheduled_at");
 
     if (coursesError) {
@@ -157,12 +193,18 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
 
     for (const course of courses ?? []) {
       const provider = profileName(course.provider);
+      const slot = Array.isArray(course.slot) ? course.slot[0] : course.slot;
       const scheduledAt = course.scheduled_at as string;
+      const startsAt = (slot?.starts_at as string | undefined) ?? scheduledAt;
+      const endsAt =
+        (slot?.ends_at as string | undefined) ??
+        scheduledAt;
       events.push({
         id: course.id as string,
+        courseId: course.id as string,
         title: (course.subject as string) || (course.title as string),
-        startsAt: scheduledAt,
-        endsAt: scheduledAt,
+        startsAt,
+        endsAt: slotEnd(startsAt, endsAt),
         kind: "course",
         status: course.status as string,
         counterpartName: provider

@@ -1,5 +1,5 @@
 import { Button } from "@gadz-connect/ui";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
   eventKindLabel,
@@ -16,12 +16,14 @@ interface WeekCalendarProps {
   events: ScheduleEvent[];
   emptyLabel?: string;
   renderEventMeta?: (event: ScheduleEvent) => string | undefined;
+  renderEventActions?: (event: ScheduleEvent) => ReactNode;
 }
 
 export function WeekCalendar({
   events,
   emptyLabel = "Aucun événement cette semaine",
   renderEventMeta,
+  renderEventActions,
 }: WeekCalendarProps) {
   const [anchor, setAnchor] = useState(() => new Date());
   const weekDays = useMemo(() => getWeekDays(anchor), [anchor]);
@@ -105,7 +107,7 @@ export function WeekCalendar({
                       return (
                         <div
                           key={event.id}
-                          className={`rounded-lg border p-2 text-xs ${eventStyles(event.kind)}`}
+                          className={`rounded-lg border p-2 text-xs ${eventStyles(event.kind, event.status)}`}
                         >
                           <p className="font-semibold leading-tight">
                             {event.title}
@@ -114,12 +116,12 @@ export function WeekCalendar({
                             {formatEventTime(event.startsAt, event.endsAt)}
                           </p>
                           <p className="mt-1 text-[10px] font-medium uppercase tracking-wide opacity-70">
-                            {eventKindLabel(event.kind)}
-                            {event.status ? ` · ${event.status}` : ""}
+                            {eventKindLabel(event.kind, event.status)}
                           </p>
                           {meta ? (
                             <p className="mt-1 truncate opacity-90">{meta}</p>
                           ) : null}
+                          {renderEventActions?.(event)}
                         </div>
                       );
                     })
@@ -143,6 +145,10 @@ export function WeekCalendar({
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50" />
           Créneau réservé / cours
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded border border-amber-300 bg-amber-50" />
+          En attente de remplacement
         </span>
       </div>
     </div>

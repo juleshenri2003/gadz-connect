@@ -21,7 +21,12 @@ import { ProviderOnboardingPage } from "@/pages/provider/ProviderOnboardingPage"
 import { ProviderPaymentsPage } from "@/pages/provider/ProviderPaymentsPage";
 import { ProviderProfilePage } from "@/pages/provider/ProviderProfilePage";
 import { TutorDetailPage } from "@/pages/provider/TutorDetailPage";
+import { NotificationsPage } from "@/pages/shared/NotificationsPage";
 import { SchedulePage } from "@/pages/provider/SchedulePage";
+import {
+  StudentRepositoryFolderPage,
+  StudentRepositoryPage,
+} from "@/pages/provider/StudentRepositoryPage";
 import { TutorOnlyRoute } from "@/pages/provider/TutorOnlyRoute";
 
 export default function App() {
@@ -55,8 +60,11 @@ export default function App() {
         <Route path="setup" element={<ProfileSetupPage />} />
         <Route index element={<ProviderOverviewPage />} />
         <Route path="planning" element={<SchedulePage />} />
+        <Route path="alertes" element={<NotificationsPage />} />
         <Route path="cours" element={<ProviderCoursesPage />} />
         <Route path="cours/:id" element={<TutorDetailPage />} />
+        <Route path="repertoire" element={<StudentRepositoryPage />} />
+        <Route path="repertoire/:folderId" element={<StudentRepositoryFolderPage />} />
         <Route
           path="micro-entreprise"
           element={
@@ -86,6 +94,7 @@ export default function App() {
       >
         <Route index element={<AdminOverviewPage />} />
         <Route path="planning" element={<AdminSchedulePage />} />
+        <Route path="alertes" element={<NotificationsPage />} />
         <Route path="membres" element={<AdminMembersPage />} />
         <Route path="budgets" element={<AdminBudgetsPage />} />
         <Route path="cours" element={<AdminCoursesPage />} />

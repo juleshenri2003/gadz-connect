@@ -6,7 +6,11 @@ export type UserRole =
 
 export type AccountStatus = "pending_siret" | "active" | "suspended";
 
-export type CourseStatus = "scheduled" | "completed" | "cancelled";
+export type CourseStatus =
+  | "scheduled"
+  | "completed"
+  | "cancelled"
+  | "awaiting_replacement";
 
 export type TransactionStripeStatus =
   | "pending"

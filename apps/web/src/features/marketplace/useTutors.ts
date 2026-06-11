@@ -8,6 +8,8 @@ export interface TutorListItem {
   last_name: string;
   role: string;
   bio: string | null;
+  cv: string | null;
+  has_cv_pdf: boolean;
   hourly_rate: number | null;
   subjects: string[];
   account_status: string;
@@ -35,6 +37,8 @@ export function useTutors() {
       return res.data;
     },
     enabled: Boolean(user && getAccessToken()),
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -85,6 +89,7 @@ export function useMyTutorProfile() {
         data: {
           id: string;
           bio: string | null;
+          cv: string | null;
           hourly_rate: number | null;
           subjects: string[];
         };
@@ -119,6 +124,7 @@ export function useUpdateTutorProfile() {
   return useMutation({
     mutationFn: async (body: {
       bio?: string;
+      cv?: string;
       hourlyRate?: number;
       subjects?: string[];
     }) => {
@@ -133,6 +139,7 @@ export function useUpdateTutorProfile() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile-me"] });
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
     },
   });
@@ -175,6 +182,7 @@ export function useBookSlot() {
           netPayout: number;
           subject: string;
           scheduledAt: string;
+          endsAt: string;
         };
       }>("/api/tutors/bookings", {
         method: "POST",

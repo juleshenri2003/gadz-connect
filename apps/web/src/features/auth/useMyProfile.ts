@@ -17,7 +17,11 @@ export interface MyProfile {
   urssaf_periodicity: string | null;
   versement_liberatoire: boolean;
   profile_setup_complete: boolean;
+  inpi_declaration_sent_at: string | null;
+  stripe_connect_onboarding_complete: boolean;
   bio: string | null;
+  cv: string | null;
+  cv_pdf_path: string | null;
   hourly_rate: number | null;
   subjects: string[];
   campus: { name: string } | null;

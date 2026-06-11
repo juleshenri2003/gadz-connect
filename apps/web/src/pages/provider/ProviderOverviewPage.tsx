@@ -4,48 +4,25 @@ import { StatCard } from "@/features/admin/StatCard";
 import { STATUS_LABELS } from "@/features/admin/format";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
-import { SiretSubmissionForm } from "@/features/onboarding/SiretSubmissionForm";
+import { ProviderTaskBanner } from "@/features/dashboard/ProviderTaskBanner";
+import { TeacherOnboardingDashboard } from "@/features/onboarding/progress/TeacherOnboardingDashboard";
+import { useMySlots } from "@/features/marketplace/useTutors";
 import { useStripeConnectStatus } from "@/features/stripe/useStripeConnect";
 import { StudentOverviewPage } from "@/pages/provider/StudentOverviewPage";
 
-export function ProviderOverviewPage() {
-  const { data: profile, isLoading, isError } = useMyProfile();
+function TeacherStatsContent() {
+  const { data: profile } = useMyProfile();
   const { data: stripe } = useStripeConnectStatus();
 
-  if (isLoading) {
-    return <p className="text-sm text-slate-500">Chargement du tableau de bord…</p>;
-  }
-
-  if (isError || !profile) {
-    return (
-      <p className="text-sm text-red-600">Impossible de charger votre profil</p>
-    );
-  }
-
-  if (isStudent(profile.role)) {
-    return <StudentOverviewPage />;
-  }
+  if (!profile) return null;
 
   const onboardingDone = Boolean(profile.micro_enterprise_activity);
   const isActive = profile.account_status === "active";
-  const pendingSiret = profile.account_status === "pending_siret";
 
   return (
-    <div className="space-y-8">
-      {pendingSiret ? (
-        <section className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Votre compte est en attente de validation RH.
-            {profile.siret
-              ? " Votre SIRET a été transmis."
-              : " Déclarez votre SIRET dès réception de l'INSEE."}
-          </div>
-          <SiretSubmissionForm existingSiret={profile.siret} />
-        </section>
-      ) : null}
-
+    <>
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Vue d&apos;ensemble</h2>
+        <h2 className="text-2xl font-bold text-slate-900">Tableau de bord</h2>
         <p className="mt-1 text-sm text-slate-600">
           {profile.campus?.name
             ? `Campus ${profile.campus.name}`
@@ -94,19 +71,6 @@ export function ProviderOverviewPage() {
         <section className="rounded-xl border border-slate-200 bg-white p-6">
           <h3 className="font-semibold text-slate-900">Prochaines actions</h3>
           <ul className="mt-4 space-y-3 text-sm text-slate-600">
-            {!onboardingDone ? (
-              <li className="flex items-center justify-between gap-4 rounded-lg bg-amber-50 px-4 py-3">
-                <span>Compléter l&apos;onboarding micro-entreprise</span>
-                <Button size="sm" asChild>
-                  <Link to="/app/micro-entreprise">Commencer →</Link>
-                </Button>
-              </li>
-            ) : null}
-            {onboardingDone && !isActive ? (
-              <li className="rounded-lg bg-amber-50 px-4 py-3">
-                Votre SIRET est en attente de validation par l&apos;équipe RH.
-              </li>
-            ) : null}
             {isActive && !stripe?.onboardingComplete ? (
               <li className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-4 py-3">
                 <span>Configurer Stripe Connect pour les virements</span>
@@ -155,6 +119,31 @@ export function ProviderOverviewPage() {
           </Button>
         </section>
       </div>
-    </div>
+    </>
+  );
+}
+
+export function ProviderOverviewPage() {
+  const { data: profile, isLoading, isError } = useMyProfile();
+
+  if (isLoading) {
+    return <p className="text-sm text-slate-500">Chargement du tableau de bord…</p>;
+  }
+
+  if (isError || !profile) {
+    return (
+      <p className="text-sm text-red-600">Impossible de charger votre profil</p>
+    );
+  }
+
+  if (isStudent(profile.role)) {
+    return <StudentOverviewPage />;
+  }
+
+  return (
+    <TeacherOnboardingDashboard>
+      <ProviderTaskBanner />
+      <TeacherStatsContent />
+    </TeacherOnboardingDashboard>
   );
 }

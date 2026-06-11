@@ -83,6 +83,7 @@ export function useUpdateProfileStatus() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutors"] });
     },
   });
 }

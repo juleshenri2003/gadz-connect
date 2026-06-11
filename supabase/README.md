@@ -6,6 +6,20 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 
 1. `migrations/001_initial_schema.sql`
 2. `migrations/002_onboarding_stripe.sql`
+3. `migrations/003_marketplace_setup.sql`
+4. `migrations/004_campus_notifications.sql`
+5. `migrations/005_onboarding_progress.sql` (jalon INPI onboarding prof)
+6. `migrations/006_profile_cv.sql` (CV texte professeur)
+7. `migrations/007_cv_pdf_storage.sql` (CV PDF + bucket Storage `cv-pdfs`)
+8. `migrations/008_replacement_workflow.sql` (remplacement prof + propositions)
+9. `migrations/009_student_repository.sql` (répertoire matières élève)
+
+Ou en local (avec `DATABASE_URL` dans `apps/api/.env`) :
+
+```bash
+pnpm --filter @gadz-connect/api apply-migration-008-009
+pnpm --filter @gadz-connect/api repair-demo
+```
 
 ## 2. Magic Link (Auth)
 

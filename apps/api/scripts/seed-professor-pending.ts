@@ -7,6 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const PROF_EMAIL = "prof.enattente@ensam.eu";
 
+import { getDemoCampusId } from "./lib/demo-campus.js";
+
 const admin = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -14,14 +16,8 @@ const admin = createClient(
 );
 
 async function main() {
-  const { data: campus } = await admin
-    .from("campus")
-    .select("id")
-    .eq("name", "Paris")
-    .maybeSingle();
-
-  if (!campus) {
-    console.error("Campus Paris introuvable");
+  const campusId = await getDemoCampusId(admin);
+  if (!campusId) {
     process.exit(1);
   }
 
@@ -51,13 +47,14 @@ async function main() {
     first_name: "Paul",
     last_name: "Bernard",
     role: "teacher" as const,
-    campus_id: campus.id,
+    campus_id: campusId,
     siret: null,
     account_status: "pending_siret" as const,
     micro_enterprise_activity: "enseignement" as const,
     urssaf_periodicity: "monthly" as const,
     versement_liberatoire: false,
     profile_setup_complete: true,
+    cv: "Formation : Arts et Métiers Paris — génie mécanique.\nExpériences : 3 ans de tutorat en maths, physique et SolidWorks.\nCompétences : CAO, accompagnement de projets étudiants, pédagogie.",
   };
 
   const { data: existingProfile } = await admin

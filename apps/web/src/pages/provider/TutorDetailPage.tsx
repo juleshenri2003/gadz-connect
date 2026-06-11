@@ -2,6 +2,7 @@ import { Button } from "@gadz-connect/ui";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatEuro } from "@/features/admin/format";
+import { useTutorCvPdfUrl } from "@/features/cv/useCvPdf";
 import {
   useBookSlot,
   useTutor,
@@ -18,6 +19,7 @@ export function TutorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: tutor, isLoading } = useTutor(id ?? "");
   const { data: slots } = useTutorSlots(id ?? "");
+  const { data: cvPdfUrl } = useTutorCvPdfUrl(id ?? "", Boolean(tutor?.has_cv_pdf));
   const bookSlot = useBookSlot();
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [booked, setBooked] = useState<{
@@ -25,6 +27,7 @@ export function TutorDetailPage() {
     amountGross: number;
     netPayout: number;
     scheduledAt: string;
+    endsAt: string;
   } | null>(null);
 
   async function handleBook() {
@@ -35,6 +38,7 @@ export function TutorDetailPage() {
       amountGross: result.amountGross,
       netPayout: result.netPayout,
       scheduledAt: result.scheduledAt,
+      endsAt: result.endsAt,
     });
   }
 
@@ -65,15 +69,26 @@ export function TutorDetailPage() {
           <p className="mt-2 text-sm text-green-800">
             {booked.subject} —{" "}
             {new Date(booked.scheduledAt).toLocaleString("fr-FR")}
+            {booked.endsAt
+              ? ` → ${new Date(booked.endsAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+              : ""}
           </p>
           <p className="mt-2 text-sm text-green-800">
             Montant : {formatEuro(booked.amountGross)} (paiement Stripe à
             venir)
           </p>
+          <p className="mt-3 text-sm text-green-900">
+            Votre cours apparaît dans votre emploi du temps.
+          </p>
         </div>
-        <Button asChild>
-          <Link to="/app/cours">Retour aux tuteurs</Link>
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link to="/app/planning">Voir mon emploi du temps →</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/app/cours">Retour aux tuteurs</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -94,9 +109,9 @@ export function TutorDetailPage() {
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <h3 className="font-semibold text-slate-900">Profil</h3>
+        <h3 className="font-semibold text-slate-900">Présentation</h3>
         <p className="mt-2 text-sm text-slate-600">
-          {tutor.bio ?? "Aucune description pour le moment."}
+          {tutor.bio ?? "Aucune description courte pour le moment."}
         </p>
         {tutor.subjects.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -109,6 +124,31 @@ export function TutorDetailPage() {
               </span>
             ))}
           </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6">
+        <h3 className="font-semibold text-slate-900">CV</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Parcours et compétences — consultez avant de réserver
+        </p>
+        {tutor.has_cv_pdf && cvPdfUrl ? (
+          <div className="mt-4">
+            <Button variant="outline" size="sm" asChild>
+              <a href={cvPdfUrl} target="_blank" rel="noopener noreferrer">
+                Ouvrir le CV PDF →
+              </a>
+            </Button>
+          </div>
+        ) : null}
+        {tutor.cv ? (
+          <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
+            {tutor.cv}
+          </pre>
+        ) : !tutor.has_cv_pdf ? (
+          <p className="mt-4 text-sm text-amber-700">
+            Ce professeur n&apos;a pas encore renseigné de CV.
+          </p>
         ) : null}
       </section>
 

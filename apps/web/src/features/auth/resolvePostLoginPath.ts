@@ -6,7 +6,6 @@ const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
 interface ProfileMe {
   role: UserRole;
-  micro_enterprise_activity: string | null;
   profile_setup_complete: boolean;
 }
 
@@ -27,13 +26,12 @@ export async function resolvePostLoginPath(
       const res = await apiFetch<{ data: ProfileMe }>("/api/profile/me", {
         token: accessToken,
       });
-      const { role, micro_enterprise_activity, profile_setup_complete } =
-        res.data;
+      const { role, profile_setup_complete } = res.data;
 
       if (PROVIDER_ROLES.includes(role)) {
         if (!profile_setup_complete) return "/app/setup";
         if (!needsMicroEnterprise(role)) return "/app";
-        return micro_enterprise_activity ? "/app" : "/app/micro-entreprise";
+        return "/app";
       }
     } catch {
       // ignore

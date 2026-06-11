@@ -2,8 +2,27 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import { createCvPdfSignedUrl } from "../lib/cv-pdf.js";
 import { calculateFiscalBreakdown } from "../lib/fiscal.js";
+import {
+  fetchCampusTutorById,
+  fetchCampusTutors,
+  fetchTutorCvPdfPath,
+} from "../lib/tutor-query.js";
+import {
+  isTeacherVisibleInMarketplace,
+} from "../lib/tutor-visibility.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+
+function mapTutorPublic<T extends { cv_pdf_path?: string | null }>(
+  row: T,
+): Omit<T, "cv_pdf_path"> & { has_cv_pdf: boolean } {
+  const { cv_pdf_path, ...rest } = row;
+  return {
+    ...rest,
+    has_cv_pdf: Boolean(cv_pdf_path),
+  };
+}
 
 export const tutorsRouter = Router();
 
@@ -11,6 +30,7 @@ tutorsRouter.use(requireAuth);
 
 const tutorProfileSchema = z.object({
   bio: z.string().max(2000).optional(),
+  cv: z.string().max(5000).optional(),
   hourlyRate: z.number().positive().max(500).optional(),
   subjects: z.array(z.string().min(1).max(80)).max(20).optional(),
 });
@@ -38,7 +58,7 @@ async function getCallerProfile(userId: string) {
 
 /**
  * GET /api/tutors
- * Tuteurs actifs du même campus.
+ * Professeurs actifs et validés du même campus (marketplace élèves).
  */
 tutorsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const caller = await getCallerProfile(req.user!.id);
@@ -47,16 +67,10 @@ tutorsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, first_name, last_name, role, bio, hourly_rate, subjects, account_status, campus:campus_id(name)",
-    )
-    .eq("campus_id", caller.campus_id)
-    .eq("account_status", "active")
-    .in("role", ["student_provider", "teacher"])
-    .neq("id", caller.id)
-    .order("last_name");
+  const { data, error } = await fetchCampusTutors(
+    caller.campus_id as string,
+    caller.id as string,
+  );
 
   if (error) {
     console.error("[tutors] list:", error.message);
@@ -64,7 +78,7 @@ tutorsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  res.json({ data: data ?? [] });
+  res.json({ data: data.map(mapTutorPublic) });
 });
 
 /**
@@ -73,7 +87,7 @@ tutorsRouter.get("/", async (req: AuthenticatedRequest, res) => {
 tutorsRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, bio, hourly_rate, subjects")
+    .select("id, bio, cv, hourly_rate, subjects")
     .eq("id", req.user!.id)
     .maybeSingle();
 
@@ -97,6 +111,7 @@ tutorsRouter.patch("/me", async (req: AuthenticatedRequest, res) => {
 
   const updates: Record<string, unknown> = {};
   if (parsed.data.bio !== undefined) updates.bio = parsed.data.bio;
+  if (parsed.data.cv !== undefined) updates.cv = parsed.data.cv;
   if (parsed.data.hourlyRate !== undefined)
     updates.hourly_rate = parsed.data.hourlyRate;
   if (parsed.data.subjects !== undefined) updates.subjects = parsed.data.subjects;
@@ -105,7 +120,7 @@ tutorsRouter.patch("/me", async (req: AuthenticatedRequest, res) => {
     .from("profiles")
     .update(updates)
     .eq("id", req.user!.id)
-    .select("id, bio, hourly_rate, subjects")
+    .select("id, bio, cv, hourly_rate, subjects")
     .maybeSingle();
 
   if (error) {
@@ -170,6 +185,41 @@ tutorsRouter.get("/me/slots", async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * GET /api/tutors/:id/cv-pdf/url
+ * Lien signé pour consulter le CV PDF d'un tuteur (même campus).
+ */
+tutorsRouter.get("/:id/cv-pdf/url", async (req: AuthenticatedRequest, res) => {
+  const caller = await getCallerProfile(req.user!.id);
+  if (!caller) {
+    res.status(404).json({ error: "Profil introuvable" });
+    return;
+  }
+
+  const tutorId = String(req.params.id);
+  const { cvPdfPath, error } = await fetchTutorCvPdfPath(
+    caller.campus_id as string,
+    tutorId,
+  );
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  if (!cvPdfPath) {
+    res.status(404).json({ error: "CV PDF introuvable" });
+    return;
+  }
+
+  try {
+    const url = await createCvPdfSignedUrl(cvPdfPath);
+    res.json({ data: { url } });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
  * GET /api/tutors/:id
  */
 tutorsRouter.get("/:id", async (req: AuthenticatedRequest, res) => {
@@ -179,23 +229,23 @@ tutorsRouter.get("/:id", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, first_name, last_name, role, bio, hourly_rate, subjects, account_status, campus:campus_id(name)",
-    )
-    .eq("id", req.params.id)
-    .eq("campus_id", caller.campus_id)
-    .eq("account_status", "active")
-    .in("role", ["student_provider", "teacher"])
-    .maybeSingle();
+  const tutorId = String(req.params.id);
+  const { data, error } = await fetchCampusTutorById(
+    caller.campus_id as string,
+    tutorId,
+  );
 
-  if (error || !data) {
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  if (!data) {
     res.status(404).json({ error: "Tuteur introuvable" });
     return;
   }
 
-  res.json({ data });
+  res.json({ data: mapTutorPublic(data) });
 });
 
 /**
@@ -210,12 +260,12 @@ tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
 
   const { data: tutor } = await supabaseAdmin
     .from("profiles")
-    .select("id, campus_id")
+    .select("id, campus_id, role, account_status, profile_setup_complete")
     .eq("id", req.params.id)
     .eq("campus_id", caller.campus_id)
     .maybeSingle();
 
-  if (!tutor) {
+  if (!tutor || !isTeacherVisibleInMarketplace(tutor)) {
     res.status(404).json({ error: "Tuteur introuvable" });
     return;
   }
@@ -272,14 +322,18 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   const { data: tutor } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id, campus_id, hourly_rate, status_acre, versement_liberatoire, first_name, last_name",
+      "id, campus_id, hourly_rate, status_acre, versement_liberatoire, first_name, last_name, role, account_status, profile_setup_complete",
     )
     .eq("id", slot.provider_id)
     .eq("campus_id", client.campus_id)
-    .eq("account_status", "active")
     .maybeSingle();
 
-  if (!tutor?.hourly_rate) {
+  if (!tutor || !isTeacherVisibleInMarketplace(tutor)) {
+    res.status(400).json({ error: "Ce tuteur n'est pas disponible" });
+    return;
+  }
+
+  if (!tutor.hourly_rate) {
     res.status(400).json({ error: "Ce tuteur n'a pas défini de tarif horaire" });
     return;
   }
@@ -354,6 +408,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       netPayout: fiscal.netPayout,
       subject,
       scheduledAt: slot.starts_at,
+      endsAt: slot.ends_at,
     },
   });
 });

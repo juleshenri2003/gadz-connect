@@ -1,11 +1,13 @@
 import type { User } from "@supabase/supabase-js";
 import { supabaseAdmin } from "./supabase.js";
 
+export const DEFAULT_CAMPUS_NAME = "Paris";
+
 async function defaultCampusId(): Promise<string | null> {
   const { data, error } = await supabaseAdmin
     .from("campus")
     .select("id")
-    .eq("name", "Paris")
+    .eq("name", DEFAULT_CAMPUS_NAME)
     .maybeSingle();
 
   if (error || !data) {

@@ -1,14 +1,14 @@
 import { Button, Input, Label } from "@gadz-connect/ui";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { formatEuro } from "@/features/admin/format";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { TutorList } from "@/features/marketplace/TutorList";
+import { CourseDocumentPanel } from "@/features/repository/CourseDocumentPanel";
 import {
   useCreateSlot,
   useMySlots,
   useMyTutorProfile,
-  useTutors,
   useUpdateTutorProfile,
 } from "@/features/marketplace/useTutors";
 
@@ -25,6 +25,7 @@ function TutorManagePanel() {
   const createSlot = useCreateSlot();
 
   const [bio, setBio] = useState("");
+  const [cv, setCv] = useState("");
   const [rate, setRate] = useState("");
   const [subjects, setSubjects] = useState("");
   const [slotStart, setSlotStart] = useState("");
@@ -33,6 +34,7 @@ function TutorManagePanel() {
   async function saveProfile() {
     await updateProfile.mutateAsync({
       bio: bio || profile?.bio || undefined,
+      cv: cv || profile?.cv || undefined,
       hourlyRate: rate ? Number(rate) : undefined,
       subjects: subjects
         ? subjects.split(",").map((s) => s.trim()).filter(Boolean)
@@ -62,13 +64,26 @@ function TutorManagePanel() {
         </p>
         <div className="mt-4 space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="bio">Présentation</Label>
+            <Label htmlFor="bio">Présentation courte</Label>
             <textarea
               id="bio"
               className="min-h-[80px] w-full rounded-md border border-slate-200 p-2 text-sm"
-              placeholder={profile?.bio ?? "Décrivez vos compétences…"}
+              placeholder={profile?.bio ?? "Résumé en quelques lignes…"}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="cv">CV (visible par les élèves)</Label>
+            <textarea
+              id="cv"
+              className="min-h-[120px] w-full rounded-md border border-slate-200 p-2 text-sm"
+              placeholder={
+                profile?.cv ??
+                "Formation, expériences, compétences, matières maîtrisées…"
+              }
+              value={cv}
+              onChange={(e) => setCv(e.target.value)}
             />
           </div>
           <div className="space-y-1">
@@ -160,49 +175,6 @@ function TutorManagePanel() {
   );
 }
 
-function TutorList() {
-  const { data: tutors, isLoading } = useTutors();
-
-  if (isLoading) {
-    return <p className="text-sm text-slate-500">Chargement…</p>;
-  }
-
-  if (!tutors?.length) {
-    return (
-      <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
-        Aucun tuteur disponible sur votre campus pour le moment.
-      </p>
-    );
-  }
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {tutors.map((tutor) => {
-        const name = `${tutor.first_name} ${tutor.last_name}`.trim();
-        return (
-          <Link
-            key={tutor.id}
-            to={`/app/cours/${tutor.id}`}
-            className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-indigo-300 hover:shadow-sm"
-          >
-            <p className="font-semibold text-slate-900">{name}</p>
-            <p className="mt-1 text-sm text-slate-500">
-              {tutor.hourly_rate
-                ? `${formatEuro(tutor.hourly_rate)} / h`
-                : "Tarif à définir"}
-            </p>
-            {tutor.subjects.length > 0 ? (
-              <p className="mt-2 text-xs text-indigo-600">
-                {tutor.subjects.slice(0, 3).join(" · ")}
-              </p>
-            ) : null}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
 export function ProviderCoursesPage() {
   const { data: me } = useMyProfile();
   const student = me ? isStudent(me.role) : false;
@@ -212,11 +184,11 @@ export function ProviderCoursesPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">
-          {student ? "Tutorat" : "Mes cours"}
+          {student ? "Trouver mon tuteur" : "Mes cours"}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {student
-            ? "Choisissez un tuteur et réservez un créneau sur votre campus."
+            ? "Professeurs validés de votre campus — réservez un créneau."
             : tutorActive
               ? "Gérez votre profil tuteur et vos créneaux."
               : "Validez votre micro-entreprise (SIRET) pour proposer des cours."}
@@ -225,12 +197,21 @@ export function ProviderCoursesPage() {
 
       {student ? (
         <section className="space-y-4">
-          <h3 className="font-semibold text-slate-900">Tuteurs du campus</h3>
+          <h3 className="font-semibold text-slate-900">Professeurs du campus</h3>
           <TutorList />
         </section>
       ) : tutorActive ? (
         <>
           <TutorManagePanel />
+          <section className="space-y-4">
+            <h3 className="font-semibold text-slate-900">Séances à documenter</h3>
+            <p className="text-sm text-slate-600">
+              Déposez un résumé après chaque cours — il sera classé dans le
+              répertoire matière de l&apos;élève (y compris après un
+              remplacement).
+            </p>
+            <CourseDocumentPanel />
+          </section>
           <section className="space-y-4">
             <h3 className="font-semibold text-slate-900">
               Autres tuteurs du campus

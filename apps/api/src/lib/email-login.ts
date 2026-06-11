@@ -10,8 +10,36 @@ export function isEmailLoginEnabled(): boolean {
   );
 }
 
+export async function syncProfileCampus(
+  userId: string,
+  campusId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: campus, error: campusError } = await supabaseAdmin
+    .from("campus")
+    .select("id")
+    .eq("id", campusId)
+    .maybeSingle();
+
+  if (campusError || !campus) {
+    return { ok: false, message: "Campus invalide" };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({ campus_id: campusId })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("[auth] sync campus:", error.message);
+    return { ok: false, message: "Impossible de mettre à jour le campus" };
+  }
+
+  return { ok: true };
+}
+
 export async function performEmailLogin(
   email: string,
+  campusId?: string,
 ): Promise<
   | {
       ok: true;
@@ -91,6 +119,13 @@ export async function performEmailLogin(
   const ensured = await ensureProfileForUser(otpData.session.user);
   if (!ensured.ok) {
     return { ok: false, status: 500, message: ensured.message };
+  }
+
+  if (campusId) {
+    const synced = await syncProfileCampus(otpData.session.user.id, campusId);
+    if (!synced.ok) {
+      return { ok: false, status: 400, message: synced.message };
+    }
   }
 
   const { data: profile } = await supabaseAdmin

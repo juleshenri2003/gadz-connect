@@ -25,6 +25,7 @@ export function useStripeConnectStatus() {
       return res.data;
     },
     enabled: Boolean(getAccessToken()),
+    retry: false,
   });
 }
 

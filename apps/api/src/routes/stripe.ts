@@ -150,9 +150,14 @@ stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, 
  */
 stripeRouter.get("/connect/status", async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
-    res.status(503).json({
-      error:
-        "Stripe non configuré — ajoutez STRIPE_SECRET_KEY (sk_test_…) dans apps/api/.env",
+    res.json({
+      data: {
+        hasAccount: false,
+        onboardingComplete: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        configured: false,
+      },
     });
     return;
   }

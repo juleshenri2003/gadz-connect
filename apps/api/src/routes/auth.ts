@@ -180,6 +180,7 @@ authRouter.post("/logout", (_req, res) => {
 
 const emailLoginSchema = z.object({
   email: z.string().email(),
+  campusId: z.string().uuid().optional(),
 });
 
 async function handleEmailLogin(
@@ -201,7 +202,7 @@ async function handleEmailLogin(
   }
 
   const email = parsed.data.email.trim().toLowerCase();
-  const result = await performEmailLogin(email);
+  const result = await performEmailLogin(email, parsed.data.campusId);
 
   if (!result.ok) {
     res.status(result.status).json({ error: result.message });

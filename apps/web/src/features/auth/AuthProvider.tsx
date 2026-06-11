@@ -21,7 +21,7 @@ interface AuthContextValue {
   session: StoredSession | null;
   loading: boolean;
   signInWithMagicLink: (email: string) => Promise<{ error: string | null }>;
-  emailLogin: (email: string) => Promise<{
+  emailLogin: (email: string, campusId?: string) => Promise<{
     error: string | null;
     accessToken?: string;
     profileSetupComplete?: boolean;
@@ -88,13 +88,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const emailLogin = useCallback(
-    async (email: string) => {
+    async (email: string, campusId?: string) => {
       try {
         const res = await apiFetch<{
           data: { session: StoredSession; profileSetupComplete: boolean };
         }>("/api/auth/email-login", {
           method: "POST",
-          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            ...(campusId ? { campusId } : {}),
+          }),
         });
         setSession(res.data.session);
         return {

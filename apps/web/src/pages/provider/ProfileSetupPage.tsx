@@ -15,6 +15,11 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
+import {
+  campusDisplayName,
+  SELECTED_CAMPUS_KEY,
+  sortCampuses,
+} from "@/features/campus/campusLabels";
 import { apiFetch } from "@/lib/api";
 
 const accountTypeSchema = z.enum([
@@ -23,12 +28,28 @@ const accountTypeSchema = z.enum([
   "teacher_awaiting_siret",
 ]);
 
-const setupSchema = z.object({
-  firstName: z.string().min(1, "Prénom requis"),
-  lastName: z.string().min(1, "Nom requis"),
-  campusId: z.string().uuid("Choisissez un campus"),
-  accountType: accountTypeSchema,
-});
+const setupSchema = z
+  .object({
+    firstName: z.string().min(1, "Prénom requis"),
+    lastName: z.string().min(1, "Nom requis"),
+    campusId: z.string().uuid("Choisissez un campus"),
+    accountType: accountTypeSchema,
+    cv: z.string().max(5000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const isTeacher = data.accountType !== "student";
+    if (isTeacher) {
+      const trimmed = data.cv?.trim() ?? "";
+      if (trimmed.length < 50) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Décrivez votre parcours (minimum 50 caractères) — les élèves consulteront ce CV pour vous choisir",
+          path: ["cv"],
+        });
+      }
+    }
+  });
 
 type SetupForm = z.infer<typeof setupSchema>;
 
@@ -53,11 +74,17 @@ const ACCOUNT_OPTIONS = [
   },
 ];
 
+const CV_PLACEHOLDER = `Exemple :
+• Formation : Arts et Métiers — spécialité mécanique (promo 20XX)
+• Expériences : 2 ans de tutorat en maths et physique
+• Compétences : SolidWorks, Python, accompagnement projet
+• Langues : français (natif), anglais (B2)`;
+
 export function ProfileSetupPage() {
   const { getAccessToken } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const { data: campuses, isLoading } = useQuery({
     queryKey: ["campus"],
@@ -74,13 +101,27 @@ export function ProfileSetupPage() {
     setError,
   } = useForm<SetupForm>({
     resolver: zodResolver(setupSchema),
+    defaultValues: {
+      campusId: sessionStorage.getItem(SELECTED_CAMPUS_KEY) ?? "",
+    },
   });
 
   const accountType = watch("accountType");
+  const isTeacher = accountType && accountType !== "student";
 
   async function goToIdentity() {
     const valid = await trigger("accountType");
     if (valid) setStep(2);
+  }
+
+  async function goToCv() {
+    const valid = await trigger(["firstName", "lastName", "campusId"]);
+    if (!valid) return;
+    if (isTeacher) {
+      setStep(3);
+      return;
+    }
+    await handleSubmit(onSubmit)();
   }
 
   async function onSubmit(values: SetupForm) {
@@ -99,6 +140,7 @@ export function ProfileSetupPage() {
           lastName: values.lastName,
           campusId: values.campusId,
           role,
+          ...(role === "teacher" ? { cv: values.cv?.trim() } : {}),
         }),
       });
       await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
@@ -134,12 +176,18 @@ export function ProfileSetupPage() {
       <Card className="border-slate-200">
         <CardHeader>
           <CardTitle>
-            {step === 1 ? "Qui êtes-vous ?" : "Vos informations"}
+            {step === 1
+              ? "Qui êtes-vous ?"
+              : step === 2
+                ? "Vos informations"
+                : "Votre CV"}
           </CardTitle>
           <CardDescription>
             {step === 1
               ? "Élève ou intervenant — le parcours s'adapte à votre situation."
-              : "Prénom, nom et campus Arts et Métiers."}
+              : step === 2
+                ? "Prénom, nom et campus Arts et Métiers."
+                : "Présentez votre parcours — les élèves le consulteront avant de réserver."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -180,7 +228,7 @@ export function ProfileSetupPage() {
                   Continuer →
                 </Button>
               </>
-            ) : (
+            ) : step === 2 ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -204,7 +252,7 @@ export function ProfileSetupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="campusId">Campus</Label>
+                  <Label htmlFor="campusId">Campus / ville</Label>
                   <select
                     id="campusId"
                     className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
@@ -212,12 +260,17 @@ export function ProfileSetupPage() {
                     disabled={isLoading}
                   >
                     <option value="">Sélectionner…</option>
-                    {campuses?.data.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
+                    {(campuses?.data ? sortCampuses(campuses.data) : []).map(
+                      (c) => (
+                        <option key={c.id} value={c.id}>
+                          {campusDisplayName(c.name)}
+                        </option>
+                      ),
+                    )}
                   </select>
+                  <p className="text-xs text-slate-500">
+                    Pré-rempli depuis la page de connexion — modifiable si besoin.
+                  </p>
                   {errors.campusId ? (
                     <p className="text-sm text-red-600">
                       {errors.campusId.message}
@@ -225,11 +278,10 @@ export function ProfileSetupPage() {
                   ) : null}
                 </div>
 
-                {accountType && accountType !== "student" ? (
+                {isTeacher ? (
                   <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                    {accountType === "teacher_existing_siret"
-                      ? "Étape suivante : saisie de votre SIRET et paramètres micro-entreprise."
-                      : "Étape suivante : questionnaire micro-entreprise et documents INPI / ACRE."}
+                    Étape suivante : rédaction de votre CV (visible par les
+                    élèves), puis onboarding micro-entreprise.
                   </p>
                 ) : null}
 
@@ -242,6 +294,64 @@ export function ProfileSetupPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setStep(1)}
+                  >
+                    Retour
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    disabled={isSubmitting}
+                    onClick={() => void goToCv()}
+                  >
+                    {isTeacher
+                      ? "Continuer vers le CV →"
+                      : isSubmitting
+                        ? "Enregistrement…"
+                        : "Accéder à mon espace →"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="cv">CV — parcours et compétences</Label>
+                  <textarea
+                    id="cv"
+                    rows={10}
+                    className="w-full rounded-md border border-slate-200 p-3 text-sm"
+                    placeholder={CV_PLACEHOLDER}
+                    {...register("cv")}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Formation, expériences de tutorat ou professionnelles,
+                    matières maîtrisées, langues… Les élèves pourront lire ce
+                    CV avant de réserver un créneau.
+                  </p>
+                  {errors.cv ? (
+                    <p className="text-sm text-red-600">{errors.cv.message}</p>
+                  ) : null}
+                </div>
+
+                {accountType === "teacher_existing_siret" ? (
+                  <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                    Ensuite : saisie de votre SIRET et paramètres
+                    micro-entreprise.
+                  </p>
+                ) : accountType === "teacher_awaiting_siret" ? (
+                  <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                    Ensuite : questionnaire micro-entreprise et guide INPI.
+                  </p>
+                ) : null}
+
+                {errors.root ? (
+                  <p className="text-sm text-red-600">{errors.root.message}</p>
+                ) : null}
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep(2)}
                   >
                     Retour
                   </Button>

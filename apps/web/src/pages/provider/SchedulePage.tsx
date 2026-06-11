@@ -8,6 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
 import { WeekCalendar } from "@/features/scheduling/WeekCalendar";
 import { useMySchedule } from "@/features/scheduling/useSchedule";
 import type { ScheduleEvent } from "@/features/scheduling/types";
@@ -18,6 +19,16 @@ export function SchedulePage() {
   const student = profile?.role ? isStudent(profile.role) : true;
 
   function renderMeta(event: ScheduleEvent): string | undefined {
+    if (event.status === "awaiting_replacement") {
+      return "Remplacement en cours — consultez vos alertes";
+    }
+    if (
+      !student &&
+      event.kind === "slot_booked" &&
+      !event.courseId
+    ) {
+      return "Créneau réservé sans cours enregistré — annulation indisponible";
+    }
     if (student) {
       return event.counterpartName
         ? `Avec ${event.counterpartName}`
@@ -64,6 +75,24 @@ export function SchedulePage() {
                   : "Aucun créneau cette semaine — ajoutez des disponibilités dans Mes cours."
               }
               renderEventMeta={renderMeta}
+              renderEventActions={(event) => {
+                if (!event.courseId || event.kind === "slot_available") {
+                  return null;
+                }
+                if (
+                  event.status === "scheduled" ||
+                  event.status === "awaiting_replacement"
+                ) {
+                  return (
+                    <DeclareUnavailableButton
+                      courseId={event.courseId}
+                      eventTitle={event.title}
+                      courseStatus={event.status}
+                    />
+                  );
+                }
+                return null;
+              }}
             />
           )}
         </CardContent>

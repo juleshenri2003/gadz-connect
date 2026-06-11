@@ -62,7 +62,16 @@ export function formatEventTime(startsAt: string, endsAt: string): string {
   return `${start} – ${end}`;
 }
 
-export function eventStyles(kind: ScheduleEvent["kind"]): string {
+export function eventStyles(
+  kind: ScheduleEvent["kind"],
+  status?: string,
+): string {
+  if (status === "awaiting_replacement") {
+    return "border-amber-300 bg-amber-50 text-amber-900";
+  }
+  if (status === "cancelled") {
+    return "border-slate-200 bg-slate-100 text-slate-500 line-through";
+  }
   switch (kind) {
     case "slot_available":
       return "border-emerald-200 bg-emerald-50 text-emerald-900";
@@ -73,7 +82,11 @@ export function eventStyles(kind: ScheduleEvent["kind"]): string {
   }
 }
 
-export function eventKindLabel(kind: ScheduleEvent["kind"]): string {
+export function eventKindLabel(
+  kind: ScheduleEvent["kind"],
+  status?: string,
+): string {
+  if (status === "awaiting_replacement") return "Remplacement en cours";
   switch (kind) {
     case "slot_available":
       return "Disponible";

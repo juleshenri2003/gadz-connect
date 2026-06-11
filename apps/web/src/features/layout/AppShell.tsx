@@ -1,10 +1,12 @@
 import { Button, cn } from "@gadz-connect/ui";
+import type { ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 export interface AppNavItem {
   to: string;
   label: string;
   end?: boolean;
+  disabled?: boolean;
 }
 
 export interface AppShellProps {
@@ -17,6 +19,7 @@ export interface AppShellProps {
   footerLabel: string;
   footerTo?: string;
   onFooterClick?: () => void;
+  headerExtra?: ReactNode;
 }
 
 export function AppShell({
@@ -29,6 +32,7 @@ export function AppShell({
   footerLabel,
   footerTo = "/",
   onFooterClick,
+  headerExtra,
 }: AppShellProps) {
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -48,23 +52,33 @@ export function AppShell({
           ) : null}
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                )
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {nav.map((item) =>
+            item.disabled ? (
+              <span
+                key={item.to}
+                className="block cursor-not-allowed rounded-lg px-3 py-2 text-sm font-medium text-slate-300"
+                aria-disabled
+              >
+                {item.label}
+              </span>
+            ) : (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                  )
+                }
+              >
+                {item.label}
+              </NavLink>
+            ),
+          )}
         </nav>
         <div className="border-t border-slate-100 p-4">
           {onFooterClick ? (
@@ -88,25 +102,38 @@ export function AppShell({
         <header className="border-b border-slate-200 bg-white px-4 py-4 md:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-2 overflow-x-auto md:hidden">
-              {nav.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
-                      "whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium",
-                      isActive
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-100 text-slate-600",
-                    )
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
+              {nav.map((item) =>
+                item.disabled ? (
+                  <span
+                    key={item.to}
+                    className="whitespace-nowrap rounded-full bg-slate-50 px-3 py-1 text-xs font-medium text-slate-300"
+                    aria-disabled
+                  >
+                    {item.label}
+                  </span>
+                ) : (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      cn(
+                        "whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium",
+                        isActive
+                          ? "bg-indigo-600 text-white"
+                          : "bg-slate-100 text-slate-600",
+                      )
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ),
+              )}
             </div>
             <p className="hidden text-sm text-slate-500 md:block">{headerHint}</p>
+            <div className="flex items-center gap-2">
+              {headerExtra}
+            </div>
             {onFooterClick ? (
               <Button
                 variant="ghost"

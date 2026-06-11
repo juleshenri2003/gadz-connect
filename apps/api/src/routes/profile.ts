@@ -1,7 +1,18 @@
 import { Router } from "express";
+import express from "express";
 import { z } from "zod";
+import {
+  createCvPdfSignedUrl,
+  removeCvPdf,
+  uploadCvPdf,
+} from "../lib/cv-pdf.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import {
+  getInpiDeclarationSentAt,
+  setInpiDeclarationSent,
+} from "../lib/inpi-milestone.js";
+import { fetchProfileByUserId } from "../lib/profile-query.js";
 import { ensureProfileForUser } from "../lib/profiles.js";
 import { isSchoolEmail, schoolEmailError } from "../lib/school-email.js";
 import { supabaseAdmin } from "../lib/supabase.js";
@@ -44,34 +55,7 @@ profileRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { data: profile, error } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      `
-      id,
-      first_name,
-      last_name,
-      role,
-      campus_id,
-      siret,
-      account_status,
-      status_acre,
-      versement_liberatoire,
-      micro_enterprise_activity,
-      urssaf_periodicity,
-      stripe_connect_account_id,
-      stripe_connect_onboarding_complete,
-      profile_setup_complete,
-      bio,
-      hourly_rate,
-      subjects,
-      created_at,
-      updated_at,
-      campus:campus_id ( name )
-    `,
-    )
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: profile, error } = await fetchProfileByUserId(user.id);
 
   if (error || !profile) {
     console.error("[profile] me:", error?.message);
@@ -79,7 +63,17 @@ profileRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  res.json({ data: profile });
+  const inpi_declaration_sent_at = await getInpiDeclarationSentAt(
+    user.id,
+    profile.inpi_declaration_sent_at as string | null | undefined,
+  );
+
+  res.json({
+    data: {
+      ...profile,
+      inpi_declaration_sent_at,
+    },
+  });
 });
 
 /**
@@ -227,12 +221,27 @@ profileRouter.patch("/siret", async (req: AuthenticatedRequest, res) => {
   res.json({ data: updated });
 });
 
-const setupSchema = z.object({
-  firstName: z.string().min(1).max(80),
-  lastName: z.string().min(1).max(80),
-  campusId: z.string().uuid(),
-  role: z.enum(["student_provider", "teacher"]),
-});
+const setupSchema = z
+  .object({
+    firstName: z.string().min(1).max(80),
+    lastName: z.string().min(1).max(80),
+    campusId: z.string().uuid(),
+    role: z.enum(["student_provider", "teacher"]),
+    cv: z.string().max(5000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "teacher") {
+      const trimmed = data.cv?.trim() ?? "";
+      if (trimmed.length < 50) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "CV requis pour les professeurs (minimum 50 caractères — parcours, expériences, compétences)",
+          path: ["cv"],
+        });
+      }
+    }
+  });
 
 /**
  * PATCH /api/profile/setup
@@ -301,7 +310,7 @@ profileRouter.patch("/setup", async (req: AuthenticatedRequest, res) => {
             micro_enterprise_activity: null,
             urssaf_periodicity: null,
           }
-        : {}),
+        : { cv: parsed.data.cv?.trim() ?? null }),
     })
     .eq("id", user.id)
     .select(
@@ -315,4 +324,190 @@ profileRouter.patch("/setup", async (req: AuthenticatedRequest, res) => {
   }
 
   res.json({ data: updated });
+});
+
+const milestoneSchema = z.object({
+  milestone: z.enum(["inpi_sent"]),
+});
+
+/**
+ * PATCH /api/profile/onboarding-milestone
+ * Marque une étape externe du parcours onboarding (ex. demande INPI envoyée).
+ */
+profileRouter.patch(
+  "/onboarding-milestone",
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = milestoneSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    const user = req.user!;
+
+    const { data: profile, error: fetchError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, role, micro_enterprise_activity")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    if (profile.role !== "teacher") {
+      res.status(403).json({
+        error: "Réservé aux enseignants / intervenants.",
+      });
+      return;
+    }
+
+    if (!profile.micro_enterprise_activity) {
+      res.status(400).json({
+        error: "Complétez d'abord le questionnaire fiscal.",
+      });
+      return;
+    }
+
+    try {
+      const updated = await setInpiDeclarationSent(user.id);
+      res.json({ data: { id: user.id, ...updated } });
+    } catch (err) {
+      res.status(500).json({
+        error: (err as Error).message,
+      });
+    }
+  },
+);
+
+const cvPdfUploadSchema = z.object({
+  pdfBase64: z.string().min(1, "Fichier PDF requis"),
+});
+
+function decodePdfBase64(encoded: string): Buffer {
+  const cleaned = encoded.replace(/^data:application\/pdf;base64,/, "");
+  const buffer = Buffer.from(cleaned, "base64");
+  if (buffer.length < 5 || buffer.subarray(0, 4).toString() !== "%PDF") {
+    throw new Error("Fichier invalide — PDF requis");
+  }
+  return buffer;
+}
+
+async function requireTeacherProfile(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  if (data.role !== "teacher") return null;
+  return data;
+}
+
+/**
+ * POST /api/profile/cv-pdf
+ * Dépose un CV au format PDF (max 5 Mo).
+ */
+profileRouter.post(
+  "/cv-pdf",
+  express.json({ limit: "8mb" }),
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = cvPdfUploadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "PDF requis" });
+      return;
+    }
+
+    const user = req.user!;
+    const teacher = await requireTeacherProfile(user.id);
+    if (!teacher) {
+      res.status(403).json({ error: "Réservé aux enseignants / intervenants." });
+      return;
+    }
+
+    try {
+      const buffer = decodePdfBase64(parsed.data.pdfBase64);
+      const { path } = await uploadCvPdf(user.id, buffer);
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("profiles")
+        .update({ cv_pdf_path: path })
+        .eq("id", user.id)
+        .select("id, cv_pdf_path")
+        .maybeSingle();
+
+      if (error || !updated) {
+        res.status(500).json({ error: error?.message ?? "Mise à jour impossible" });
+        return;
+      }
+
+      res.json({ data: updated });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+/**
+ * GET /api/profile/cv-pdf/url
+ * Lien signé pour consulter son propre CV PDF.
+ */
+profileRouter.get("/cv-pdf/url", async (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("cv_pdf_path")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.cv_pdf_path) {
+    res.status(404).json({ error: "Aucun CV PDF déposé" });
+    return;
+  }
+
+  try {
+    const url = await createCvPdfSignedUrl(profile.cv_pdf_path as string);
+    res.json({ data: { url } });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * DELETE /api/profile/cv-pdf
+ * Supprime le CV PDF déposé.
+ */
+profileRouter.delete("/cv-pdf", async (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  const teacher = await requireTeacherProfile(user.id);
+  if (!teacher) {
+    res.status(403).json({ error: "Réservé aux enseignants / intervenants." });
+    return;
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("cv_pdf_path")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.cv_pdf_path) {
+    res.status(404).json({ error: "Aucun CV PDF à supprimer" });
+    return;
+  }
+
+  try {
+    await removeCvPdf(profile.cv_pdf_path as string);
+    await supabaseAdmin
+      .from("profiles")
+      .update({ cv_pdf_path: null })
+      .eq("id", user.id);
+    res.json({ data: { removed: true } });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
