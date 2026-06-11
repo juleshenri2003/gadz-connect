@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
-  getActiveCampusTeachers,
   notifyUsers,
   courseFromNotification,
   loadCampusNotification,
@@ -144,7 +143,6 @@ replacementsRouter.get(
       return;
     }
 
-    const course = courseFromNotification(notification);
     const clientId = notification.client_id as string | null | undefined;
     const isClient = clientId === profile.id;
     const isTeacher = profile.role === "teacher";
