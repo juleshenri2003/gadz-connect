@@ -301,3 +301,22 @@ export async function replacementProposalsAvailable(): Promise<boolean> {
     .limit(0);
   return !error;
 }
+
+export async function replacementTeacherDeclinesAvailable(): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from("replacement_teacher_declines")
+    .select("notification_id")
+    .limit(0);
+  return !error;
+}
+
+export function isNotificationClient(
+  notification: NotificationWithCourse,
+  userId: string,
+): boolean {
+  const course = courseFromNotification(notification);
+  const clientId =
+    (notification.client_id as string | null | undefined) ??
+    (course?.client_id as string | null | undefined);
+  return clientId === userId;
+}

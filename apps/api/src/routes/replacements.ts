@@ -3,10 +3,12 @@ import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
-  notifyUsers,
   courseFromNotification,
+  isNotificationClient,
   loadCampusNotification,
+  notifyUsers,
   replacementProposalsAvailable,
+  replacementTeacherDeclinesAvailable,
 } from "../lib/notification-helpers.js";
 import {
   acceptReplacementProposal,
@@ -126,6 +128,128 @@ replacementsRouter.get(
 );
 
 /**
+ * GET /api/replacements/:notificationId/my-response
+ * Réponse du prof connecté à une alerte remplacement.
+ */
+replacementsRouter.get(
+  "/:notificationId/my-response",
+  async (req: AuthenticatedRequest, res) => {
+    const profile = await getProfile(req.user!.id);
+    if (!profile || profile.role !== "teacher") {
+      res.json({ data: { status: "none" } });
+      return;
+    }
+
+    const notificationId = String(req.params.notificationId);
+
+    if (await replacementProposalsAvailable()) {
+      const { data: proposal } = await supabaseAdmin
+        .from("replacement_proposals")
+        .select("id, status, message")
+        .eq("notification_id", notificationId)
+        .eq("proposed_provider_id", profile.id)
+        .maybeSingle();
+
+      if (proposal) {
+        res.json({
+          data: {
+            status: proposal.status === "pending" ? "proposed" : proposal.status,
+            proposalId: proposal.id,
+            message: proposal.message,
+          },
+        });
+        return;
+      }
+    }
+
+    if (await replacementTeacherDeclinesAvailable()) {
+      const { data: decline } = await supabaseAdmin
+        .from("replacement_teacher_declines")
+        .select("created_at")
+        .eq("notification_id", notificationId)
+        .eq("teacher_id", profile.id)
+        .maybeSingle();
+
+      if (decline) {
+        res.json({ data: { status: "declined" } });
+        return;
+      }
+    }
+
+    res.json({ data: { status: "none" } });
+  },
+);
+
+/**
+ * POST /api/replacements/:notificationId/decline-offer
+ * Prof du campus : indique qu'il ne peut pas remplacer.
+ */
+replacementsRouter.post(
+  "/:notificationId/decline-offer",
+  async (req: AuthenticatedRequest, res) => {
+    const profile = await getProfile(req.user!.id);
+    if (!profile || profile.role !== "teacher" || profile.account_status !== "active") {
+      res.status(403).json({ error: "Seuls les professeurs actifs peuvent répondre" });
+      return;
+    }
+
+    if (!(await replacementTeacherDeclinesAvailable())) {
+      res.status(503).json({
+        error:
+          "Réponses prof indisponibles — exécutez les migrations 008 et 010 dans Supabase",
+      });
+      return;
+    }
+
+    const notification = await loadOpenNotification(String(req.params.notificationId));
+    if (!notification) {
+      res.status(404).json({ error: "Notification introuvable" });
+      return;
+    }
+
+    if (notification.kind !== "prof_unavailable" || notification.replacement_status !== "open") {
+      res.status(400).json({ error: "Cette alerte n'est plus ouverte" });
+      return;
+    }
+
+    if (notification.declared_by === profile.id) {
+      res.status(400).json({ error: "Vous ne pouvez pas répondre à votre propre alerte" });
+      return;
+    }
+
+    if (await replacementProposalsAvailable()) {
+      const { data: existing } = await supabaseAdmin
+        .from("replacement_proposals")
+        .select("id")
+        .eq("notification_id", notification.id)
+        .eq("proposed_provider_id", profile.id)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (existing) {
+        res.status(409).json({ error: "Vous avez déjà proposé de remplacer ce cours" });
+        return;
+      }
+    }
+
+    const { error } = await supabaseAdmin.from("replacement_teacher_declines").upsert(
+      {
+        notification_id: notification.id,
+        teacher_id: profile.id,
+      },
+      { onConflict: "notification_id,teacher_id" },
+    );
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ data: { status: "declined" } });
+  },
+);
+
+/**
  * GET /api/replacements/:notificationId/proposals
  */
 replacementsRouter.get(
@@ -143,12 +267,38 @@ replacementsRouter.get(
       return;
     }
 
-    const clientId = notification.client_id as string | null | undefined;
-    const isClient = clientId === profile.id;
+    const isClient = isNotificationClient(notification, profile.id);
     const isTeacher = profile.role === "teacher";
 
     if (!isClient && !isTeacher) {
       res.status(403).json({ error: "Accès refusé" });
+      return;
+    }
+
+    if (isClient) {
+      const { data, error } = await supabaseAdmin
+        .from("replacement_proposals")
+        .select(
+          `
+          id, notification_id, original_course_id, proposed_provider_id,
+          message, status, created_at,
+          proposed_provider:proposed_provider_id (
+            first_name, last_name, bio, subjects, hourly_rate
+          )
+        `,
+        )
+        .eq("notification_id", notification.id)
+        .eq("status", "pending")
+        .order("created_at");
+
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      res.json({
+        data: (data ?? []).map((r) => mapProposal(r as Record<string, unknown>)),
+      });
       return;
     }
 
@@ -275,6 +425,14 @@ replacementsRouter.post(
       }
       res.status(500).json({ error: error.message });
       return;
+    }
+
+    if (await replacementTeacherDeclinesAvailable()) {
+      await supabaseAdmin
+        .from("replacement_teacher_declines")
+        .delete()
+        .eq("notification_id", notification.id)
+        .eq("teacher_id", profile.id);
     }
 
     const profName = `${profile.first_name} ${profile.last_name}`.trim();

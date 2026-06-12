@@ -10,7 +10,11 @@ import { createClient } from "@supabase/supabase-js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const MIGRATIONS = ["008_replacement_workflow.sql", "009_student_repository.sql"];
+const MIGRATIONS = [
+  "008_replacement_workflow.sql",
+  "009_student_repository.sql",
+  "010_replacement_teacher_responses.sql",
+];
 
 async function applyViaDatabaseUrl(sql: string): Promise<boolean> {
   const databaseUrl = process.env.DATABASE_URL;

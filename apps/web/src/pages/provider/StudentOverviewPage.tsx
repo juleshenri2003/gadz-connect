@@ -4,6 +4,7 @@ import { StatCard } from "@/features/admin/StatCard";
 import { ProviderTaskBanner } from "@/features/dashboard/ProviderTaskBanner";
 import { useStudentDashboardProgress } from "@/features/dashboard/useStudentDashboardProgress";
 import { TutorList } from "@/features/marketplace/TutorList";
+import { StudentPendingReplacementBanner } from "@/features/replacements/StudentPendingReplacementBanner";
 
 export function StudentOverviewPage() {
   const { progress, profile, tutorCount, isLoading, isError } =
@@ -22,6 +23,8 @@ export function StudentOverviewPage() {
   return (
     <div className="space-y-8">
       <ProviderTaskBanner />
+
+      <StudentPendingReplacementBanner />
 
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Tableau de bord</h2>

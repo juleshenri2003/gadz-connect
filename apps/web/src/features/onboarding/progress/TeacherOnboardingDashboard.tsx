@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TaskProgressBanner } from "@/features/dashboard/TaskProgressBanner";
 import { OnboardingTaskList } from "./OnboardingTaskList";
 import { useTeacherOnboardingProgress } from "./useTeacherOnboardingProgress";
 
@@ -26,8 +27,22 @@ export function TeacherOnboardingDashboard({
     );
   }
 
+  const isPendingRh = profile.account_status === "pending_siret";
+
   return (
     <div className="space-y-8">
+      {isPendingRh ? (
+        <TaskProgressBanner
+          progress={progress}
+          title="Mon parcours prestataire"
+          subtitle={
+            profile.campus?.name
+              ? `Campus ${profile.campus.name} — complétez les étapes en attendant la validation RH`
+              : "Complétez les étapes en attendant la validation RH"
+          }
+        />
+      ) : null}
+
       {children}
 
       {!progress.isComplete ? (

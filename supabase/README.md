@@ -13,6 +13,7 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 7. `migrations/007_cv_pdf_storage.sql` (CV PDF + bucket Storage `cv-pdfs`)
 8. `migrations/008_replacement_workflow.sql` (remplacement prof + propositions)
 9. `migrations/009_student_repository.sql` (répertoire matières élève)
+10. `migrations/010_replacement_teacher_responses.sql` (refus prof sur alerte)
 
 Ou en local (avec `DATABASE_URL` dans `apps/api/.env`) :
 

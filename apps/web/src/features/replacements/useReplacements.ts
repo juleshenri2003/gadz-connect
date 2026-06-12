@@ -64,6 +64,49 @@ export function usePendingReplacementsForStudent() {
   });
 }
 
+export function useReplacementMyResponse(notificationId: string | null) {
+  const { getAccessToken, user } = useAuth();
+
+  return useQuery({
+    queryKey: ["replacement-my-response", notificationId],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token || !notificationId) throw new Error("Non authentifié");
+      const res = await apiFetch<{
+        data: {
+          status: string;
+          proposalId?: string;
+          message?: string | null;
+        };
+      }>(`/api/replacements/${notificationId}/my-response`, { token });
+      return res.data;
+    },
+    enabled: Boolean(user && getAccessToken() && notificationId),
+  });
+}
+
+export function useDeclineReplacementOffer() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      await apiFetch(`/api/replacements/${notificationId}/decline-offer`, {
+        method: "POST",
+        token,
+      });
+    },
+    onSuccess: (_data, notificationId) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["replacement-my-response", notificationId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
 export function useProposeReplacement() {
   const { getAccessToken } = useAuth();
   const queryClient = useQueryClient();
@@ -88,9 +131,13 @@ export function useProposeReplacement() {
       );
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["replacement-my-response", vars.notificationId],
+      });
       void queryClient.invalidateQueries({ queryKey: ["replacement-proposals"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["replacements-pending-student"] });
     },
   });
 }
