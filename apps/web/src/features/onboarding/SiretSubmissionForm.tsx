@@ -1,9 +1,11 @@
+import type { AccountStatus } from "@gadz-connect/types";
 import { Button, Input, Label } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { formatSiretDisplay } from "@/features/onboarding/microEnterprisePageUtils";
 import { apiFetch } from "@/lib/api";
 
 const siretSchema = z.object({
@@ -18,11 +20,23 @@ type SiretForm = z.infer<typeof siretSchema>;
 
 interface SiretSubmissionFormProps {
   existingSiret?: string | null;
+  accountStatus?: AccountStatus;
+  siretVerificationFailed?: boolean;
+  /** Masque le titre interne (ex. étape déjà titrée dans le guide modal). */
+  hideHeader?: boolean;
 }
 
-export function SiretSubmissionForm({ existingSiret }: SiretSubmissionFormProps) {
+export function SiretSubmissionForm({
+  existingSiret,
+  accountStatus,
+  siretVerificationFailed = false,
+  hideHeader = false,
+}: SiretSubmissionFormProps) {
   const { getAccessToken } = useAuth();
   const queryClient = useQueryClient();
+  const canCorrect = Boolean(existingSiret && siretVerificationFailed);
+  const showReadOnly =
+    Boolean(existingSiret) && !canCorrect && accountStatus !== "active";
 
   const {
     register,
@@ -31,20 +45,22 @@ export function SiretSubmissionForm({ existingSiret }: SiretSubmissionFormProps)
     setError,
   } = useForm<SiretForm>({
     resolver: zodResolver(siretSchema),
+    defaultValues: canCorrect
+      ? { siret: existingSiret?.replace(/\s/g, "") ?? "" }
+      : undefined,
   });
 
   const submitSiret = useMutation({
     mutationFn: async (siret: string) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");
-      const res = await apiFetch<{ data: { siret: string } }>(
-        "/api/profile/siret",
-        {
-          method: "PATCH",
-          token,
-          body: JSON.stringify({ siret }),
-        },
-      );
+      const res = await apiFetch<{
+        data: { siret: string; account_status: AccountStatus };
+      }>("/api/profile/siret", {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ siret }),
+      });
       return res.data;
     },
     onSuccess: () => {
@@ -60,57 +76,87 @@ export function SiretSubmissionForm({ existingSiret }: SiretSubmissionFormProps)
     }
   }
 
-  if (existingSiret) {
+  if (accountStatus === "active" && existingSiret) {
+    const displaySiret = formatSiretDisplay(existingSiret) ?? existingSiret;
     return (
-      <section className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2">
-        <h3 className="text-sm font-semibold text-indigo-900">
+      <section
+        className="rounded-md border border-success/20 bg-success-bg p-4 space-y-2"
+        role="status"
+      >
+        <h3 className="text-sm font-semibold text-success">
+          Compte activé
+        </h3>
+        <p className="text-sm text-success">
+          SIRET enregistré : <strong>{displaySiret}</strong>
+        </p>
+      </section>
+    );
+  }
+
+  if (showReadOnly) {
+    const displaySiret = formatSiretDisplay(existingSiret) ?? existingSiret;
+    return (
+      <section className="rounded-md border border-brand-100 bg-brand-50/50 p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-brand-700">
           SIRET transmis
         </h3>
-        <p className="text-sm text-indigo-800">
-          Numéro déclaré : <strong>{existingSiret}</strong>
+        <p className="text-sm text-brand-700">
+          Numéro déclaré : <strong>{displaySiret}</strong>
         </p>
-        <p className="text-xs text-indigo-700/80">
-          En attente de validation par l&apos;équipe RH. Vous serez notifié
-          lorsque votre compte sera activé.
+        <p className="text-xs text-brand-700/80">
+          Vérification en cours — vous serez notifié dès que votre compte sera
+          activé.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900">
-          J&apos;ai reçu mon SIRET
-        </h3>
-        <p className="mt-1 text-xs text-slate-600">
-          Saisissez le numéro à 14 chiffres reçu de l&apos;INSEE après votre
-          immatriculation sur le Guichet Unique.
+    <section className="rounded-md border border-line bg-surface p-4 space-y-4">
+      {!hideHeader ? (
+        <div>
+          <h3 className="text-sm font-semibold text-ink-900">
+            {canCorrect ? "Corriger mon SIRET" : "J'ai reçu mon SIRET"}
+          </h3>
+          <p className="mt-1 text-xs text-ink-600">
+            {canCorrect
+              ? "Le numéro précédent n'a pas été reconnu dans le répertoire Sirene. Saisissez le bon numéro à 14 chiffres."
+              : "Saisissez le numéro à 14 chiffres reçu de l'INSEE après votre immatriculation sur le Guichet Unique."}
+          </p>
+        </div>
+      ) : null}
+      {canCorrect && existingSiret ? (
+        <p className="rounded-lg border border-danger/20 bg-danger-bg px-3 py-2 text-xs text-danger">
+          Numéro refusé :{" "}
+          <strong>{formatSiretDisplay(existingSiret) ?? existingSiret}</strong>
         </p>
-      </div>
+      ) : null}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
         <div className="space-y-1">
           <Label htmlFor="declared-siret">Numéro SIRET</Label>
           <Input
             id="declared-siret"
-            placeholder="12345678901234"
+            placeholder="123 456 789 01234"
             inputMode="numeric"
             maxLength={17}
             {...register("siret")}
           />
           {errors.siret ? (
-            <p className="text-sm text-red-600">{errors.siret.message}</p>
+            <p className="text-sm text-danger">{errors.siret.message}</p>
           ) : null}
         </div>
         {errors.root ? (
-          <p className="text-sm text-red-600">{errors.root.message}</p>
+          <p className="text-sm text-danger">{errors.root.message}</p>
         ) : null}
         <Button
           type="submit"
-          size="sm"
           disabled={isSubmitting || submitSiret.isPending}
         >
-          {submitSiret.isPending ? "Envoi…" : "Déclarer mon SIRET"}
+          {submitSiret.isPending
+            ? "Envoi…"
+            : canCorrect
+              ? "Corriger mon SIRET"
+              : "Déclarer mon SIRET"}
         </Button>
       </form>
     </section>

@@ -2,12 +2,25 @@ import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
 
-export type StudentTaskId =
-  | "profile"
-  | "explore_tutors"
-  | "book_session"
-  | "planning"
-  | "repository";
+export type StudentTaskId = "profile" | "find_tutor" | "follow_courses";
+
+const TUTOR_PROFILE_VIEWED_KEY = "gadz_tutor_profile_viewed";
+
+export function markTutorProfileViewed(): void {
+  try {
+    sessionStorage.setItem(TUTOR_PROFILE_VIEWED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function hasViewedTutorProfile(): boolean {
+  try {
+    return sessionStorage.getItem(TUTOR_PROFILE_VIEWED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const TASK_DEFINITIONS: Omit<DashboardTask, "status">[] = [
   {
@@ -17,28 +30,16 @@ const TASK_DEFINITIONS: Omit<DashboardTask, "status">[] = [
     href: "/app/profil",
   },
   {
-    id: "explore_tutors",
-    title: "Découvrir les tuteurs",
-    description: "Parcourir les profils de votre campus",
-    href: "/app#trouver-un-tuteur",
+    id: "find_tutor",
+    title: "Trouver un tuteur",
+    description: "Parcourir les profils et réserver un cours",
+    href: "/app/cours",
   },
   {
-    id: "book_session",
-    title: "Réserver un cours",
-    description: "Choisir un créneau avec un tuteur",
-    href: "/app#trouver-un-tuteur",
-  },
-  {
-    id: "planning",
-    title: "Consulter l'emploi du temps",
-    description: "Voir vos sessions planifiées",
+    id: "follow_courses",
+    title: "Suivre mes cours",
+    description: "Emploi du temps et répertoire de cours",
     href: "/app/planning",
-  },
-  {
-    id: "repository",
-    title: "Consulter mon répertoire",
-    description: "Résumés de cours par matière",
-    href: "/app/repertoire",
   },
 ];
 
@@ -52,19 +53,13 @@ function isTaskDone(
   events: ScheduleEvent[] | undefined,
   campusTutorCount = 0,
 ): boolean {
+  void campusTutorCount;
   switch (id) {
     case "profile":
       return profile.profile_setup_complete;
-    case "explore_tutors":
-      return (
-        hasBookedCourse(events) ||
-        (profile.profile_setup_complete && campusTutorCount > 0)
-      );
-    case "book_session":
-      return hasBookedCourse(events);
-    case "planning":
-      return hasBookedCourse(events);
-    case "repository":
+    case "find_tutor":
+      return hasBookedCourse(events) || hasViewedTutorProfile();
+    case "follow_courses":
       return hasBookedCourse(events);
   }
 }
@@ -95,4 +90,8 @@ export function computeStudentDashboardProgress(
     percent,
     isComplete: completedCount === totalCount,
   };
+}
+
+export function isStudentCampusEmpty(campusTutorCount: number): boolean {
+  return campusTutorCount === 0;
 }

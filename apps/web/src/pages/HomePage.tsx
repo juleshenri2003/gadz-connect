@@ -36,20 +36,20 @@ export function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center gap-8 p-8">
       <div className="text-center">
-        <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">
+        <p className="text-sm font-semibold uppercase tracking-widest text-ink-400">
           Gadz&apos;Connect
         </p>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">
           Plateforme inter-campus
         </h1>
-        <p className="mx-auto mt-3 max-w-lg text-slate-600">
+        <p className="mx-auto mt-3 max-w-lg text-ink-600">
           Mise en relation, cours et micro-entreprise pour les campus Arts et
           Métiers.
         </p>
       </div>
 
       {user && profileLoading ? (
-        <p className="text-sm text-slate-500">Chargement…</p>
+        <p className="text-sm text-ink-400">Chargement…</p>
       ) : null}
 
       <div className="flex flex-wrap justify-center gap-3">

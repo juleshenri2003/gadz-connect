@@ -22,10 +22,10 @@ function TaskChip({ task, active }: { task: DashboardTask; active: boolean }) {
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
           isDone
-            ? "bg-green-600 text-white"
+            ? "bg-success text-white"
             : active
-              ? "bg-indigo-600 text-white"
-              : "border border-slate-300 bg-white text-slate-400",
+              ? "bg-brand-600 text-white"
+              : "border border-line bg-surface text-ink-400",
         )}
         aria-hidden
       >
@@ -38,14 +38,14 @@ function TaskChip({ task, active }: { task: DashboardTask; active: boolean }) {
   const baseClass = cn(
     "flex min-w-[9.5rem] max-w-[14rem] shrink-0 items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
     isDone
-      ? "border-green-200 bg-green-50 text-green-900"
+      ? "border-success/20 bg-success-bg text-success"
       : active
-        ? "border-indigo-400 bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200"
+        ? "border-brand-100 bg-brand-50 text-brand-700 ring-1 ring-brand-100"
         : task.readOnly
-          ? "border-amber-200 bg-amber-50 text-amber-900"
+          ? "border-warning/20 bg-warning-bg text-warning"
           : isClickable
-            ? "border-slate-200 bg-white text-slate-700"
-            : "border-slate-200 bg-white text-slate-700",
+            ? "border-line bg-surface text-ink-600"
+            : "border-line bg-surface text-ink-600",
   );
 
   if (isClickable && task.href) {
@@ -78,8 +78,8 @@ export function SequentialTaskBanner({
 
   if (isComplete) {
     return (
-      <section className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 sm:px-5">
-        <p className="text-sm font-medium text-green-800">
+      <section className="rounded-md border border-success/20 bg-success-bg px-4 py-3 sm:px-5">
+        <p className="text-sm font-medium text-success">
           {title} — tout est à jour ✓
         </p>
       </section>
@@ -91,41 +91,41 @@ export function SequentialTaskBanner({
 
   return (
     <section
-      className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-slate-50 p-4 shadow-sm sm:p-5"
+      className="rounded-md border border-brand-100 bg-surface-alt border border-line p-4 shadow-surface sm:p-5"
       aria-label="Tâches à accomplir"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
           {subtitle ? (
-            <p className="mt-0.5 text-xs text-slate-600">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-ink-600">{subtitle}</p>
           ) : null}
         </div>
-        <p className="text-sm font-medium text-indigo-700">
+        <p className="text-sm font-medium text-brand-700">
           {queue.completedCount}/{queue.totalCount} — {queue.percent}%
         </p>
       </div>
 
       <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200"
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-line"
         role="progressbar"
         aria-valuenow={queue.percent}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+          className="h-full rounded-full bg-brand-600 transition-all duration-300"
           style={{ width: `${queue.percent}%` }}
         />
       </div>
 
       {sequential && currentTask ? (
-        <div className="mt-4 rounded-lg border border-indigo-200 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+        <div className="mt-4 rounded-lg border border-brand-100 bg-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
             Étape {queue.currentIndex + 1} / {todoTasks.length}
           </p>
-          <p className="mt-1 font-semibold text-slate-900">{currentTask.title}</p>
-          <p className="mt-1 text-sm text-slate-600">{currentTask.description}</p>
+          <p className="mt-1 font-semibold text-ink-900">{currentTask.title}</p>
+          <p className="mt-1 text-sm text-ink-600">{currentTask.description}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {currentTask.href ? (
               <Button size="sm" asChild>
@@ -142,7 +142,7 @@ export function SequentialTaskBanner({
             ) : null}
           </div>
           {showInpiAction ? (
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-line pt-3">
               <Button
                 size="sm"
                 variant="outline"

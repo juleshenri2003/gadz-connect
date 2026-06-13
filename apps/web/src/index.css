@@ -2,9 +2,82 @@
 @import "@gadz-connect/ui/globals.css";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Typography */
+  --font-sans: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+
+  /* Semantic palette — Atelier */
+  --color-paper: #f7f5f1;
+  --color-surface: #ffffff;
+  --color-surface-alt: #fbfaf7;
+  --color-ink-900: #1a1d24;
+  --color-ink-600: #52555e;
+  --color-ink-400: #8a8d94;
+  --color-line: #e7e3db;
+
+  --color-brand-700: #1f3a5f;
+  --color-brand-600: #27496d;
+  --color-brand-100: #dce6f0;
+  --color-brand-50: #eef3f8;
+
+  --color-accent-600: #b0303a;
+  --color-accent-500: #c8434d;
+  --color-accent-100: #f6dadb;
+  --color-accent-50: #fbeded;
+
+  --color-success: #2e7d5b;
+  --color-success-bg: #e7f1eb;
+  --color-warning: #b8791a;
+  --color-warning-bg: #fbf0dd;
+  --color-danger: #c0392b;
+  --color-danger-bg: #fbe7e4;
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+
+  /* Elevation */
+  --shadow-surface: 0 1px 2px 0 rgb(26 29 36 / 0.04);
+  --shadow-raised: 0 4px 16px -2px rgb(26 29 36 / 0.1);
 }
 
-body {
-  @apply min-h-screen bg-slate-50 font-sans text-slate-900 antialiased;
+@layer base {
+  body {
+    @apply min-h-screen bg-paper font-sans text-ink-900 antialiased;
+  }
+
+  h1,
+  h2,
+  h3.font-display {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .shadow-surface {
+    box-shadow: var(--shadow-surface);
+  }
+
+  .shadow-raised {
+    box-shadow: var(--shadow-raised);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

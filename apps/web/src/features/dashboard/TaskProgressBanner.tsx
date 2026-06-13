@@ -19,8 +19,8 @@ function TaskChip({ task }: { task: DashboardTask }) {
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
           isDone
-            ? "bg-green-600 text-white"
-            : "border border-slate-300 bg-white text-slate-400",
+            ? "bg-success text-white"
+            : "border border-line bg-surface text-ink-400",
         )}
         aria-hidden
       >
@@ -33,12 +33,12 @@ function TaskChip({ task }: { task: DashboardTask }) {
   const baseClass = cn(
     "flex min-w-[9.5rem] max-w-[14rem] shrink-0 items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
     isDone
-      ? "border-green-200 bg-green-50 text-green-900"
+      ? "border-success/20 bg-success-bg text-success"
       : task.readOnly
-        ? "border-amber-200 bg-amber-50 text-amber-900"
+        ? "border-warning/20 bg-warning-bg text-warning"
         : isClickable
-          ? "border-indigo-200 bg-white text-slate-900 hover:border-indigo-400 hover:bg-indigo-50"
-          : "border-slate-200 bg-white text-slate-700",
+          ? "border-brand-100 bg-surface text-ink-900 hover:border-brand-100 hover:bg-brand-50"
+          : "border-line bg-surface text-ink-600",
   );
 
   if (isClickable && task.href) {
@@ -70,19 +70,19 @@ export function TaskProgressBanner({
 
   return (
     <section
-      className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-slate-50 p-4 shadow-sm sm:p-5"
+      className="rounded-md border border-brand-100 bg-surface-alt border border-line p-4 shadow-surface sm:p-5"
       aria-label="Tâches à accomplir"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
           {subtitle ? (
-            <p className="mt-0.5 text-xs text-slate-600">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-ink-600">{subtitle}</p>
           ) : null}
         </div>
-        <p className="text-sm font-medium text-indigo-700">
+        <p className="text-sm font-medium text-brand-700">
           {progress.isComplete ? (
-            <span className="text-green-700">Parcours terminé ✓</span>
+            <span className="text-success">Parcours terminé ✓</span>
           ) : (
             <>
               {progress.completedCount}/{progress.totalCount} — {progress.percent}
@@ -93,7 +93,7 @@ export function TaskProgressBanner({
       </div>
 
       <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200"
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-line"
         role="progressbar"
         aria-valuenow={progress.percent}
         aria-valuemin={0}
@@ -103,13 +103,13 @@ export function TaskProgressBanner({
         <div
           className={cn(
             "h-full rounded-full transition-all duration-300",
-            progress.isComplete ? "bg-green-500" : "bg-indigo-600",
+            progress.isComplete ? "bg-success" : "bg-brand-600",
           )}
           style={{ width: `${progress.percent}%` }}
         />
       </div>
 
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-ink-400">
         Cliquez sur une étape pour y accéder — vous pouvez les faire dans
         l&apos;ordre de votre choix.
       </p>
@@ -121,8 +121,8 @@ export function TaskProgressBanner({
       </div>
 
       {showInpiAction ? (
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-indigo-100 pt-4">
-          <p className="text-xs text-slate-600">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-brand-100 pt-4">
+          <p className="text-xs text-ink-600">
             Après envoi sur le Guichet Unique INPI :
           </p>
           <Button
@@ -138,7 +138,7 @@ export function TaskProgressBanner({
                 : "J'ai envoyé ma demande sur l'INPI"}
           </Button>
           {markInpiSent.isError ? (
-            <p className="text-xs text-red-600" role="alert">
+            <p className="text-xs text-danger" role="alert">
               {(markInpiSent.error as Error).message}
             </p>
           ) : null}

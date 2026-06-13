@@ -23,6 +23,7 @@ export const onboardingStep2Schema = z.object({
 
 export const onboardingStep3Schema = z.object({
   versementLiberatoire: z.boolean(),
+  statusAcre: z.boolean().optional(),
 });
 
 export const onboardingFullSchema = onboardingStep0Schema

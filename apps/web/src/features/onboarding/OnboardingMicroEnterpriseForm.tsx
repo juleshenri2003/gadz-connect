@@ -4,19 +4,40 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
   Input,
   Label,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMyProfile } from "@/features/auth/useMyProfile";
-import { OnboardingAccompanimentGuide } from "@/features/onboarding/OnboardingAccompanimentGuide";
-import { useMarkInpiSent } from "@/features/onboarding/progress/useMarkInpiSent";
+import { FiscalQuestionnaireRecap } from "@/features/onboarding/FiscalQuestionnaireRecap";
+import {
+  ACTIVITY_OPTIONS,
+  hasValidSiret,
+  isQuestionnaireEditable,
+  type MicroEnterpriseActivity,
+} from "@/features/onboarding/fiscalLabels";
+import { MicroEnterpriseAlerts } from "@/features/onboarding/MicroEnterpriseAlerts";
+import { MicroEnterpriseTimeline } from "@/features/onboarding/MicroEnterpriseTimeline";
+import { MicroEnterpriseWizardStepper } from "@/features/onboarding/MicroEnterpriseWizardStepper";
+import {
+  getPrimaryRecapCta,
+  isMicroEnterpriseRecapView,
+  type MicroStep,
+} from "@/features/onboarding/microEnterprisePageUtils";
+import {
+  inferRegistrationPath,
+  registrationPathToStatus,
+} from "@/features/onboarding/registrationPath";
+import {
+  INPI_GUIDE_SECTION_ID,
+  MicroEnterpriseInpiGuidePanel,
+} from "@/features/onboarding/MicroEnterpriseInpiGuidePanel";
 import { SiretSubmissionForm } from "@/features/onboarding/SiretSubmissionForm";
-import { StripeConnectPanel } from "@/features/stripe/StripeConnectPanel";
+import { MicroEnterpriseValidatedPanel } from "@/features/onboarding/MicroEnterpriseValidatedPanel";
+import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
 import { saveOnboardingToProfile } from "./api";
 import {
   onboardingFullSchema,
@@ -30,26 +51,80 @@ const STEPS = [
   { id: 4, title: "Fiscalité", description: "Option versement libératoire" },
 ] as const;
 
-const ACTIVITY_OPTIONS = [
-  { value: "enseignement", label: "Enseignement / cours particuliers" },
-  { value: "conseil", label: "Conseil et accompagnement" },
-  {
-    value: "prestation_intellectuelle",
-    label: "Prestation intellectuelle (BNC)",
-  },
-] as const;
-
-type MicroStep = "questionnaire" | "guide" | "siret";
-
 type OnboardingLocationState = {
   registrationStatus?: "already_registered" | "awaiting_registration";
 };
 
-function DashboardBackLink() {
+interface RecapPanelProps {
+  profile: NonNullable<ReturnType<typeof useMyProfile>["data"]>;
+  questionnaireEditable: boolean;
+}
+
+function RecapPanel({
+  profile,
+  questionnaireEditable,
+}: RecapPanelProps) {
+  const cta = getPrimaryRecapCta(profile);
+  const isPendingSiret = profile.account_status === "pending_siret";
+  const canDeclareSiret = isPendingSiret && !hasValidSiret(profile.siret);
+  const inpiSent = Boolean(profile.inpi_declaration_sent_at);
+
+  const registrationPath = inferRegistrationPath(profile);
+  const showInpiGuide = registrationPath === "new_micro";
+  const inpiPending = showInpiGuide && !inpiSent;
+  const showActionAside = !inpiPending;
+
+  const primaryCta =
+    showInpiGuide && cta.primary.href.includes("#inpi-guide") ? null : cta.primary;
+  const secondaryCta =
+    showInpiGuide && cta.secondary?.href.includes("#inpi-guide")
+      ? null
+      : cta.secondary;
+
+  const hasActionAside =
+    showActionAside && Boolean(primaryCta || secondaryCta || canDeclareSiret);
+
   return (
-    <Button variant="ghost" size="sm" className="-ml-2 mb-4" asChild>
-      <Link to="/app">← Retour au tableau de bord</Link>
-    </Button>
+    <div className="space-y-6">
+      {showInpiGuide ? (
+        <MicroEnterpriseInpiGuidePanel profile={profile} />
+      ) : null}
+      <div
+        className={
+          hasActionAside
+            ? "grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start"
+            : undefined
+        }
+      >
+        <FiscalQuestionnaireRecap
+          profile={profile}
+          editable={questionnaireEditable}
+        />
+        {hasActionAside ? (
+          <div className="space-y-4 rounded-md border border-brand-100 bg-brand-50/50 p-5 shadow-surface sm:p-6">
+            <MicroEnterpriseAlerts profile={profile} />
+            <div className="flex flex-wrap gap-3">
+              {primaryCta ? (
+                canDeclareSiret || primaryCta.href.includes("siret") ? (
+                  <Button asChild>
+                    <Link to={primaryCta.href}>{primaryCta.label}</Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" asChild>
+                    <Link to={primaryCta.href}>{primaryCta.label}</Link>
+                  </Button>
+                )
+              ) : null}
+              {secondaryCta ? (
+                <Button variant="outline" asChild>
+                  <Link to={secondaryCta.href}>{secondaryCta.label}</Link>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -58,6 +133,8 @@ export function OnboardingMicroEnterpriseForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stepParam = searchParams.get("step") as MicroStep | null;
+  const isEditMode =
+    stepParam === "questionnaire" && searchParams.get("edit") === "1";
 
   const prefilledStatus = (location.state as OnboardingLocationState | null)
     ?.registrationStatus;
@@ -66,10 +143,12 @@ export function OnboardingMicroEnterpriseForm() {
   const [submittedSiret, setSubmittedSiret] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const markInpiSent = useMarkInpiSent();
   const questionnaireDone = Boolean(profile?.micro_enterprise_activity);
   const isActive = profile?.account_status === "active";
   const isPendingSiret = profile?.account_status === "pending_siret";
+  const questionnaireEditable = Boolean(
+    profile && isQuestionnaireEditable(profile),
+  );
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingFullSchema),
@@ -79,6 +158,7 @@ export function OnboardingMicroEnterpriseForm() {
       activity: undefined,
       urssafPeriodicity: "quarterly",
       versementLiberatoire: false,
+      statusAcre: false,
     },
     mode: "onChange",
   });
@@ -94,31 +174,46 @@ export function OnboardingMicroEnterpriseForm() {
   const registrationStatus = watch("registrationStatus");
   const versementLiberatoire = watch("versementLiberatoire");
   const alreadyRegistered = registrationStatus === "already_registered";
+  const lockedRegistrationPath = profile?.registration_path ?? null;
 
   useEffect(() => {
-    if (!prefilledStatus) return;
+    if (!profile?.registration_path) return;
+    form.setValue(
+      "registrationStatus",
+      registrationPathToStatus(inferRegistrationPath(profile)),
+      { shouldValidate: true },
+    );
+  }, [profile, form]);
+
+  useEffect(() => {
+    if (!prefilledStatus || lockedRegistrationPath) return;
     form.setValue("registrationStatus", prefilledStatus, {
       shouldValidate: true,
     });
-  }, [prefilledStatus, form]);
+  }, [prefilledStatus, lockedRegistrationPath, form]);
 
   useEffect(() => {
-    if (profileLoading) return;
-    if (!questionnaireDone) return;
-    if (stepParam === "questionnaire") {
-      navigate("/app", { replace: true });
-      return;
-    }
-    if (stepParam) return;
-    if (isActive) return;
-    navigate("/app", { replace: true });
-  }, [
-    profileLoading,
-    questionnaireDone,
-    stepParam,
-    isActive,
-    navigate,
-  ]);
+    if (!profile || !isEditMode) return;
+
+    form.reset({
+      registrationStatus: registrationPathToStatus(inferRegistrationPath(profile)),
+      siret: "",
+      activity: profile.micro_enterprise_activity as MicroEnterpriseActivity,
+      urssafPeriodicity:
+        profile.urssaf_periodicity === "monthly" ? "monthly" : "quarterly",
+      versementLiberatoire: profile.versement_liberatoire,
+      statusAcre: profile.status_acre ?? false,
+    });
+  }, [profile, isEditMode, form]);
+
+  useEffect(() => {
+    if (stepParam !== "guide") return;
+    requestAnimationFrame(() => {
+      document
+        .getElementById(INPI_GUIDE_SECTION_ID)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [stepParam, profile?.id]);
 
   async function goNext() {
     const fieldsByStep: (keyof OnboardingFormValues)[][] = [
@@ -150,10 +245,19 @@ export function OnboardingMicroEnterpriseForm() {
     }
   }
 
+  const pageShell = (content: ReactNode) => (
+    <div className="w-full space-y-6">
+      {profile && !isActive ? (
+        <MicroEnterpriseTimeline profile={profile} stepParam={stepParam} />
+      ) : null}
+      {content}
+    </div>
+  );
+
   if (profileLoading) {
     return (
-      <Card className="w-full max-w-xl">
-        <CardContent className="py-8 text-center text-sm text-slate-500">
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-ink-400">
           Chargement de votre profil…
         </CardContent>
       </Card>
@@ -161,172 +265,162 @@ export function OnboardingMicroEnterpriseForm() {
   }
 
   if (isActive && questionnaireDone && !stepParam) {
-    return (
-      <div className="w-full max-w-xl space-y-4">
-        <DashboardBackLink />
-        <Card>
-          <CardHeader>
-            <CardTitle>Compte micro-entreprise validé</CardTitle>
-            <CardDescription>
-              Votre SIRET est enregistré — vous pouvez proposer des cours et
-              configurer vos paiements.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div
-              className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900"
-              role="status"
-            >
-              Statut : <strong>Validé (active)</strong>
-              {(submittedSiret ?? profile?.siret) ? (
-                <>
-                  <br />
-                  SIRET : <strong>{submittedSiret ?? profile?.siret}</strong>
-                </>
-              ) : null}
-            </div>
-            <StripeConnectPanel />
-          </CardContent>
-        </Card>
-      </div>
+    return pageShell(
+      <Card className="w-full">
+        <CardContent className="px-6 py-8 sm:px-8">
+          {profile ? (
+            <MicroEnterpriseValidatedPanel
+              profile={profile}
+              submittedSiret={submittedSiret}
+            />
+          ) : null}
+        </CardContent>
+      </Card>,
     );
   }
 
-  if (stepParam === "guide") {
-    return (
-      <div className="w-full max-w-3xl space-y-4">
-        <DashboardBackLink />
-        <OnboardingAccompanimentGuide showInpiGuide />
-        {!profile?.inpi_declaration_sent_at ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="flex-1 text-sm text-slate-600">
-              Une fois votre demande envoyée sur le Guichet Unique, confirmez-la
-              ici pour débloquer l&apos;étape suivante.
+  if (stepParam === "guide" && !questionnaireDone) {
+    return pageShell(
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="space-y-3 px-6 py-6 sm:px-8">
+            <p className="text-sm text-ink-600">
+              Pour valider votre parcours, complétez d&apos;abord le
+              questionnaire fiscal. Vous pouvez consulter le guide INPI
+              ci-dessous en parallèle.
             </p>
-            <Button
-              variant="outline"
-              disabled={markInpiSent.isPending}
-              onClick={() => void markInpiSent.mutate()}
-            >
-              {markInpiSent.isPending
-                ? "Enregistrement…"
-                : "J'ai envoyé ma demande sur l'INPI"}
+            <Button size="sm" asChild>
+              <Link to="/app/micro-entreprise?step=questionnaire">
+                Remplir le questionnaire
+              </Link>
             </Button>
-          </div>
-        ) : null}
-        {markInpiSent.isError ? (
-          <p className="text-sm text-red-600" role="alert">
-            {(markInpiSent.error as Error).message}
-          </p>
-        ) : null}
-      </div>
+          </CardContent>
+        </Card>
+        <MicroEnterpriseInpiGuidePanel profile={profile} />
+      </div>,
     );
   }
 
   if (stepParam === "siret") {
-    return (
-      <div className="w-full max-w-xl space-y-4">
-        <DashboardBackLink />
-        <Card>
-          <CardHeader>
-            <CardTitle>Déclarer votre SIRET</CardTitle>
-            <CardDescription>
-              Saisissez le numéro à 14 chiffres reçu de l&apos;INSEE après votre
-              immatriculation sur le Guichet Unique.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isPendingSiret ? (
-              <SiretSubmissionForm existingSiret={profile?.siret} />
-            ) : (
-              <p className="text-sm text-slate-600">
-                Complétez d&apos;abord le questionnaire fiscal depuis votre
-                tableau de bord.
+    return pageShell(
+      <Card className="w-full">
+        <CardContent className="space-y-6 px-6 py-8 sm:px-8">
+          {profile ? <MicroEnterpriseAlerts profile={profile} /> : null}
+          {isPendingSiret ? (
+            <SiretSubmissionForm
+              existingSiret={profile?.siret}
+              accountStatus={profile?.account_status}
+              siretVerificationFailed={profile?.siret_verification_failed}
+            />
+          ) : (
+            <div className="space-y-3 rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink-600">
+              <p>
+                Complétez d&apos;abord le questionnaire fiscal pour pouvoir
+                déclarer votre SIRET.
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <Button size="sm" asChild>
+                <Link to="/app/micro-entreprise?step=questionnaire">
+                  Remplir le questionnaire
+                </Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>,
     );
   }
 
-  if (questionnaireDone && !stepParam) {
-    return null;
+  if (
+    isMicroEnterpriseRecapView(profile, stepParam, isEditMode) &&
+    profile
+  ) {
+    return pageShell(
+      <RecapPanel
+        profile={profile}
+        questionnaireEditable={questionnaireEditable}
+      />,
+    );
   }
 
-  const showCompactGuide =
-    registrationStatus === "awaiting_registration" && step >= 1;
+  if (isEditMode && questionnaireDone && !questionnaireEditable) {
+    return pageShell(
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-ink-600">
+          Le questionnaire fiscal n&apos;est plus modifiable — votre SIRET a
+          déjà été transmis.
+        </CardContent>
+      </Card>,
+    );
+  }
 
-  return (
-    <div className="w-full max-w-3xl space-y-8">
-      <DashboardBackLink />
-      {showCompactGuide ? (
-        <OnboardingAccompanimentGuide showInpiGuide={false} />
+  const isEditing = isEditMode && questionnaireDone;
+  const showInpiGuideTeaser =
+    (lockedRegistrationPath === "new_micro" ||
+      registrationStatus === "awaiting_registration") &&
+    !alreadyRegistered;
+
+  return pageShell(
+    <div className="space-y-6">
+      {showInpiGuideTeaser ? (
+        <MicroEnterpriseInpiGuidePanel profile={profile} />
       ) : null}
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Onboarding micro-entreprise</CardTitle>
-          <CardDescription>
-            Déjà entrepreneur ou en cours d&apos;immatriculation — parcours adapté
-            à votre situation
+        <CardHeader className="px-6 py-6 sm:px-8">
+          <CardDescription className="text-base">
+            {isEditing
+              ? "Ajustez vos réponses tant que votre SIRET n'a pas été déclaré."
+              : "Déjà entrepreneur ou en cours d'immatriculation — parcours adapté à votre situation"}
           </CardDescription>
-          <ol className="mt-4 flex gap-1">
-            {STEPS.map((s) => (
-              <li
-                key={s.id}
-                className={`flex-1 rounded-md px-1 py-1 text-center text-[10px] font-medium sm:text-xs ${
-                  step === s.id
-                    ? "bg-slate-900 text-white"
-                    : step > s.id
-                      ? "bg-slate-200 text-slate-700"
-                      : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                {s.title}
-              </li>
-            ))}
-          </ol>
+          <MicroEnterpriseWizardStepper steps={STEPS} currentStep={step} />
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-6 pb-8 sm:px-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {step === 1 && (
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Votre situation</legend>
-                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-50">
+                {lockedRegistrationPath ? (
+                  <p className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-ink-600">
+                    Parcours choisi lors de votre inscription — contactez le
+                    support pour modifier votre situation.
+                  </p>
+                ) : null}
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper">
                   <input
                     type="radio"
                     value="already_registered"
                     className="mt-1"
                     {...register("registrationStatus")}
+                    disabled={Boolean(lockedRegistrationPath)}
                   />
                   <span className="text-sm">
                     <strong>Je possède déjà un SIRET</strong>
                     <br />
-                    <span className="text-slate-500">
-                      Micro-entreprise ou activité déjà immatriculée — accès
-                      immédiat après validation.
+                    <span className="text-ink-400">
+                      Micro-entreprise déjà immatriculée — activation automatique
+                      après saisie du SIRET.
                     </span>
                   </span>
                 </label>
-                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-50">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper">
                   <input
                     type="radio"
                     value="awaiting_registration"
                     className="mt-1"
                     {...register("registrationStatus")}
+                    disabled={Boolean(lockedRegistrationPath)}
                   />
                   <span className="text-sm">
                     <strong>J&apos;attends mon SIRET INSEE</strong>
                     <br />
-                    <span className="text-slate-500">
-                      Création en cours — statut en attente jusqu&apos;à
-                      validation RH.
+                    <span className="text-ink-400">
+                      Création en cours — déclarez votre SIRET dès réception
+                      pour activer votre compte.
                     </span>
                   </span>
                 </label>
                 {errors.registrationStatus && (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-danger">
                     {errors.registrationStatus.message}
                   </p>
                 )}
@@ -341,7 +435,7 @@ export function OnboardingMicroEnterpriseForm() {
                       {...register("siret")}
                     />
                     {errors.siret && (
-                      <p className="text-sm text-red-600">{errors.siret.message}</p>
+                      <p className="text-sm text-danger">{errors.siret.message}</p>
                     )}
                   </div>
                 )}
@@ -354,7 +448,7 @@ export function OnboardingMicroEnterpriseForm() {
                 {ACTIVITY_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-50"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper"
                   >
                     <input
                       type="radio"
@@ -366,7 +460,7 @@ export function OnboardingMicroEnterpriseForm() {
                   </label>
                 ))}
                 {errors.activity && (
-                  <p className="text-sm text-red-600">{errors.activity.message}</p>
+                  <p className="text-sm text-danger">{errors.activity.message}</p>
                 )}
               </fieldset>
             )}
@@ -376,7 +470,7 @@ export function OnboardingMicroEnterpriseForm() {
                 <legend className="text-sm font-medium">
                   Périodicité URSSAF
                 </legend>
-                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/50">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper">
                   <input
                     type="radio"
                     value="quarterly"
@@ -386,22 +480,23 @@ export function OnboardingMicroEnterpriseForm() {
                   <span className="text-sm">
                     <strong>Trimestrielle (recommandée)</strong>
                     <br />
-                    <span className="text-slate-500">
+                    <span className="text-ink-400">
                       Conseil du guide Méthodo — moins de risque d&apos;oubli
                       qu&apos;en mensuel (amende URSSAF possible).
                     </span>
                   </span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 has-[:checked]:border-slate-900">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper">
                   <input
                     type="radio"
                     value="monthly"
+                    className="mt-1"
                     {...register("urssafPeriodicity")}
                   />
                   <span className="text-sm">Mensuelle</span>
                 </label>
                 {errors.urssafPeriodicity && (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-danger">
                     {errors.urssafPeriodicity.message}
                   </p>
                 )}
@@ -416,7 +511,7 @@ export function OnboardingMicroEnterpriseForm() {
                     <Label htmlFor="versementLiberatoire">
                       Versement libératoire (+2,2 %)
                     </Label>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-400">
                       Paiement de l&apos;impôt sur le revenu en même temps que les
                       cotisations URSSAF.
                     </p>
@@ -429,16 +524,31 @@ export function OnboardingMicroEnterpriseForm() {
                   />
                 </div>
                 {versementLiberatoire && (
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-ink-600">
                     Sur un cours de 40 € brut, le libératoire représente environ
                     0,77 € (2,2 % de la base après commission).
                   </p>
                 )}
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <Label htmlFor="statusAcre">ACRE (exonération partielle)</Label>
+                    <p className="mt-1 text-xs text-ink-400">
+                      Cochez si vous bénéficiez de l&apos;Aide à la Création
+                      d&apos;Entreprise (12 mois).
+                    </p>
+                  </div>
+                  <input
+                    id="statusAcre"
+                    type="checkbox"
+                    className="h-5 w-5"
+                    {...register("statusAcre")}
+                  />
+                </div>
               </fieldset>
             )}
 
             {submitError && (
-              <p className="text-sm text-red-600" role="alert">
+              <p className="text-sm text-danger" role="alert">
                 {submitError}
               </p>
             )}
@@ -458,15 +568,18 @@ export function OnboardingMicroEnterpriseForm() {
                 </Button>
               ) : (
                 <Button type="submit" disabled={isSubmitting}>
-                  {alreadyRegistered
-                    ? "Valider mon SIRET et continuer"
-                    : "Envoyer et retourner au tableau de bord"}
+                  {isEditing
+                    ? "Enregistrer les modifications"
+                    : alreadyRegistered
+                      ? "Valider mon SIRET et continuer"
+                      : "Envoyer et retourner au tableau de bord"}
                 </Button>
               )}
             </div>
+            <WrongProfileLink className="text-center" />
           </form>
         </CardContent>
       </Card>
-    </div>
+    </div>,
   );
 }

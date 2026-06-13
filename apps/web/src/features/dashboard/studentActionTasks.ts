@@ -1,5 +1,6 @@
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
+import { buildAlertFocusHref } from "@/features/notifications/notificationUtils";
 import type { PendingReplacementAlert } from "@/features/replacements/useReplacements";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
@@ -20,12 +21,17 @@ export function computeStudentActionTasks(
       (sum, p) => sum + p.pendingProposalsCount,
       0,
     );
+    const first = pending[0]!;
+    const href =
+      first.recipientId
+        ? buildAlertFocusHref(first.recipientId, first.id)
+        : "/app/alertes";
     tasks.push({
       id: "choose-replacement",
       title: `Choisir un remplaçant (${totalProposals} proposition${totalProposals > 1 ? "s" : ""})`,
       description:
         "Votre professeur est indisponible — validez un remplaçant pour garder le même horaire",
-      href: "/app/alertes",
+      href,
       status: "todo",
     });
   }
@@ -39,12 +45,14 @@ export function computeStudentActionTasks(
     ) ?? [];
 
   if (openProfUnavailable.length > 0 && pending.length === 0) {
+    const first = openProfUnavailable[0]!;
+    const notificationId = first.notification?.id ?? first.id;
     tasks.push({
       id: "replacement-waiting",
       title: "Remplacement de cours en cours",
       description:
         "En attente de propositions de professeurs — consultez vos alertes",
-      href: "/app/alertes",
+      href: buildAlertFocusHref(first.id, notificationId),
       status: "todo",
     });
   }

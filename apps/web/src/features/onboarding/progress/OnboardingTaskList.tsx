@@ -14,8 +14,8 @@ function StatusIcon({ status }: { status: DashboardTask["status"] }) {
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
         isDone
-          ? "bg-green-100 text-green-700"
-          : "bg-slate-100 text-slate-500",
+          ? "bg-success-bg text-success"
+          : "bg-paper text-ink-400",
       )}
       aria-hidden
     >
@@ -38,15 +38,15 @@ export function OnboardingTaskList({ tasks }: OnboardingTaskListProps) {
               <p
                 className={cn(
                   "text-sm font-medium",
-                  isDone ? "text-green-900" : "text-slate-900",
+                  isDone ? "text-success" : "text-ink-900",
                 )}
               >
                 {task.title}
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">{task.description}</p>
+              <p className="mt-0.5 text-xs text-ink-400">{task.description}</p>
             </div>
             {isClickable ? (
-              <span className="shrink-0 text-xs font-medium text-indigo-600">
+              <span className="shrink-0 text-xs font-medium text-brand-600">
                 Accéder →
               </span>
             ) : null}
@@ -56,11 +56,11 @@ export function OnboardingTaskList({ tasks }: OnboardingTaskListProps) {
         const className = cn(
           "flex items-start gap-3 rounded-lg border px-4 py-3",
           isDone
-            ? "border-green-100 bg-green-50/30"
+            ? "border-success/20 bg-success-bg/30"
             : task.readOnly
-              ? "border-amber-100 bg-amber-50/40"
-              : "border-slate-200 bg-white",
-          isClickable && "hover:border-indigo-200 hover:bg-indigo-50/30",
+              ? "border-warning/20 bg-warning-bg/40"
+              : "border-line bg-surface",
+          isClickable && "hover:border-brand-100 hover:bg-brand-50/30",
         );
 
         return (

@@ -1,58 +1,77 @@
 import { Button } from "@gadz-connect/ui";
+import { useState } from "react";
 import {
   ACTIVITY_PATH_COPY,
   ID_CONFORMITY_MENTION,
   INPI_STEPS,
-  INPI_URL,
 } from "./content";
 import { CopyablePath, CopyableText } from "./CopyableText";
 import { GuideAccordion } from "./GuideAccordion";
+import { GuideRichList, GuideRichText } from "./GuideRichText";
 
-function StepDetailList({ lines }: { lines: readonly string[] }) {
-  return (
-    <ul className="list-disc space-y-2 pl-5">
-      {lines.map((line) => (
-        <li key={line}>
-          {line.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-            i % 2 === 1 ? (
-              <strong key={`${line}-${i}`}>{part}</strong>
-            ) : (
-              <span key={`${line}-${i}`}>{part}</span>
-            ),
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+interface OnboardingInpiStepGuideProps {
+  /** Masque la barre de progression (affichée par le parent) */
+  hideProgressHeader?: boolean;
+  openId?: string;
+  onOpenIdChange?: (id: string) => void;
 }
 
-export function OnboardingInpiStepGuide() {
-  const items = INPI_STEPS.map((step) => ({
+export function OnboardingInpiStepGuide({
+  hideProgressHeader = false,
+  openId: controlledOpenId,
+  onOpenIdChange,
+}: OnboardingInpiStepGuideProps = {}) {
+  const firstStepId =
+    INPI_STEPS.find((step) => step.id === "access")?.id ?? INPI_STEPS[0]?.id ?? "";
+  const [internalOpenId, setInternalOpenId] = useState<string>(firstStepId);
+  const openId = controlledOpenId ?? internalOpenId;
+
+  function setOpenId(id: string) {
+    if (onOpenIdChange) onOpenIdChange(id);
+    else setInternalOpenId(id);
+  }
+
+  const openIndex = INPI_STEPS.findIndex((step) => step.id === openId);
+  const currentIndex = openIndex >= 0 ? openIndex : 0;
+  const currentStep = INPI_STEPS[currentIndex];
+
+  function goToStep(index: number) {
+    const step = INPI_STEPS[index];
+    if (!step) return;
+    setOpenId(step.id);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`inpi-step-${step.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
+
+  const items = INPI_STEPS.map((step, index) => ({
     id: step.id,
     title: step.title,
     summary: step.summary,
     badge: "critical" in step && step.critical ? "Obligatoire" : undefined,
-    defaultOpen: step.id === "access",
+    defaultOpen: step.id === firstStepId,
     children: (
       <div className="space-y-4">
-        <StepDetailList lines={step.details} />
+        <GuideRichList items={step.details} />
 
         {"alert" in step && step.alert ? (
           <div
-            className={`rounded-lg border p-3 text-sm ${
+            className={`rounded-lg border p-3 text-sm leading-relaxed ${
               "critical" in step && step.critical
-                ? "border-red-300 bg-red-50 font-medium text-red-950"
-                : "border-amber-300 bg-amber-50 text-amber-950"
+                ? "border-danger/30 bg-danger-bg text-danger"
+                : "border-warning/30 bg-warning-bg text-warning"
             }`}
             role="note"
           >
-            {step.alert}
+            <GuideRichText text={step.alert} />
           </div>
         ) : null}
 
         {"tip" in step && step.tip ? (
-          <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-            💡 {step.tip}
+          <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm leading-relaxed text-brand-700">
+            <GuideRichText text={step.tip} />
           </p>
         ) : null}
 
@@ -71,31 +90,61 @@ export function OnboardingInpiStepGuide() {
             </a>
           </Button>
         ) : null}
+
+        <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={index === 0}
+            onClick={() => goToStep(index - 1)}
+          >
+            Étape précédente
+          </Button>
+          {index < INPI_STEPS.length - 1 ? (
+            <Button type="button" size="sm" onClick={() => goToStep(index + 1)}>
+              Étape suivante
+            </Button>
+          ) : null}
+        </div>
       </div>
     ),
   }));
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900">
-          Guide INPI pas à pas
-        </h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Suivez chaque étape sur le Guichet Unique. Cliquez pour déplier le
-          détail — rien n&apos;est laissé au hasard.
-        </p>
-      </div>
+    <section className="space-y-4" aria-label="Étapes du guide INPI">
+      {!hideProgressHeader ? (
+        <>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-line"
+            role="progressbar"
+            aria-valuenow={currentIndex + 1}
+            aria-valuemin={1}
+            aria-valuemax={INPI_STEPS.length}
+            aria-label="Progression du guide INPI"
+          >
+            <div
+              className="h-full rounded-full bg-brand-600 transition-all duration-300"
+              style={{ width: `${((currentIndex + 1) / INPI_STEPS.length) * 100}%` }}
+            />
+          </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" asChild>
-          <a href={INPI_URL} target="_blank" rel="noopener noreferrer">
-            Ouvrir le Guichet Unique INPI →
-          </a>
-        </Button>
-      </div>
+          <p className="text-sm text-ink-600">
+            <span className="font-semibold text-ink-900">
+              {currentIndex + 1}/{INPI_STEPS.length}
+            </span>
+            {" — "}
+            {currentStep?.title}
+          </p>
+        </>
+      ) : null}
 
-      <GuideAccordion items={items} />
+      <GuideAccordion
+        items={items}
+        openId={openId}
+        onOpenIdChange={setOpenId}
+        anchorPrefix="inpi-step"
+      />
     </section>
   );
 }

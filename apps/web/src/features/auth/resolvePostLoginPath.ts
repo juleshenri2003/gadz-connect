@@ -1,5 +1,4 @@
 import type { UserRole } from "@gadz-connect/types";
-import { needsMicroEnterprise } from "@/features/auth/roles";
 import { apiFetch } from "@/lib/api";
 
 const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
@@ -26,11 +25,10 @@ export async function resolvePostLoginPath(
       const res = await apiFetch<{ data: ProfileMe }>("/api/profile/me", {
         token: accessToken,
       });
-      const { role, profile_setup_complete } = res.data;
+      const profile = res.data;
 
-      if (PROVIDER_ROLES.includes(role)) {
-        if (!profile_setup_complete) return "/app/setup";
-        if (!needsMicroEnterprise(role)) return "/app";
+      if (PROVIDER_ROLES.includes(profile.role)) {
+        if (!profile.profile_setup_complete) return "/app/setup";
         return "/app";
       }
     } catch {

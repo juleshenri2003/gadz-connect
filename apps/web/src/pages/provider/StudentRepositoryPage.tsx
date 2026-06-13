@@ -1,11 +1,21 @@
-import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "@gadz-connect/ui";
+import { useMemo, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { RepositoryFoldersSkeleton } from "@/features/repository/RepositoryPageSkeleton";
+import { StudentRecentSummariesBanner } from "@/features/repository/StudentRecentSummariesBanner";
+import { StudentRepositoryEmptyState } from "@/features/repository/StudentRepositoryEmptyState";
+import { StudentRepositoryFolderCard } from "@/features/repository/StudentRepositoryFolderCard";
+import { formatRepositoryDate } from "@/features/repository/studentRepositoryUtils";
 import {
-  useFolderSummaries,
+  useRecentSummaries,
   useRepositoryFolders,
 } from "@/features/repository/useRepository";
+
+export { StudentRepositoryFolderPage } from "./StudentRepositoryFolderPage";
+
+type FolderSort = "recent" | "alpha";
 
 export function StudentRepositoryPage() {
   const { data: profile } = useMyProfile();
@@ -13,112 +23,135 @@ export function StudentRepositoryPage() {
     return <Navigate to="/app" replace />;
   }
 
-  const { data: folders, isLoading, isError } = useRepositoryFolders();
+  const {
+    data: folders,
+    isLoading,
+    isError,
+    refetch,
+  } = useRepositoryFolders();
+  const { data: recentSummaries } = useRecentSummaries(5);
+  const [sort, setSort] = useState<FolderSort>("recent");
+  const [showEmptyFolders, setShowEmptyFolders] = useState(false);
+
+  const visibleFolders = useMemo(() => {
+    let list = folders ?? [];
+    if (!showEmptyFolders) {
+      list = list.filter((folder) => folder.summaryCount > 0);
+    }
+    if (sort === "alpha") {
+      list = [...list].sort((a, b) =>
+        a.subject.localeCompare(b.subject, "fr"),
+      );
+    }
+    return list;
+  }, [folders, showEmptyFolders, sort]);
+
+  const totalSummaries = (folders ?? []).reduce(
+    (sum, folder) => sum + folder.summaryCount,
+    0,
+  );
+  const latestSummaryAt = (folders ?? []).reduce<string | null>(
+    (latest, folder) => {
+      if (!folder.lastSummaryAt) return latest;
+      if (!latest) return folder.lastSummaryAt;
+      return new Date(folder.lastSummaryAt) > new Date(latest)
+        ? folder.lastSummaryAt
+        : latest;
+    },
+    null,
+  );
+
+  const hasAnyFolder = (folders?.length ?? 0) > 0;
+  const hasVisibleFolders = visibleFolders.length > 0;
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Mon répertoire</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <h2 className="text-2xl font-bold text-ink-900">Comptes-rendus</h2>
+        <p className="mt-1 text-sm text-ink-600">
           Résumés de cours déposés par vos professeurs, classés par matière
         </p>
+        {totalSummaries > 0 && latestSummaryAt ? (
+          <p className="mt-2 text-sm text-ink-400">
+            {totalSummaries} résumé{totalSummaries !== 1 ? "s" : ""} · dernière
+            publication le {formatRepositoryDate(latestSummaryAt)}
+          </p>
+        ) : null}
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-500">Chargement…</p>
+        <RepositoryFoldersSkeleton />
       ) : isError ? (
-        <p className="text-sm text-red-600">Impossible de charger le répertoire.</p>
-      ) : !folders?.length ? (
-        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600">
-          Aucun dossier pour le moment. Les résumés apparaîtront ici après vos
-          cours.
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {folders.map((folder) => (
-            <Link
-              key={folder.id}
-              to={`/app/repertoire/${folder.id}`}
-              className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-indigo-300 hover:shadow-sm"
-            >
-              <p className="font-semibold text-slate-900">{folder.subject}</p>
-              <p className="mt-1 text-sm text-slate-500">
-                {folder.summaryCount} résumé{folder.summaryCount !== 1 ? "s" : ""}
-              </p>
-            </Link>
-          ))}
+        <div className="rounded-md border border-danger/20 bg-danger-bg px-4 py-3 text-sm text-danger">
+          <p>Impossible de charger vos comptes-rendus.</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={() => void refetch()}
+          >
+            Réessayer
+          </Button>
         </div>
-      )}
-
-      <Button variant="outline" size="sm" asChild>
-        <Link to="/app">← Tableau de bord</Link>
-      </Button>
-    </div>
-  );
-}
-
-export function StudentRepositoryFolderPage() {
-  const { data: profile } = useMyProfile();
-  if (profile && !isStudent(profile.role)) {
-    return <Navigate to="/app" replace />;
-  }
-
-  const { folderId } = useParams<{ folderId: string }>();
-  const { data, isLoading, isError } = useFolderSummaries(folderId ?? null);
-
-  if (isLoading) {
-    return <p className="text-sm text-slate-500">Chargement…</p>;
-  }
-
-  if (isError || !data) {
-    return (
-      <p className="text-sm text-red-600">Impossible de charger ce dossier.</p>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/app/repertoire">← Toutes les matières</Link>
-        </Button>
-        <h2 className="mt-4 text-2xl font-bold text-slate-900">
-          {data.folder.subject}
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Notions importantes de vos sessions de tutorat
-        </p>
-      </div>
-
-      {!data.summaries.length ? (
-        <p className="text-sm text-slate-500">Aucun résumé dans ce dossier.</p>
+      ) : !hasAnyFolder ? (
+        <StudentRepositoryEmptyState />
       ) : (
-        <div className="space-y-4">
-          {data.summaries.map((summary) => {
-            const provider = summary.provider
-              ? `${summary.provider.first_name} ${summary.provider.last_name}`.trim()
-              : "Professeur";
-            return (
-              <article
-                key={summary.id}
-                className="rounded-xl border border-slate-200 bg-white p-6"
+        <>
+          {recentSummaries && recentSummaries.length > 0 ? (
+            <StudentRecentSummariesBanner summaries={recentSummaries} />
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={sort === "recent" ? "default" : "outline"}
+                onClick={() => setSort("recent")}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h3 className="font-semibold text-slate-900">
-                    {summary.title}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {new Date(summary.published_at).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-                <p className="mt-1 text-xs text-indigo-600">Par {provider}</p>
-                <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
-                  {summary.content}
-                </p>
-              </article>
-            );
-          })}
-        </div>
+                Plus récent
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={sort === "alpha" ? "default" : "outline"}
+                onClick={() => setSort("alpha")}
+              >
+                Par matière
+              </Button>
+            </div>
+            {(folders ?? []).some((f) => f.summaryCount === 0) ? (
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-600">
+                <input
+                  type="checkbox"
+                  className="rounded border-line"
+                  checked={showEmptyFolders}
+                  onChange={(e) => setShowEmptyFolders(e.target.checked)}
+                />
+                Afficher les matières sans résumé
+              </label>
+            ) : null}
+          </div>
+
+          {hasVisibleFolders ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleFolders.map((folder) => (
+                <StudentRepositoryFolderCard key={folder.id} folder={folder} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-ink-400">
+              Aucune matière avec résumé pour le moment.{" "}
+              <Link
+                to="/app/cours"
+                className="font-medium text-brand-700 hover:underline"
+              >
+                Réserver un cours →
+              </Link>
+            </p>
+          )}
+        </>
       )}
     </div>
   );

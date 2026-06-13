@@ -22,9 +22,9 @@ export function CopyableText({ text, label, className = "" }: CopyableTextProps)
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
+      className={`flex flex-col gap-2 rounded-lg border border-line bg-surface p-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
     >
-      <code className="text-sm font-medium text-slate-800 break-words">
+      <code className="text-sm font-medium text-ink-900 break-words">
         {label ?? text}
       </code>
       <Button type="button" size="sm" variant="outline" onClick={() => void handleCopy()}>
@@ -45,11 +45,11 @@ export function CopyablePath({ labels, fullText }: CopyablePathProps) {
       <ol className="flex flex-wrap items-center gap-1 text-sm">
         {labels.map((label, i) => (
           <li key={label} className="flex items-center gap-1">
-            <span className="rounded-md bg-indigo-100 px-2 py-1 font-medium text-indigo-900">
+            <span className="rounded-md bg-brand-100 px-2 py-1 font-medium text-brand-700">
               {label}
             </span>
             {i < labels.length - 1 ? (
-              <span className="text-slate-400" aria-hidden>
+              <span className="text-ink-400" aria-hidden>
                 →
               </span>
             ) : null}

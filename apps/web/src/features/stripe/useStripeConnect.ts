@@ -64,3 +64,19 @@ export function useStripeOnboardingLink() {
     },
   });
 }
+
+export function useStripeDashboardLink() {
+  const { getAccessToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: { url: string } }>(
+        "/api/stripe/connect/dashboard-link",
+        { method: "POST", token },
+      );
+      return res.data.url;
+    },
+  });
+}

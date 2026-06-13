@@ -13,13 +13,18 @@ export function StripeReturnPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {isLoading ? (
-            <p className="text-sm text-slate-500">Vérification du compte…</p>
+            <p className="text-sm text-ink-400">Vérification du compte…</p>
           ) : data?.onboardingComplete ? (
-            <p className="text-sm text-green-700">
-              Votre compte Express est actif. Les virements sont activés.
-            </p>
+            <>
+              <p className="text-sm text-success">
+                Votre compte Express est actif. Les virements sont activés.
+              </p>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/app/cours">Publier vos créneaux</Link>
+              </Button>
+            </>
           ) : (
-            <p className="text-sm text-amber-800">
+            <p className="text-sm text-warning">
               L&apos;onboarding Stripe n&apos;est pas encore terminé. Complétez
               les étapes depuis votre espace prestataire.
             </p>

@@ -85,15 +85,15 @@ export function RhLoginPage() {
 
   if (sent) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md items-center bg-indigo-50/30 p-8">
-        <Card className="w-full border-indigo-100">
+      <main className="mx-auto flex min-h-screen max-w-md items-center bg-brand-50/30 p-8">
+        <Card className="w-full border-brand-100">
           <CardHeader>
             <CardTitle>Vérifiez votre boîte mail</CardTitle>
             <CardDescription>
               Un lien de connexion a été envoyé à {RH_EMAIL}.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-slate-600">
+          <CardContent className="space-y-4 text-sm text-ink-600">
             <p>Après connexion, vous serez redirigé vers le pilotage RH.</p>
             {IS_DEV ? (
               <Button
@@ -115,11 +115,11 @@ export function RhLoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 bg-indigo-50/30 p-8">
-      <Link to="/" className="text-sm text-slate-500 hover:text-slate-900">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 bg-brand-50/30 p-8">
+      <Link to="/" className="text-sm text-ink-400 hover:text-ink-900">
         ← Accueil
       </Link>
-      <Card className="border-indigo-100">
+      <Card className="border-brand-100">
         <CardHeader>
           <CardTitle>Plateforme RH</CardTitle>
           <CardDescription>
@@ -134,18 +134,18 @@ export function RhLoginPage() {
                 id="email"
                 type="email"
                 readOnly
-                className="bg-slate-50"
+                className="bg-paper"
                 {...register("email")}
               />
               {errors.email && (
-                <p className="text-sm text-red-600">{errors.email.message}</p>
+                <p className="text-sm text-danger">{errors.email.message}</p>
               )}
             </div>
             {serverError && (
               <div className="space-y-2">
-                <p className="text-sm text-red-600">{serverError}</p>
+                <p className="text-sm text-danger">{serverError}</p>
                 {isRateLimit && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-400">
                     Supabase limite le nombre d&apos;e-mails par heure après
                     plusieurs tests.
                   </p>
@@ -154,7 +154,7 @@ export function RhLoginPage() {
             )}
             <Button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700"
+              className="w-full bg-brand-600 hover:bg-brand-700"
               disabled={isSubmitting}
             >
               Recevoir le lien magique RH
@@ -162,8 +162,8 @@ export function RhLoginPage() {
           </form>
 
           {IS_DEV ? (
-            <div className="border-t border-slate-100 pt-4">
-              <p className="mb-2 text-xs text-slate-500">
+            <div className="border-t border-line pt-4">
+              <p className="mb-2 text-xs text-ink-400">
                 Développement local — connexion directe sans envoi d&apos;e-mail
               </p>
               <Button

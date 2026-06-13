@@ -10,7 +10,8 @@ import { HomePage } from "@/pages/HomePage";
 import { StripeReturnPage } from "@/pages/stripe/StripeReturnPage";
 import { RhLoginPage } from "@/pages/rh/RhLoginPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
-import { AdminMembersPage } from "@/pages/admin/AdminMembersPage";
+import { AdminMembersRedirect } from "@/pages/admin/AdminMembersRedirect";
+import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminBudgetsPage } from "@/pages/admin/AdminBudgetsPage";
 import { AdminCoursesPage } from "@/pages/admin/AdminCoursesPage";
 import { AdminSchedulePage } from "@/pages/admin/AdminSchedulePage";
@@ -95,7 +96,8 @@ export default function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="planning" element={<AdminSchedulePage />} />
         <Route path="alertes" element={<NotificationsPage />} />
-        <Route path="membres" element={<AdminMembersPage />} />
+        <Route path="utilisateurs" element={<AdminUsersPage />} />
+        <Route path="membres" element={<AdminMembersRedirect />} />
         <Route path="budgets" element={<AdminBudgetsPage />} />
         <Route path="cours" element={<AdminCoursesPage />} />
       </Route>

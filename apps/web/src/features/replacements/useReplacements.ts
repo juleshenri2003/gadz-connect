@@ -25,6 +25,7 @@ export interface PendingReplacementAlert {
   scheduled_at: string | null;
   course_id: string | null;
   pendingProposalsCount: number;
+  recipientId: string | null;
 }
 
 export function useReplacementProposals(notificationId: string | null) {
@@ -103,6 +104,7 @@ export function useDeclineReplacementOffer() {
         queryKey: ["replacement-my-response", notificationId],
       });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
     },
   });
 }
@@ -138,6 +140,7 @@ export function useProposeReplacement() {
       void queryClient.invalidateQueries({ queryKey: ["replacement-proposals"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
       void queryClient.invalidateQueries({ queryKey: ["replacements-pending-student"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
     },
   });
 }
@@ -162,6 +165,7 @@ export function useAcceptReplacement() {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
       void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
     },
   });
 }
@@ -183,6 +187,7 @@ export function useDeclineReplacement() {
       void queryClient.invalidateQueries({ queryKey: ["replacement-proposals"] });
       void queryClient.invalidateQueries({ queryKey: ["replacements-pending-student"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
     },
   });
 }
@@ -203,6 +208,10 @@ export function useDismissReplacement() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
       void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-admin"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-unread"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
     },
   });
 }

@@ -1,18 +1,25 @@
+import { useSearchParams } from "react-router-dom";
+import { useMyProfile } from "@/features/auth/useMyProfile";
 import { OnboardingMicroEnterpriseForm } from "@/features/onboarding/OnboardingMicroEnterpriseForm";
+import { MicroEnterprisePageHeader } from "@/features/onboarding/MicroEnterprisePageHeader";
+import type { MicroStep } from "@/features/onboarding/microEnterprisePageUtils";
 
 export function ProviderOnboardingPage() {
+  const { data: profile, isLoading } = useMyProfile();
+  const [searchParams] = useSearchParams();
+  const stepParam = searchParams.get("step") as MicroStep | null;
+  const isEditMode =
+    stepParam === "questionnaire" && searchParams.get("edit") === "1";
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Micro-entreprise</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Créez ou déclarez votre statut micro-entreprise pour proposer des
-          cours sur Gadz&apos;Connect.
-        </p>
-      </div>
-      <div className="max-w-3xl">
-        <OnboardingMicroEnterpriseForm />
-      </div>
+    <div className="w-full space-y-8">
+      <MicroEnterprisePageHeader
+        profile={profile}
+        isLoading={isLoading}
+        stepParam={stepParam}
+        isEditMode={isEditMode}
+      />
+      <OnboardingMicroEnterpriseForm />
     </div>
   );
 }

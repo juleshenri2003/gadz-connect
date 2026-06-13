@@ -3,6 +3,9 @@ import type {
   DashboardProgress,
   DashboardTask,
 } from "@/features/dashboard/dashboardTypes";
+import type { RegistrationPath } from "@gadz-connect/types";
+import { inferRegistrationPath } from "@/features/onboarding/registrationPath";
+import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 
 export type OnboardingTaskStatus = DashboardTask["status"];
 export type OnboardingTaskId =
@@ -10,7 +13,6 @@ export type OnboardingTaskId =
   | "questionnaire"
   | "inpi"
   | "siret"
-  | "rh_validation"
   | "stripe"
   | "publish_slots";
 
@@ -21,19 +23,40 @@ interface StripeStatus {
   onboardingComplete: boolean;
 }
 
-function hasValidSiret(siret: string | null | undefined): boolean {
-  return /^\d{14}$/.test(siret?.replace(/\s/g, "") ?? "");
-}
+const EXPRESS_TASKS: Omit<OnboardingTask, "status">[] = [
+  {
+    id: "profile",
+    title: "Profil complété",
+    description: "Identité, campus et rôle enseignant",
+    href: "/app/setup",
+  },
+  {
+    id: "questionnaire",
+    title: "Questionnaire fiscal",
+    description: "Activité, URSSAF et options fiscales",
+    href: "/app/micro-entreprise?step=questionnaire",
+  },
+  {
+    id: "siret",
+    title: "Déclarer son SIRET",
+    description: "Votre numéro SIRET existant (14 chiffres)",
+    href: "/app/micro-entreprise?step=siret",
+  },
+  {
+    id: "stripe",
+    title: "Configurer les paiements",
+    description: "Stripe Connect pour recevoir vos virements",
+    href: "/app/paiements",
+  },
+  {
+    id: "publish_slots",
+    title: "Publier des créneaux",
+    description: "Tarif horaire et au moins un créneau à venir",
+    href: coursesTabHref("slots"),
+  },
+];
 
-function countFutureSlots(
-  slots: { starts_at: string }[] | undefined,
-): number {
-  const now = Date.now();
-  return (slots ?? []).filter((s) => new Date(s.starts_at).getTime() > now)
-    .length;
-}
-
-const TASK_DEFINITIONS: Omit<OnboardingTask, "status">[] = [
+const FULL_TASKS: Omit<OnboardingTask, "status">[] = [
   {
     id: "profile",
     title: "Profil complété",
@@ -50,7 +73,7 @@ const TASK_DEFINITIONS: Omit<OnboardingTask, "status">[] = [
     id: "inpi",
     title: "Créer sa micro-entreprise sur l'INPI",
     description: "Immatriculation sur le Guichet Unique",
-    href: "/app/micro-entreprise?step=guide",
+    href: "/app/micro-entreprise#inpi-guide",
     manualAction: "inpi_sent",
   },
   {
@@ -58,12 +81,6 @@ const TASK_DEFINITIONS: Omit<OnboardingTask, "status">[] = [
     title: "Déclarer son SIRET",
     description: "Numéro à 14 chiffres reçu de l'INSEE",
     href: "/app/micro-entreprise?step=siret",
-  },
-  {
-    id: "rh_validation",
-    title: "Validation RH",
-    description: "Vérification de votre dossier par l'équipe campus",
-    readOnly: true,
   },
   {
     id: "stripe",
@@ -75,9 +92,27 @@ const TASK_DEFINITIONS: Omit<OnboardingTask, "status">[] = [
     id: "publish_slots",
     title: "Publier des créneaux",
     description: "Tarif horaire et au moins un créneau à venir",
-    href: "/app/cours",
+    href: coursesTabHref("slots"),
   },
 ];
+
+function hasValidSiret(siret: string | null | undefined): boolean {
+  return /^\d{14}$/.test(siret?.replace(/\s/g, "") ?? "");
+}
+
+function countFutureSlots(
+  slots: { starts_at: string }[] | undefined,
+): number {
+  const now = Date.now();
+  return (slots ?? []).filter((s) => new Date(s.starts_at).getTime() > now)
+    .length;
+}
+
+export function getTaskDefinitions(
+  registrationPath: RegistrationPath,
+): Omit<OnboardingTask, "status">[] {
+  return registrationPath === "existing_siret" ? EXPRESS_TASKS : FULL_TASKS;
+}
 
 function isTaskDone(
   id: OnboardingTaskId,
@@ -96,8 +131,6 @@ function isTaskDone(
       );
     case "siret":
       return hasValidSiret(profile.siret);
-    case "rh_validation":
-      return profile.account_status === "active";
     case "stripe":
       return Boolean(stripe?.onboardingComplete);
     case "publish_slots":
@@ -113,10 +146,13 @@ export function computeTeacherOnboardingProgress(
   profile: MyProfile,
   stripe: StripeStatus | undefined,
   slots: { starts_at: string }[] | undefined,
+  registrationPath?: RegistrationPath,
 ): OnboardingProgress {
+  const path = registrationPath ?? inferRegistrationPath(profile);
+  const taskDefs = getTaskDefinitions(path);
   const futureSlotsCount = countFutureSlots(slots);
 
-  const tasks: OnboardingTask[] = TASK_DEFINITIONS.map((def) => {
+  const tasks: OnboardingTask[] = taskDefs.map((def) => {
     const done = isTaskDone(def.id, profile, stripe, futureSlotsCount);
     return { ...def, status: done ? "done" : "todo" };
   });
@@ -140,4 +176,14 @@ export function isTeacherOnboardingIncomplete(
   slots: { starts_at: string }[] | undefined,
 ): boolean {
   return !computeTeacherOnboardingProgress(profile, stripe, slots).isComplete;
+}
+
+export function getNextOnboardingHref(
+  profile: MyProfile,
+  stripe: StripeStatus | undefined,
+  slots: { starts_at: string }[] | undefined,
+): string {
+  const progress = computeTeacherOnboardingProgress(profile, stripe, slots);
+  const next = progress.tasks.find((t) => t.status !== "done");
+  return next?.href ?? "/app";
 }

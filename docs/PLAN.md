@@ -10,25 +10,35 @@ Document de référence produit. Voir le dépôt pour l'état d'implémentation 
 | Module | Objectif | Statut implémentation |
 |--------|----------|----------------------|
 | **1 — Auth & profils** | Magic link, rôles, campus, cloisonnement | En cours — parcours `/app/setup` |
-| **2 — Onboarding micro-entreprise** | Questionnaire, PDF INPI, ACRE, attente SIRET | En cours — saisie SIRET + validation RH |
+| **2 — Onboarding micro-entreprise** | Questionnaire, PDF INPI, ACRE, auto-activation SIRET | En cours — parcours express (5 étapes) et complet (6 étapes) |
 | **3 — Marketplace tutorat** | Recherche, profils, créneaux, réservation | En cours — MVP campus pilote |
 | **4 — Gestion financière** | Stripe Connect, commission, URSSAF, net 48h | Partiel — calcul fiscal + réservation |
 
 ## V2 / V3
 
 - Module 5 — Planning iCal ADE + remplacement enseignants
-- Module 6 — Administration campus (validation SIRET, exports)
+- Module 6 — Administration campus (supervision exceptionnelle, exports)
 - Module 7 — Multi-écoles
 
 ## Flux SIRET professeur
 
-1. Questionnaire micro-entreprise → `pending_siret` (si attente INPI)
-2. PDF guide + Guichet Unique INPI
-3. Prof déclare son SIRET (`PATCH /api/profile/siret`)
-4. RH valide dans `/admin/membres` → `active`
+**Principe : auto-validation maximale.** La RH intervient en exception (suspension, doublon SIRET, échec vérif API).
+
+### Parcours express (`existing_siret`) — ~15 min
+
+1. Setup profil + CV
+2. Questionnaire fiscal + saisie SIRET existant → `active` immédiat
+3. Stripe Connect + publication de créneaux
+
+### Parcours complet (`new_micro`) — ~2 semaines
+
+1. Setup profil + CV
+2. Questionnaire fiscal → `pending_siret`
+3. PDF guide + Guichet Unique INPI (milestone `inpi_sent`)
+4. Prof déclare son SIRET (`PATCH /api/profile/siret`) → `active` automatique
 5. Stripe Connect + publication de créneaux
 
-Compte test pending : `prof.enattente@ensam.eu` (`pnpm seed-professor-pending`)
+Comptes test : `prof.enattente@ensam.eu`, `prof.express@ensam.eu`, `prof.complet@ensam.eu` (`pnpm seed-professor-pending`)
 
 ## Règle d'or
 

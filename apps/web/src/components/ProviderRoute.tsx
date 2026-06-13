@@ -3,6 +3,7 @@ import { Button } from "@gadz-connect/ui";
 import type { UserRole } from "@gadz-connect/types";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SuspendedAccountPage } from "@/pages/provider/SuspendedAccountPage";
 
 const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
@@ -12,7 +13,7 @@ function ProviderGate() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-ink-400">
         Chargement de votre espace…
       </div>
     );
@@ -21,10 +22,10 @@ function ProviderGate() {
   if (isError || !profile) {
     return (
       <div className="mx-auto max-w-lg space-y-4 p-8 text-center">
-        <h1 className="text-lg font-semibold text-slate-900">
+        <h1 className="text-lg font-semibold text-ink-900">
           Profil introuvable
         </h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-600">
           Votre compte n&apos;a pas encore de profil Gadz&apos;Connect.
         </p>
         <Button asChild>
@@ -32,6 +33,10 @@ function ProviderGate() {
         </Button>
       </div>
     );
+  }
+
+  if (profile.account_status === "suspended") {
+    return <SuspendedAccountPage />;
   }
 
   if (!PROVIDER_ROLES.includes(profile.role)) {

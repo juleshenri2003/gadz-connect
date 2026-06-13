@@ -7,6 +7,8 @@ export interface SubjectFolder {
   subject: string;
   created_at: string;
   summaryCount: number;
+  lastSummaryAt: string | null;
+  latestTitle: string | null;
 }
 
 export interface CourseSummary {
@@ -15,7 +17,14 @@ export interface CourseSummary {
   content: string;
   published_at: string;
   course_id: string;
+  folder_id?: string;
   provider?: { first_name: string; last_name: string } | null;
+  course?: { scheduled_at: string | null } | null;
+}
+
+export interface RecentCourseSummary extends CourseSummary {
+  folder_id: string;
+  folder?: { id: string; subject: string } | null;
 }
 
 export interface CourseToDocument {
@@ -62,6 +71,24 @@ export function useFolderSummaries(folderId: string | null) {
       return res.data;
     },
     enabled: Boolean(user && getAccessToken() && folderId),
+  });
+}
+
+export function useRecentSummaries(limit = 5) {
+  const { getAccessToken, user } = useAuth();
+
+  return useQuery({
+    queryKey: ["repository-recent-summaries", limit],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: RecentCourseSummary[] }>(
+        `/api/repository/summaries/recent?limit=${limit}`,
+        { token },
+      );
+      return res.data;
+    },
+    enabled: Boolean(user && getAccessToken()),
   });
 }
 
@@ -112,7 +139,12 @@ export function useSubmitCourseSummary() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses-to-document"] });
       void queryClient.invalidateQueries({ queryKey: ["repository-folders"] });
-      void queryClient.invalidateQueries({ queryKey: ["repository-folder-summaries"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["repository-folder-summaries"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["repository-recent-summaries"],
+      });
     },
   });
 }

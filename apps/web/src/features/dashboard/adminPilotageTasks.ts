@@ -1,41 +1,44 @@
-import type { AdminDashboardData, AdminProfileRow } from "@/features/admin/types";
+import { buildAdminAlertHref } from "@/features/notifications/notificationUtils";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
 import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
 
 export function computeAdminPilotageTasks(
-  dashboard: AdminDashboardData | undefined,
-  profiles: AdminProfileRow[] | undefined,
+  profiles: Array<{
+    account_status: string;
+    siret: string | null;
+    siret_verification_failed?: boolean;
+  }> | undefined,
   notifications: CampusNotificationItem[] | undefined,
+  suspendedCount = 0,
+  awaitingReplacementCount = 0,
 ): DashboardProgress {
   const tasks: DashboardTask[] = [];
 
-  const pendingWithSiret =
-    profiles?.filter(
-      (p) => p.account_status === "pending_siret" && Boolean(p.siret),
-    ) ?? [];
+  const verificationFailed =
+    profiles?.filter((p) => p.siret_verification_failed) ?? [];
 
-  if (pendingWithSiret.length > 0) {
+  if (verificationFailed.length > 0) {
     tasks.push({
-      id: "validate-siret",
-      title: `Valider ${pendingWithSiret.length} SIRET`,
-      description:
-        "Professeurs en attente de validation RH après déclaration SIRET",
-      href: "/admin/membres",
+      id: "siret-verification-failed",
+      title: `${verificationFailed.length} vérification(s) SIRET en échec`,
+      description: "Dossiers à contrôler manuellement dans Utilisateurs",
+      href: "/admin/utilisateurs?filter=verification_failed",
       status: "todo",
     });
   }
 
-  const pendingNoSiret =
-    profiles?.filter(
-      (p) => p.account_status === "pending_siret" && !p.siret,
-    ) ?? [];
-
-  if (pendingNoSiret.length > 0) {
+  const siretCounts = new Map<string, number>();
+  for (const p of profiles ?? []) {
+    if (!p.siret) continue;
+    siretCounts.set(p.siret, (siretCounts.get(p.siret) ?? 0) + 1);
+  }
+  const duplicateCount = [...siretCounts.values()].filter((c) => c > 1).length;
+  if (duplicateCount > 0) {
     tasks.push({
-      id: "follow-pending-profs",
-      title: `${pendingNoSiret.length} prof(s) en attente de SIRET`,
-      description: "Relancer les dossiers micro-entreprise incomplets",
-      href: "/admin/membres",
+      id: "duplicate-siret",
+      title: `${duplicateCount} SIRET en doublon`,
+      description: "Résoudre les conflits d'attribution SIRET",
+      href: "/admin/utilisateurs?filter=duplicates",
       status: "todo",
     });
   }
@@ -48,36 +51,33 @@ export function computeAdminPilotageTasks(
     ) ?? [];
 
   if (openReplacements.length > 0) {
+    const firstOpen = openReplacements[0];
     tasks.push({
       id: "review-replacements",
       title: `${openReplacements.length} remplacement(s) en cours`,
       description:
         "Superviser les indisponibilités prof et le choix des remplaçants",
-      href: "/admin/alertes",
+      href: buildAdminAlertHref(firstOpen?.id, "in_progress"),
       status: "todo",
     });
   }
 
-  const awaitingCount =
-    dashboard?.courses.byStatus.awaiting_replacement ?? 0;
-
-  if (awaitingCount > 0) {
+  if (awaitingReplacementCount > 0) {
     tasks.push({
       id: "courses-awaiting-replacement",
-      title: `${awaitingCount} cours en attente de remplaçant`,
+      title: `${awaitingReplacementCount} cours en attente de remplaçant`,
       description: "Cours dont le statut est « awaiting_replacement »",
-      href: "/admin/cours",
+      href: "/admin/planning?status=awaiting_replacement",
       status: "todo",
     });
   }
 
-  const suspended = dashboard?.profiles.byStatus.suspended ?? 0;
-  if (suspended > 0) {
+  if (suspendedCount > 0) {
     tasks.push({
       id: "review-suspended",
-      title: `${suspended} compte(s) suspendu(s)`,
+      title: `${suspendedCount} compte(s) suspendu(s)`,
       description: "Vérifier les comptes suspendus et réactiver si besoin",
-      href: "/admin/membres",
+      href: "/admin/utilisateurs?filter=suspended",
       status: "todo",
     });
   }
@@ -89,7 +89,7 @@ export function computeAdminPilotageTasks(
       id: "read-alerts",
       title: `${unreadCount} alerte(s) non lue(s)`,
       description: "Consulter les alertes campus du pilotage",
-      href: "/admin/alertes",
+      href: buildAdminAlertHref(),
       status: "todo",
     });
   }

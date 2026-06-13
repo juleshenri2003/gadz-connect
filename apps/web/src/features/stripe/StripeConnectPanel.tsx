@@ -26,16 +26,16 @@ export function StripeConnectPanel() {
 
   if (status?.onboardingComplete) {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+      <div className="rounded-lg border border-success/20 bg-success-bg p-4 text-sm text-success">
         Compte Stripe Connect actif — virements activés.
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+    <div className="rounded-lg border border-line p-4 space-y-3">
       <p className="text-sm font-medium">Paiements — Stripe Connect Express</p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-400">
         Créez votre compte prestataire pour recevoir les virements après chaque
         cours validé.
       </p>
@@ -49,7 +49,7 @@ export function StripeConnectPanel() {
           : "Configurer Stripe Connect"}
       </Button>
       {(createAccount.error || onboardingLink.error) && (
-        <p className="text-xs text-red-600">
+        <p className="text-xs text-danger">
           {(createAccount.error ?? onboardingLink.error)?.message}
         </p>
       )}

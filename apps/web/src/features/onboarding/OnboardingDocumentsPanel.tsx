@@ -48,12 +48,12 @@ export function OnboardingDocumentsPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-5 space-y-3">
+    <section className="rounded-md border border-brand-100 bg-brand-50/40 p-5 space-y-3">
       <div>
-        <h3 className="font-semibold text-indigo-900">
+        <h3 className="font-semibold text-brand-700">
           Documents complémentaires (optionnel)
         </h3>
-        <p className="mt-1 text-sm text-indigo-800/80">
+        <p className="mt-1 text-sm text-brand-700/80">
           Le parcours interactif ci-dessus remplace le PDF Méthodo. Vous pouvez
           toutefois télécharger votre récapitulatif personnalisé ou le dossier
           ACRE.
@@ -86,7 +86,7 @@ export function OnboardingDocumentsPanel() {
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </section>
   );
 }

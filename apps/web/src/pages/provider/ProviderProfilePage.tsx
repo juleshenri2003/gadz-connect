@@ -1,208 +1,180 @@
-import { useEffect, useRef, useState } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Label } from "@gadz-connect/ui";
-import { ROLE_LABELS, STATUS_LABELS } from "@/features/admin/format";
+import { Button } from "@gadz-connect/ui";
+import { Link, useNavigate } from "react-router-dom";
+import { RH_CONTACT_EMAIL } from "@/features/admin/rhContact";
 import { isStudent } from "@/features/auth/roles";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import {
-  useDeleteCvPdf,
-  useMyCvPdfUrl,
-  useUploadCvPdf,
-} from "@/features/cv/useCvPdf";
-import { useUpdateTutorProfile } from "@/features/marketplace/useTutors";
+  MarketplaceVisibilityPill,
+  TeacherMarketplaceVisibility,
+} from "@/features/dashboard/teacher-cockpit/TeacherMarketplaceVisibility";
+import { useStudentDashboardProgress } from "@/features/dashboard/useStudentDashboardProgress";
+import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
+import { useMyTutorProfile } from "@/features/marketplace/useTutors";
+import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
+import { ProfilePageSkeleton } from "@/features/profile/ProfilePageSkeleton";
+import {
+  AccountStatusBadge,
+  TeacherProfileAccountCard,
+} from "@/features/profile/TeacherProfileAccountCard";
+import { StudentProfileAccountCard } from "@/features/profile/StudentProfileAccountCard";
+import { StudentProfileHeader } from "@/features/profile/StudentProfileHeader";
+import { StudentProfileJourneyCard } from "@/features/profile/StudentProfileJourneyCard";
+import { TeacherProfileCvSection } from "@/features/profile/TeacherProfileCvSection";
+import { TeacherProfileStudentPreview } from "@/features/profile/TeacherProfileStudentPreview";
+import { TeacherPublicProfileForm } from "@/features/profile/TeacherPublicProfileForm";
+
+function SuspendedAccountBanner() {
+  return (
+    <div
+      className="rounded-md border border-danger/20 bg-danger-bg px-4 py-4 text-sm text-danger"
+      role="alert"
+    >
+      <p className="font-medium">Compte suspendu</p>
+      <p className="mt-2">
+        Votre accès prestataire est suspendu. Contactez l&apos;équipe campus pour
+        plus d&apos;informations.
+      </p>
+      <Button className="mt-3" size="sm" variant="outline" asChild>
+        <a href={`mailto:${RH_CONTACT_EMAIL}?subject=Compte%20suspendu%20Gadz'Connect`}>
+          Contacter le support
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+function SiretStatusAlert({
+  accountStatus,
+  siretVerificationFailed,
+}: {
+  accountStatus: string;
+  siretVerificationFailed: boolean;
+}) {
+  if (!siretVerificationFailed && accountStatus !== "pending_siret") return null;
+
+  const message = siretVerificationFailed
+    ? "Votre SIRET n'a pas pu être vérifié. Corrigez-le depuis la page Micro-entreprise."
+    : "Votre compte est en attente de validation SIRET. Complétez ou vérifiez votre déclaration.";
+
+  return (
+    <div
+      className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning"
+      role="status"
+    >
+      <p>{message}</p>
+      <Button className="mt-3" size="sm" variant="outline" asChild>
+        <Link to="/app/micro-entreprise">Aller à Micro-entreprise →</Link>
+      </Button>
+    </div>
+  );
+}
+
+function StudentProfileView({
+  email,
+  profile,
+}: {
+  email: string | undefined;
+  profile: NonNullable<ReturnType<typeof useMyProfile>["data"]>;
+}) {
+  const { progress } = useStudentDashboardProgress();
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <StudentProfileHeader profile={profile} />
+
+      <StudentProfileAccountCard profile={profile} email={email} />
+
+      {progress ? <StudentProfileJourneyCard progress={progress} /> : null}
+
+      <WrongProfileLink className="text-center text-ink-400" useModal />
+    </div>
+  );
+}
+
+function ProfileLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mx-auto max-w-lg space-y-4 text-center">
+      <p className="text-sm text-danger">Impossible de charger votre profil</p>
+      <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+        Réessayer
+      </Button>
+    </div>
+  );
+}
 
 export function ProviderProfilePage() {
   const { user } = useAuth();
-  const { data: profile, isLoading, isError } = useMyProfile();
-  const updateProfile = useUpdateTutorProfile();
-  const uploadPdf = useUploadCvPdf();
-  const deletePdf = useDeleteCvPdf();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [cv, setCv] = useState("");
+  const navigate = useNavigate();
+  const { data: profile, isLoading, isError, refetch } = useMyProfile();
 
-  const hasPdf = Boolean(profile?.cv_pdf_path);
-  const { data: pdfUrl } = useMyCvPdfUrl(hasPdf);
-
-  useEffect(() => {
-    setCv(profile?.cv ?? "");
-  }, [profile?.cv]);
+  const studentRole = profile ? isStudent(profile.role) : false;
+  const { data: tutorProfile } = useMyTutorProfile({
+    enabled: Boolean(profile) && !studentRole,
+  });
 
   if (isLoading) {
-    return <p className="text-sm text-slate-500">Chargement du profil…</p>;
+    return <ProfilePageSkeleton variant="teacher" />;
   }
 
   if (isError || !profile) {
-    return (
-      <p className="text-sm text-red-600">Impossible de charger votre profil</p>
-    );
+    return <ProfileLoadError onRetry={() => void refetch()} />;
   }
 
-  const fullName = `${profile.first_name} ${profile.last_name}`.trim();
   const student = isStudent(profile.role);
-  const textCvValid = cv.trim().length === 0 || cv.trim().length >= 50;
-  const canSaveText = textCvValid && (cv.trim().length >= 50 || hasPdf);
+  const marketplace = profile.marketplace ?? tutorProfile?.marketplace;
 
-  const fields = student
-    ? [
-        ["E-mail", user?.email],
-        ["Rôle", ROLE_LABELS[profile.role]],
-        ["Campus", profile.campus?.name],
-        ["Statut", "Compte élève actif"],
-      ]
-    : [
-        ["E-mail", user?.email],
-        ["Rôle", ROLE_LABELS[profile.role]],
-        ["Campus", profile.campus?.name],
-        ["Statut", STATUS_LABELS[profile.account_status]],
-        ["SIRET", profile.siret ?? "Non renseigné"],
-        ["Activité", profile.micro_enterprise_activity ?? "—"],
-        ["Périodicité URSSAF", profile.urssaf_periodicity ?? "—"],
-        [
-          "Versement libératoire",
-          profile.versement_liberatoire ? "Oui" : "Non",
-        ],
-      ];
-
-  async function saveCv() {
-    await updateProfile.mutateAsync({ cv: cv.trim() });
-  }
-
-  async function onPdfSelected(file: File | undefined) {
-    if (!file) return;
-    await uploadPdf.mutateAsync(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  if (student) {
+    return <StudentProfileView email={user?.email} profile={profile} />;
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Mon profil</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {student
-            ? "Votre compte élève — pas de micro-entreprise requise"
-            : "Informations de votre compte prestataire"}
-        </p>
-      </div>
-
-      <Card className="border-slate-200">
-        <CardHeader>
-          <CardTitle className="text-lg">{fullName || user?.email}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            {fields.map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {label}
-                </dt>
-                <dd className="mt-1 text-sm font-medium text-slate-900">
-                  {value ?? "—"}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-
-      {!student ? (
-        <Card className="border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-base">Mon CV</CardTitle>
-            <p className="text-sm text-slate-500">
-              Texte et/ou PDF — visible par les élèves lors du choix d&apos;un
-              professeur.
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-ink-900">Mon profil</h2>
+            <p className="mt-1 text-sm text-ink-600">
+              Votre hub personnel — compte, profil public et CV
             </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-              <div>
-                <p className="text-sm font-medium text-slate-900">CV en PDF</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Déposez votre CV au format PDF (max. 5 Mo). Un seul fichier à
-                  la fois — le précédent est remplacé.
-                </p>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-700"
-                disabled={uploadPdf.isPending}
-                onChange={(e) => void onPdfSelected(e.target.files?.[0])}
-              />
-              {hasPdf ? (
-                <div className="flex flex-wrap gap-2">
-                  {pdfUrl ? (
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                        Voir mon CV PDF
-                      </a>
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={deletePdf.isPending}
-                    onClick={() => void deletePdf.mutate()}
-                  >
-                    {deletePdf.isPending ? "Suppression…" : "Supprimer le PDF"}
-                  </Button>
-                </div>
-              ) : null}
-              {uploadPdf.isError ? (
-                <p className="text-sm text-red-600" role="alert">
-                  {(uploadPdf.error as Error).message}
-                </p>
-              ) : null}
-              {uploadPdf.isSuccess ? (
-                <p className="text-sm text-green-700" role="status">
-                  CV PDF enregistré.
-                </p>
-              ) : null}
-            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <AccountStatusBadge status={profile.account_status} />
+            <MarketplaceVisibilityPill marketplace={marketplace} />
+          </div>
+        </div>
+        <WrongProfileLink />
+      </header>
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="profile-cv">
-                  CV texte (complément ou alternative)
-                </Label>
-                <textarea
-                  id="profile-cv"
-                  rows={8}
-                  className="w-full rounded-md border border-slate-200 p-3 text-sm"
-                  placeholder="Formation, expériences de tutorat, matières maîtrisées, langues…"
-                  value={cv}
-                  onChange={(e) => setCv(e.target.value)}
-                />
-              </div>
-              {updateProfile.isError ? (
-                <p className="text-sm text-red-600" role="alert">
-                  {(updateProfile.error as Error).message}
-                </p>
-              ) : null}
-              {updateProfile.isSuccess ? (
-                <p className="text-sm text-green-700" role="status">
-                  CV texte enregistré.
-                </p>
-              ) : null}
-              <Button
-                size="sm"
-                disabled={updateProfile.isPending || !canSaveText}
-                onClick={() => void saveCv()}
-              >
-                {updateProfile.isPending
-                  ? "Enregistrement…"
-                  : "Enregistrer le texte"}
-              </Button>
-              {cv.trim().length > 0 && cv.trim().length < 50 ? (
-                <p className="text-xs text-slate-500">
-                  Minimum 50 caractères pour le texte, ou déposez un PDF.
-                </p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      {profile.account_status === "suspended" ? <SuspendedAccountBanner /> : null}
+
+      <SiretStatusAlert
+        accountStatus={profile.account_status}
+        siretVerificationFailed={profile.siret_verification_failed}
+      />
+
+      <TeacherMarketplaceVisibility
+        marketplace={marketplace}
+        onFixRate={() => {
+          document
+            .getElementById("teacher-public-profile")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        onFixSlots={() => navigate(coursesTabHref("slots"))}
+      />
+
+      <TeacherProfileAccountCard profile={profile} email={user?.email} />
+
+      <TeacherPublicProfileForm profile={profile} variant="standalone" />
+
+      <TeacherProfileCvSection profile={profile} />
+
+      <TeacherProfileStudentPreview
+        profile={profile}
+        bio={tutorProfile?.bio}
+        subjects={tutorProfile?.subjects ?? profile.subjects}
+        hourlyRate={tutorProfile?.hourly_rate ?? profile.hourly_rate}
+      />
     </div>
   );
 }

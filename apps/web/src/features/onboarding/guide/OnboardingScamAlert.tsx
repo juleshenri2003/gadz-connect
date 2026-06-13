@@ -4,33 +4,33 @@ export function OnboardingScamAlert() {
   return (
     <div
       role="alert"
-      className="rounded-xl border-2 border-red-500 bg-red-50 p-5 shadow-sm"
+      className="rounded-md border-2 border-danger bg-danger-bg p-5 shadow-surface"
     >
       <div className="flex items-start gap-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger text-lg font-bold text-white"
           aria-hidden
         >
           !
         </span>
         <div className="min-w-0 space-y-3">
           <div>
-            <h3 className="text-lg font-bold text-red-950">
+            <h3 className="text-lg font-bold text-danger">
               Alerte arnaques — tout est gratuit
             </h3>
-            <p className="mt-1 text-sm text-red-900">
+            <p className="mt-1 text-sm text-danger">
               Vous ne serez <strong>jamais</strong> amené à payer quoi que ce soit
               pour créer ou conserver votre statut. Les cotisations URSSAF ne
               commencent que lorsque vous encaissez de l&apos;argent en donnant des
               cours.
             </p>
           </div>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-red-900">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-danger">
             {SCAM_WARNINGS.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
-          <p className="text-sm font-semibold text-red-950">
+          <p className="text-sm font-semibold text-danger">
             Dans le doute, contactez le responsable au{" "}
             <a
               href={PLATFORM_CONTACTS.responsable.phoneHref}

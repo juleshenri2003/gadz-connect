@@ -1,91 +1,205 @@
+import { Button } from "@gadz-connect/ui";
+import { useCallback, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { buildAdminPlanningHref } from "@/features/scheduling/adminScheduleUtils";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@gadz-connect/ui";
-import { useAdminDashboard } from "@/features/admin/useAdmin";
+  useAdminCampuses,
+  useAdminCourses,
+  useAdminCoursesSummary,
+  useAdminMe,
+} from "@/features/admin/useAdmin";
+import { CourseDetailDrawer } from "@/features/admin/courses/CourseDetailDrawer";
+import { CoursesFilterBar } from "@/features/admin/courses/CoursesFilterBar";
+import { CoursesKpiStrip } from "@/features/admin/courses/CoursesKpiStrip";
+import { CoursesTable } from "@/features/admin/courses/CoursesTable";
+import { CoursesPageSkeleton } from "@/features/admin/courses/CoursesTableSkeleton";
+import {
+  filtersFromSearchParams,
+  filtersToApiParams,
+  filtersToQueryParams,
+  type CourseFiltersState,
+} from "@/features/admin/courses/courseFilters";
+import type { AdminCoursePreset } from "@/features/admin/types";
 
-const COURSE_STATUS: Record<string, string> = {
-  scheduled: "Planifié",
-  completed: "Terminé",
-  cancelled: "Annulé",
-};
+const PAGE_SIZE = 50;
 
 export function AdminCoursesPage() {
-  const { data: dashboard, isLoading } = useAdminDashboard();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  if (isLoading || !dashboard) {
-    return <p className="text-sm text-slate-500">Chargement des cours…</p>;
+  const filters = useMemo(
+    () => filtersFromSearchParams(searchParams),
+    [searchParams],
+  );
+
+  const { data: me } = useAdminMe();
+  const { data: campuses = [] } = useAdminCampuses();
+  const isGlobalScope = me?.role === "admin_general";
+  const campusIdForSummary =
+    filters.campusId !== "all" ? filters.campusId : undefined;
+
+  const apiParams = useMemo(
+    () => filtersToApiParams(filters, page, PAGE_SIZE),
+    [filters, page],
+  );
+
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useAdminCourses(apiParams);
+  const summaryQuery = useAdminCoursesSummary(campusIdForSummary);
+
+  const courses = data?.courses ?? [];
+  const meta = data?.meta;
+  const selectedListCourse =
+    courses.find((course) => course.id === selectedCourseId) ?? null;
+
+  const updateFilters = useCallback(
+    (next: CourseFiltersState) => {
+      setPage(1);
+      setSearchParams(filtersToQueryParams(next), { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const resetFilters = useCallback(() => {
+    setPage(1);
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }, [setSearchParams]);
+
+  const handlePresetChange = useCallback(
+    (preset: AdminCoursePreset | null) => {
+      updateFilters({ ...filters, preset, statuses: [] });
+    },
+    [filters, updateFilters],
+  );
+
+  const scopeLabel = isGlobalScope
+    ? "Tous les campus Arts et Métiers"
+    : "Périmètre limité à votre campus";
+
+  const totalPages = meta
+    ? Math.max(1, Math.ceil(meta.total / meta.pageSize))
+    : 1;
+
+  const showInitialSkeleton =
+    isLoading && !data && summaryQuery.isLoading && !summaryQuery.data;
+
+  const hasAwaitingReplacementInList = courses.some(
+    (course) => course.status === "awaiting_replacement",
+  );
+
+  if (showInitialSkeleton) {
+    return <CoursesPageSkeleton />;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Cours</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {dashboard.courses.total} cours enregistré
-          {dashboard.courses.total > 1 ? "s" : ""} dans la base
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-ink-900">Cours</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            Registre des sessions de tutorat — supervision et recherche
+          </p>
+          <p className="mt-1 text-xs text-ink-400">{scopeLabel}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link to={buildAdminPlanningHref({})}>
+              Emploi du temps →
+            </Link>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <Link to="/admin">← Retour au pilotage</Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {Object.entries(dashboard.courses.byStatus).map(([status, count]) => (
-          <Card key={status}>
-            <CardHeader className="pb-2">
-              <CardDescription>
-                {COURSE_STATUS[status] ?? status}
-              </CardDescription>
-              <CardTitle className="text-2xl tabular-nums">{count}</CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+      <CoursesKpiStrip
+        summary={summaryQuery.data}
+        loading={summaryQuery.isLoading}
+        activePreset={filters.preset}
+        onPresetChange={handlePresetChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Liste des cours récents</CardTitle>
-          <CardDescription>
-            Les interfaces élève / prof alimenteront cette liste plus tard
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {dashboard.courses.recent.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Titre</th>
-                    <th className="px-4 py-3 font-medium">Campus</th>
-                    <th className="px-4 py-3 font-medium">Statut</th>
-                    <th className="px-4 py-3 font-medium">Créé le</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboard.courses.recent.map((course) => (
-                    <tr key={course.id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{course.title}</td>
-                      <td className="px-4 py-3">{course.campus?.name ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        {COURSE_STATUS[course.status] ?? course.status}
-                      </td>
-                      <td className="px-4 py-3">
-                        {new Date(course.created_at).toLocaleDateString("fr-FR")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="p-4 text-sm text-slate-500">
-              Aucun cours pour le moment. Exécutez le script de démo ou créez des
-              cours via les futures interfaces.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {(filters.preset === "awaiting_replacement" ||
+        hasAwaitingReplacementInList) &&
+      (summaryQuery.data?.awaitingReplacement ?? 0) > 0 ? (
+        <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning">
+          Un ou plusieurs cours sont en attente de remplacement.{" "}
+          <Link
+            to={buildAdminPlanningHref({ status: ["awaiting_replacement"] })}
+            className="font-medium underline"
+          >
+            Voir dans le planning →
+          </Link>{" "}
+          ·{" "}
+          <Link to="/admin/alertes" className="font-medium underline">
+            Alertes campus →
+          </Link>
+        </div>
+      ) : null}
+
+      <CoursesFilterBar
+        filters={filters}
+        campuses={campuses}
+        showCampusFilter={isGlobalScope}
+        onChange={updateFilters}
+        onReset={resetFilters}
+        displayedCount={courses.length}
+        totalCount={meta?.total ?? 0}
+      />
+
+      <CoursesTable
+        courses={courses}
+        filters={filters}
+        showCampus={isGlobalScope}
+        isLoading={isLoading}
+        isError={isError}
+        errorMessage={(error as Error)?.message}
+        onOpenCourse={setSelectedCourseId}
+        onRetry={() => void refetch()}
+      />
+
+      {meta && meta.total > meta.pageSize ? (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <p className="text-ink-600">
+            Page {meta.page} sur {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Précédent
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+            >
+              Suivant
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <CourseDetailDrawer
+        courseId={selectedCourseId}
+        listCourse={selectedListCourse}
+        onClose={() => setSelectedCourseId(null)}
+      />
     </div>
   );
 }

@@ -8,9 +8,10 @@ export function useAdminPilotageTasks() {
   const notificationsQuery = useNotifications();
 
   const progress = computeAdminPilotageTasks(
-    dashboardQuery.data,
-    profilesQuery.data,
+    profilesQuery.data?.profiles,
     notificationsQuery.data,
+    dashboardQuery.data?.profiles.byStatus.suspended ?? 0,
+    dashboardQuery.data?.courses.byStatus.awaiting_replacement ?? 0,
   );
 
   const isLoading =

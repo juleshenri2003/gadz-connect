@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@gadz-connect/ui";
+import { KpiCard } from "@gadz-connect/ui";
 
 export function StatCard({
   label,
@@ -15,26 +9,26 @@ export function StatCard({
   label: string;
   value: string | number;
   hint?: string;
-  accent?: "indigo" | "green" | "amber" | "slate";
+  accent?: "indigo" | "green" | "amber" | "slate" | "brand" | "success" | "warning";
 }) {
-  const accentClass =
-    accent === "indigo"
-      ? "border-indigo-100 bg-indigo-50/50"
-      : accent === "green"
-        ? "border-green-100 bg-green-50/50"
-        : accent === "amber"
-          ? "border-amber-100 bg-amber-50/50"
-          : "border-slate-200 bg-white";
+  const className =
+    accent === "indigo" || accent === "brand"
+      ? "border-brand-100 bg-brand-50/40"
+      : accent === "green" || accent === "success"
+        ? "border-success/20 bg-success-bg/40"
+        : accent === "amber" || accent === "warning"
+          ? "border-warning/20 bg-warning-bg/40"
+          : undefined;
+
+  const isCritical = accent === "amber" || accent === "warning";
 
   return (
-    <Card className={accentClass}>
-      <CardHeader className="pb-2">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
-      </CardHeader>
-      {hint ? (
-        <CardContent className="pt-0 text-xs text-slate-500">{hint}</CardContent>
-      ) : null}
-    </Card>
+    <KpiCard
+      label={label}
+      value={value}
+      hint={hint}
+      accent={isCritical}
+      className={className}
+    />
   );
 }

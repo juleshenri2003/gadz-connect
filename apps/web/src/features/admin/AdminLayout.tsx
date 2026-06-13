@@ -1,17 +1,25 @@
+import {
+  Bell,
+  BookOpen,
+  Calendar,
+  LayoutDashboard,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { NotificationNavBadge } from "@/features/notifications/NotificationNavBadge";
 import { AppShell } from "@/features/layout/AppShell";
+import { AdminCommandPaletteTrigger } from "./AdminCommandPalette";
 import { useAdminMe } from "./useAdmin";
 import { ROLE_LABELS } from "./format";
 
 const NAV = [
-  { to: "/admin", label: "Vue d'ensemble", end: true },
-  { to: "/admin/planning", label: "Emploi du temps", end: false },
-  { to: "/admin/alertes", label: "Alertes campus", end: false },
-  { to: "/admin/membres", label: "Membres", end: false },
-  { to: "/admin/budgets", label: "Budgets", end: false },
-  { to: "/admin/cours", label: "Cours", end: false },
+  { to: "/admin", label: "Tableau de bord", end: true, icon: LayoutDashboard },
+  { to: "/admin/planning", label: "Emploi du temps", icon: Calendar },
+  { to: "/admin/alertes", label: "Alertes campus", icon: Bell },
+  { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
+  { to: "/admin/budgets", label: "Budgets", icon: Wallet },
+  { to: "/admin/cours", label: "Cours", icon: BookOpen },
 ] as const;
 
 export function AdminLayout() {
@@ -38,10 +46,11 @@ export function AdminLayout() {
       userName={userName}
       userRole={me ? ROLE_LABELS[me.role] : undefined}
       nav={NAV}
+      spaceVariant="admin"
       headerHint="Console d'administration — données Supabase en temps réel"
       footerLabel="Quitter le pilotage"
       onFooterClick={() => void handleLeave()}
-      headerExtra={<NotificationNavBadge to="/admin/alertes" />}
+      headerExtra={<AdminCommandPaletteTrigger />}
     />
   );
 }

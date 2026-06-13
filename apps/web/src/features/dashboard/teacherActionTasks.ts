@@ -1,9 +1,33 @@
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
+import { buildAlertFocusHref } from "@/features/notifications/notificationUtils";
 import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
+import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 
 interface StripeStatus {
   onboardingComplete?: boolean;
+}
+
+function shouldShowUrssafReminder(
+  periodicity: string | null | undefined,
+): boolean {
+  if (periodicity === "monthly") return true;
+  const month = new Date().getMonth();
+  return [0, 3, 6, 9].includes(month);
+}
+
+function isTeacherToAnswer(
+  item: CampusNotificationItem,
+  profileId: string,
+): boolean {
+  const n = item.notification;
+  if (!n) return false;
+  return (
+    n.kind === "prof_unavailable" &&
+    n.replacement_status === "open" &&
+    n.declared_by !== profileId &&
+    (n.teacher_response ?? "none") === "none"
+  );
 }
 
 export function computeTeacherActionTasks(
@@ -25,22 +49,17 @@ export function computeTeacherActionTasks(
   }
 
   const openReplacements =
-    notifications?.filter(
-      (n) =>
-        !n.read_at &&
-        n.notification?.kind === "prof_unavailable" &&
-        n.notification.replacement_status === "open" &&
-        n.notification.declared_by !== profile.id,
-    ) ?? [];
+    notifications?.filter((n) => isTeacherToAnswer(n, profile.id)) ?? [];
 
   for (const item of openReplacements) {
     const subject = item.notification?.subject ?? "Cours";
+    const notificationId = item.notification?.id ?? item.id;
     tasks.push({
-      id: `propose-${item.notification?.id ?? item.id}`,
+      id: `propose-${notificationId}`,
       title: `Proposer un remplacement — ${subject}`,
       description:
         "Un collègue est indisponible : proposez de reprendre le cours au même horaire",
-      href: "/app/alertes",
+      href: buildAlertFocusHref(item.id, notificationId),
       status: "todo",
     });
   }
@@ -55,11 +74,12 @@ export function computeTeacherActionTasks(
 
   for (const item of ownOpen) {
     const subject = item.notification?.subject ?? "Cours";
+    const notificationId = item.notification?.id ?? item.id;
     tasks.push({
-      id: `track-${item.notification?.id ?? item.id}`,
+      id: `track-${notificationId}`,
       title: `Suivre le remplacement — ${subject}`,
       description: "Votre indisponibilité : suivez les propositions reçues",
-      href: "/app/alertes",
+      href: buildAlertFocusHref(item.id, notificationId),
       status: "todo",
     });
   }
@@ -74,22 +94,29 @@ export function computeTeacherActionTasks(
     });
   }
 
-  const monthKey = new Date().toISOString().slice(0, 7);
-  tasks.push({
-    id: `urssaf-${monthKey}`,
-    title: "Déclarer et payer l'URSSAF",
-    description:
-      "Cotisations micro-entreprise — vérifiez votre périodicité et effectuez la déclaration",
-    href: "/app/micro-entreprise",
-    status: "todo",
-  });
+  if (shouldShowUrssafReminder(profile.urssaf_periodicity)) {
+    const periodKey =
+      profile.urssaf_periodicity === "quarterly"
+        ? `Q${Math.floor(new Date().getMonth() / 3) + 1}-${new Date().getFullYear()}`
+        : new Date().toISOString().slice(0, 7);
+    tasks.push({
+      id: `urssaf-${periodKey}`,
+      title: "Déclarer et payer l'URSSAF",
+      description:
+        profile.urssaf_periodicity === "quarterly"
+          ? "Déclaration trimestrielle — espace auto-entrepreneur URSSAF"
+          : "Déclaration mensuelle — espace auto-entrepreneur URSSAF",
+      href: "https://www.autoentrepreneur.urssaf.fr/portail/accueil.html",
+      status: "todo",
+    });
+  }
 
   if (futureSlotCount === 0) {
     tasks.push({
       id: "publish-slots",
       title: "Publier des créneaux de cours",
       description: "Ajoutez au moins un créneau à venir pour être réservable",
-      href: "/app/cours",
+      href: coursesTabHref("slots"),
       status: "todo",
     });
   }

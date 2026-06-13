@@ -6,7 +6,7 @@ export function AdminTaskBanner() {
 
   if (isLoading) {
     return (
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+      <div className="mb-6 rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink-400">
         Chargement du pilotage…
       </div>
     );

@@ -1,0 +1,97 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@gadz-connect/ui";
+import type { AdminProfileRow } from "@/features/admin/types";
+import { UserTableRow } from "./UserTableRow";
+import { UsersTableSkeleton } from "./UsersTableSkeleton";
+import { getEmptyStateMessage, type UserFiltersState } from "./userFilters";
+
+interface UsersTableProps {
+  profiles: AdminProfileRow[];
+  filters: UserFiltersState;
+  showCampus: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  errorMessage?: string;
+  mutatingProfileId: string | null;
+  onOpenProfile: (profileId: string) => void;
+  onValidate: (profileId: string) => void;
+  onSuspend: (profile: AdminProfileRow) => void;
+  onReactivate: (profileId: string) => void;
+}
+
+export function UsersTable({
+  profiles,
+  filters,
+  showCampus,
+  isLoading,
+  isError,
+  errorMessage,
+  mutatingProfileId,
+  onOpenProfile,
+  onValidate,
+  onSuspend,
+  onReactivate,
+}: UsersTableProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Liste des utilisateurs</CardTitle>
+        <CardDescription>
+          Cliquez sur une ligne pour ouvrir la fiche détail
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <UsersTableSkeleton />
+        ) : isError ? (
+          <p className="p-4 text-sm text-danger">{errorMessage}</p>
+        ) : profiles.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="border-b bg-paper text-ink-600">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Utilisateur</th>
+                  <th className="px-4 py-3 font-medium">E-mail</th>
+                  {showCampus ? (
+                    <th className="px-4 py-3 font-medium">Campus</th>
+                  ) : null}
+                  <th className="px-4 py-3 font-medium">Rôle</th>
+                  <th className="px-4 py-3 font-medium">Inscription</th>
+                  <th className="px-4 py-3 font-medium">Parcours</th>
+                  <th className="px-4 py-3 font-medium">SIRET</th>
+                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">Alertes</th>
+                  <th className="px-4 py-3 font-medium">Stripe</th>
+                  <th className="px-4 py-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((profile) => (
+                  <UserTableRow
+                    key={profile.id}
+                    profile={profile}
+                    showCampus={showCampus}
+                    isMutating={mutatingProfileId === profile.id}
+                    onOpen={() => onOpenProfile(profile.id)}
+                    onValidate={() => onValidate(profile.id)}
+                    onSuspend={() => onSuspend(profile)}
+                    onReactivate={() => onReactivate(profile.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="p-4 text-sm text-ink-400">
+            {getEmptyStateMessage(filters)}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

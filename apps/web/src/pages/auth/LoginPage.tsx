@@ -141,7 +141,7 @@ export function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-8">
-      <Link to="/" className="text-sm text-slate-500 hover:text-slate-900">
+      <Link to="/" className="text-sm text-ink-400 hover:text-ink-900">
         ← Accueil
       </Link>
       <Card>
@@ -164,7 +164,7 @@ export function LoginPage() {
               <Label htmlFor="campusId">Campus / ville</Label>
               <select
                 id="campusId"
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                className="flex h-10 w-full rounded-md border border-line bg-surface px-3 text-sm"
                 disabled={campusesLoading}
                 {...register("campusId")}
               >
@@ -178,7 +178,7 @@ export function LoginPage() {
                 ))}
               </select>
               {errors.campusId ? (
-                <p className="text-sm text-red-600">{errors.campusId.message}</p>
+                <p className="text-sm text-danger">{errors.campusId.message}</p>
               ) : null}
             </div>
 
@@ -192,11 +192,11 @@ export function LoginPage() {
                 {...register("email")}
               />
               {errors.email ? (
-                <p className="text-sm text-red-600">{errors.email.message}</p>
+                <p className="text-sm text-danger">{errors.email.message}</p>
               ) : null}
             </div>
             {serverError ? (
-              <p className="text-sm text-red-600">{serverError}</p>
+              <p className="text-sm text-danger">{serverError}</p>
             ) : null}
             <Button
               type="submit"
@@ -207,7 +207,7 @@ export function LoginPage() {
             </Button>
           </form>
           {USE_EMAIL_LOGIN ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-400">
               Compte connu → votre espace (élève, prof ou RH) sur le campus
               choisi.
               <br />

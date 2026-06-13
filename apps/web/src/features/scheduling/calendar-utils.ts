@@ -62,23 +62,94 @@ export function formatEventTime(startsAt: string, endsAt: string): string {
   return `${start} – ${end}`;
 }
 
+export function formatSessionDurationLabel(
+  startsAt: string,
+  endsAt: string,
+): string | null {
+  const ms = new Date(endsAt).getTime() - new Date(startsAt).getTime();
+  if (ms <= 0) return null;
+  const totalMinutes = Math.round(ms / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours} h ${minutes} min`;
+  if (hours > 0) return `${hours} h`;
+  return `${minutes} min`;
+}
+
+export const COURSE_STATUS_LABELS: Record<string, string> = {
+  scheduled: "Planifié",
+  completed: "Terminé",
+  cancelled: "Annulé",
+  awaiting_replacement: "Remplacement",
+};
+
+export function courseStatusLabel(status?: string): string | undefined {
+  if (!status) return undefined;
+  return COURSE_STATUS_LABELS[status] ?? status;
+}
+
+export function isEventPast(startsAt: string, endsAt?: string): boolean {
+  const end = endsAt ?? startsAt;
+  return new Date(end).getTime() < Date.now();
+}
+
+export function isExpiredAvailableSlot(
+  kind: ScheduleEvent["kind"],
+  startsAt: string,
+  endsAt?: string,
+): boolean {
+  return kind === "slot_available" && isEventPast(startsAt, endsAt);
+}
+
+export function countWeekSummary(
+  events: ScheduleEvent[],
+  weekDays: Date[],
+): { sessions: number; openSlots: number } {
+  let sessions = 0;
+  let openSlots = 0;
+
+  for (const day of weekDays) {
+    for (const event of eventsForDay(events, day)) {
+      if (event.kind === "slot_available") {
+        if (!isEventPast(event.startsAt, event.endsAt)) openSlots++;
+      } else if (event.kind === "course" || event.kind === "slot_booked") {
+        sessions++;
+      }
+    }
+  }
+
+  return { sessions, openSlots };
+}
+
 export function eventStyles(
   kind: ScheduleEvent["kind"],
   status?: string,
+  startsAt?: string,
+  endsAt?: string,
 ): string {
   if (status === "awaiting_replacement") {
-    return "border-amber-300 bg-amber-50 text-amber-900";
+    return "border-warning/30 bg-warning-bg text-warning";
   }
   if (status === "cancelled") {
-    return "border-slate-200 bg-slate-100 text-slate-500 line-through";
+    return "border-line bg-paper text-ink-400 line-through";
+  }
+  if (status === "completed") {
+    return "border-line bg-paper text-ink-600";
+  }
+  if (
+    kind === "slot_available" &&
+    startsAt &&
+    isExpiredAvailableSlot(kind, startsAt, endsAt)
+  ) {
+    return "border-line bg-paper/80 text-ink-400 opacity-60";
   }
   switch (kind) {
     case "slot_available":
-      return "border-emerald-200 bg-emerald-50 text-emerald-900";
+      return "border-success/20 bg-success-bg text-success";
     case "slot_booked":
-      return "border-indigo-200 bg-indigo-50 text-indigo-900";
+      return "border-brand-100 bg-brand-50 text-brand-700";
     default:
-      return "border-slate-200 bg-white text-slate-900 shadow-sm";
+      return "border-line bg-surface text-ink-900 shadow-surface";
   }
 }
 
@@ -87,6 +158,11 @@ export function eventKindLabel(
   status?: string,
 ): string {
   if (status === "awaiting_replacement") return "Remplacement en cours";
+  if (status === "completed") return "Terminé";
+  if (status === "cancelled") return "Annulé";
+  if (status === "scheduled" && (kind === "course" || kind === "slot_booked")) {
+    return "Planifié";
+  }
   switch (kind) {
     case "slot_available":
       return "Disponible";

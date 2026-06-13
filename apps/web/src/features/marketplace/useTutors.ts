@@ -14,6 +14,8 @@ export interface TutorListItem {
   subjects: string[];
   account_status: string;
   campus: { name: string } | null;
+  available_slot_count: number;
+  next_available_slot_at: string | null;
 }
 
 export interface TutorSlot {
@@ -21,6 +23,29 @@ export interface TutorSlot {
   starts_at: string;
   ends_at: string;
   booked: boolean;
+  client?: { first_name: string; last_name: string } | null;
+}
+
+export interface MarketplaceChecks {
+  rate: boolean;
+  futureSlots: boolean;
+  stripe: boolean;
+  profileSetup: boolean;
+}
+
+export interface MarketplaceStatus {
+  visible: boolean;
+  checks: MarketplaceChecks;
+}
+
+export interface MyTutorProfile {
+  id: string;
+  bio: string | null;
+  cv: string | null;
+  hourly_rate: number | null;
+  subjects: string[];
+  cv_complete?: boolean;
+  marketplace?: MarketplaceStatus;
 }
 
 export function useTutors() {
@@ -77,26 +102,19 @@ export function useTutorSlots(tutorId: string) {
   });
 }
 
-export function useMyTutorProfile() {
+export function useMyTutorProfile(options?: { enabled?: boolean }) {
   const { getAccessToken, user } = useAuth();
+  const enabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: ["tutor-me"],
     queryFn: async () => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");
-      const res = await apiFetch<{
-        data: {
-          id: string;
-          bio: string | null;
-          cv: string | null;
-          hourly_rate: number | null;
-          subjects: string[];
-        };
-      }>("/api/tutors/me", { token });
+      const res = await apiFetch<{ data: MyTutorProfile }>("/api/tutors/me", { token });
       return res.data;
     },
-    enabled: Boolean(user && getAccessToken()),
+    enabled: enabled && Boolean(user && getAccessToken()),
   });
 }
 
@@ -163,6 +181,35 @@ export function useCreateSlot() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
       void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-financial"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutors"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
+    },
+  });
+}
+
+export function useDeleteSlot() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (slotId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      await apiFetch(`/api/tutors/me/slots/${slotId}`, {
+        method: "DELETE",
+        token,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-financial"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutors"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
     },
   });
 }

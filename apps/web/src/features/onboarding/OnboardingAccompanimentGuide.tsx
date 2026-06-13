@@ -6,14 +6,17 @@ import { OnboardingScamAlert } from "./guide/OnboardingScamAlert";
 interface OnboardingAccompanimentGuideProps {
   /** Affiche le guide INPI complet et la section CFE */
   showInpiGuide?: boolean;
+  /** Replie la section réassurance par défaut (ex. INPI déjà confirmé) */
+  reassuranceCollapsed?: boolean;
 }
 
 export function OnboardingAccompanimentGuide({
   showInpiGuide = true,
+  reassuranceCollapsed = false,
 }: OnboardingAccompanimentGuideProps) {
   return (
     <div className="space-y-6">
-      <OnboardingReassuranceSection />
+      <OnboardingReassuranceSection defaultCollapsed={reassuranceCollapsed} />
       <OnboardingScamAlert />
       {showInpiGuide ? (
         <>

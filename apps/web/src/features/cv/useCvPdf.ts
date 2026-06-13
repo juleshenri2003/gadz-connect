@@ -60,6 +60,7 @@ export function useDeleteCvPdf() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["profile-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
       void queryClient.invalidateQueries({ queryKey: ["my-cv-pdf-url"] });
     },
   });

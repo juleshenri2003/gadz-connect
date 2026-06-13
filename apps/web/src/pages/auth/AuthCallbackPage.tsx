@@ -52,7 +52,7 @@ export function AuthCallbackPage() {
   if (error) {
     return (
       <main className="mx-auto max-w-md p-8 text-center">
-        <p className="text-red-600">{error}</p>
+        <p className="text-danger">{error}</p>
         <a href="/auth/login" className="mt-4 inline-block text-sm underline">
           Réessayer la connexion
         </a>
@@ -61,7 +61,7 @@ export function AuthCallbackPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center text-sm text-slate-500">
+    <main className="flex min-h-screen items-center justify-center text-sm text-ink-400">
       Connexion en cours…
     </main>
   );

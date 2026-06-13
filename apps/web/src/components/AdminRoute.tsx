@@ -13,19 +13,19 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
       {isLoading ? (
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+        <div className="flex min-h-[40vh] items-center justify-center text-sm text-ink-400">
           Vérification de l&apos;accès RH…
         </div>
       ) : isError ? (
         <div className="mx-auto max-w-lg space-y-4 p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900">Accès refusé</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-lg font-semibold text-ink-900">Accès refusé</h1>
+          <p className="text-sm text-ink-600">
             {(error as Error).message.includes("autorisée") ||
             (error as Error).message.includes("administrateur")
               ? `La plateforme RH n'accepte que ${RH_EMAIL}.`
               : (error as Error).message}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-400">
             Connecté en tant que : {user?.email ?? "—"}
           </p>
           <Button asChild>
@@ -39,8 +39,8 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
         <>{children}</>
       ) : (
         <div className="mx-auto max-w-lg space-y-4 p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900">Accès refusé</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-lg font-semibold text-ink-900">Accès refusé</h1>
+          <p className="text-sm text-ink-600">
             Plateforme RH réservée à {RH_EMAIL}.
           </p>
           <Button asChild>

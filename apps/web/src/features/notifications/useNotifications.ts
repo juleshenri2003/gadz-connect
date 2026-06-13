@@ -23,7 +23,14 @@ export interface CampusNotificationItem {
     course_id: string | null;
     declared_by?: string;
     subject?: string | null;
+    client_id?: string | null;
+    teacher_response?: "none" | "proposed" | "declined";
+    pending_proposals_count?: number;
     campus: { name: string } | null;
+    client: {
+      first_name: string;
+      last_name: string;
+    } | null;
     declarant: {
       first_name: string;
       last_name: string;
@@ -70,6 +77,25 @@ export function useUnreadNotificationCount() {
   });
 }
 
+export function useNotificationActionCount() {
+  const { getAccessToken, user } = useAuth();
+
+  return useQuery({
+    queryKey: ["notifications-action-count"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: { count: number } }>(
+        "/api/notifications/action-count",
+        { token },
+      );
+      return res.data.count;
+    },
+    enabled: Boolean(user && getAccessToken()),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useMarkNotificationRead() {
   const { getAccessToken } = useAuth();
   const queryClient = useQueryClient();
@@ -86,6 +112,7 @@ export function useMarkNotificationRead() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications-unread"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
     },
   });
 }
@@ -112,6 +139,7 @@ export function useDeclareUnavailable() {
       void queryClient.invalidateQueries({ queryKey: ["schedule-admin"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications-unread"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-action-count"] });
       void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
       void queryClient.invalidateQueries({ queryKey: ["replacement-proposals"] });
       void queryClient.invalidateQueries({ queryKey: ["replacements-pending-student"] });

@@ -20,8 +20,9 @@ export function useStudentDashboardProgress() {
   return {
     progress,
     profile: profileQuery.data,
+    events: scheduleQuery.data?.events ?? [],
     tutorCount: tutorsQuery.data?.length ?? 0,
-    isLoading: profileQuery.isLoading,
+    isLoading: profileQuery.isLoading || scheduleQuery.isLoading,
     isError: profileQuery.isError,
   };
 }

@@ -7,7 +7,7 @@ export function TutorOnlyRoute({ children }: { children: React.ReactNode }) {
   const { data: profile, isLoading } = useMyProfile();
 
   if (isLoading) {
-    return <p className="text-sm text-slate-500">Chargement…</p>;
+    return <p className="text-sm text-ink-400">Chargement…</p>;
   }
 
   if (profile && isStudent(profile.role)) {
