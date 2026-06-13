@@ -50,6 +50,7 @@ async function main() {
     campus_id: campusId,
     siret: null,
     account_status: "pending_siret" as const,
+    registration_path: "new_micro",
     micro_enterprise_activity: "enseignement" as const,
     urssaf_periodicity: "monthly" as const,
     versement_liberatoire: false,
@@ -89,7 +90,9 @@ async function main() {
   console.log("");
   console.log("Test :");
   console.log("  1. Connexion dev → déclarer SIRET sur /app/micro-entreprise");
-  console.log("  2. RH jules.henri@ensam.eu → /admin/membres → Valider SIRET");
+  console.log("  2. Compte activé automatiquement (sans validation RH)");
+  console.log("");
+  console.log("Autres seeds : pnpm --filter @gadz-connect/api seed-professor-personas");
 }
 
 main().catch((err) => {

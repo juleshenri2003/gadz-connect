@@ -1,4 +1,4 @@
-import type { AccountStatus } from "@gadz-connect/types";
+import type { AccountStatus, UserRole } from "@gadz-connect/types";
 import { Router } from "express";
 import { z } from "zod";
 import {
@@ -7,7 +7,32 @@ import {
   requireAdmin,
 } from "../middleware/admin.js";
 import { requireAuth } from "../middleware/auth.js";
+import {
+  exportAdminScheduleCsv,
+  fetchAdminCampuses,
+  fetchAdminScheduleEvents,
+  fetchAdminScheduleSummary,
+  parseAdminScheduleQuery,
+} from "../lib/admin-schedule.js";
+import {
+  fetchAdminBudgets,
+  fetchAdminTransactions,
+  parseAdminBudgetQuery,
+  parseAdminTransactionsQuery,
+} from "../lib/admin-budget.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+import {
+  fetchAdminProfileDetail,
+  listAdminProfiles,
+  type AdminProfileFilter,
+} from "../lib/admin-profiles-query.js";
+import {
+  fetchAdminCourseDetail,
+  fetchAdminCoursesSummary,
+  listAdminCourses,
+  parseAdminCoursesQuery,
+} from "../lib/admin-courses-query.js";
+import { computeMarketplaceStatus } from "../lib/tutor-visibility.js";
 
 export const adminRouter = Router();
 
@@ -24,51 +49,163 @@ function parseAmount(value: unknown): number {
   return 0;
 }
 
+function emptyStatusCounts(): Record<AccountStatus, number> {
+  return { pending_siret: 0, active: 0, suspended: 0 };
+}
+
+function summarizeStripeAccounts(
+  profiles: Array<{
+    stripe_connect_account_id: string | null;
+    stripe_connect_onboarding_complete: boolean | null;
+  }>,
+) {
+  return {
+    total: profiles.length,
+    withAccount: profiles.filter((p) => p.stripe_connect_account_id).length,
+    onboardingComplete: profiles.filter(
+      (p) => p.stripe_connect_onboarding_complete,
+    ).length,
+    pending: profiles.filter(
+      (p) => p.stripe_connect_account_id && !p.stripe_connect_onboarding_complete,
+    ).length,
+    withoutAccount: profiles.filter((p) => !p.stripe_connect_account_id).length,
+  };
+}
+
+function getWeekBounds(reference = new Date()) {
+  const start = new Date(reference);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() + diff);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+}
+
+const ADMIN_PROFILE_FILTERS = new Set<AdminProfileFilter>([
+  "verification_failed",
+  "duplicates",
+  "suspended",
+  "pending_siret",
+  "stripe_incomplete",
+]);
+
+function parseAdminProfilesQuery(req: AdminRequest) {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const filterParam = req.query.filter as string | undefined;
+  const filter =
+    filterParam && ADMIN_PROFILE_FILTERS.has(filterParam as AdminProfileFilter)
+      ? (filterParam as AdminProfileFilter)
+      : undefined;
+
+  const pageRaw = req.query.page as string | undefined;
+  const limitRaw = req.query.limit as string | undefined;
+  const page = pageRaw ? Math.max(1, Number.parseInt(pageRaw, 10) || 1) : undefined;
+  const limit = limitRaw
+    ? Math.min(100, Math.max(1, Number.parseInt(limitRaw, 10) || 25))
+    : undefined;
+
+  return {
+    campusScopeId: campusFilter?.campusId,
+    search: (req.query.search as string | undefined)?.trim() || undefined,
+    role: parseAdminRole(req.query.role as string | undefined),
+    account_status: parseAccountStatus(
+      req.query.account_status as string | undefined,
+    ),
+    campus_id: campusFilter
+      ? undefined
+      : (req.query.campus_id as string | undefined) || undefined,
+    filter,
+    page,
+    limit,
+  };
+}
+
+const USER_ROLES = new Set<UserRole>([
+  "student_provider",
+  "teacher",
+  "admin_campus",
+  "admin_general",
+]);
+
+function parseAdminRole(
+  value: string | undefined,
+): UserRole | "admin" | undefined {
+  if (!value) return undefined;
+  if (value === "admin") return "admin";
+  if (USER_ROLES.has(value as UserRole)) return value as UserRole;
+  return undefined;
+}
+
+function parseAccountStatus(
+  value: string | undefined,
+): AccountStatus | undefined {
+  if (
+    value === "pending_siret" ||
+    value === "active" ||
+    value === "suspended"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 /**
  * GET /api/admin/profiles
  * Liste des profils (filtrée par campus pour admin_campus).
  */
 adminRouter.get("/profiles", async (req: AdminRequest, res) => {
-  const campusFilter = adminCampusFilter(req.adminProfile!);
+  try {
+    const params = parseAdminProfilesQuery(req);
+    const result = await listAdminProfiles(params);
 
-  let query = supabaseAdmin
-    .from("profiles")
-    .select(
-      `
-      id,
-      first_name,
-      last_name,
-      role,
-      campus_id,
-      siret,
-      account_status,
-      micro_enterprise_activity,
-      stripe_connect_account_id,
-      stripe_connect_onboarding_complete,
-      created_at,
-      campus:campus_id ( name )
-    `,
-    )
-    .order("created_at", { ascending: false });
-
-  if (campusFilter) {
-    query = query.eq("campus_id", campusFilter.campusId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("[admin] profiles:", error.message);
+    res.json({
+      data: result.rows,
+      meta: {
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+      },
+    });
+  } catch (error) {
+    console.error("[admin] profiles:", error);
     res.status(500).json({ error: "Impossible de charger les profils" });
-    return;
   }
+});
 
-  res.json({ data: data ?? [] });
+/**
+ * GET /api/admin/profiles/:id
+ * Fiche détail d'un utilisateur (admin).
+ */
+adminRouter.get("/profiles/:id", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const profileId = req.params.id as string;
+
+  try {
+    const detail = await fetchAdminProfileDetail(
+      profileId,
+      campusFilter?.campusId,
+    );
+
+    if (!detail) {
+      res.status(404).json({ error: "Profil introuvable ou hors périmètre" });
+      return;
+    }
+
+    res.json({ data: detail });
+  } catch (error) {
+    console.error("[admin] profile detail:", error);
+    res.status(500).json({ error: "Impossible de charger le profil" });
+  }
 });
 
 /**
  * PATCH /api/admin/profiles/:id/status
- * Valide un SIRET (pending_siret → active) ou change le statut compte.
+ * Valide un SIRET (activation manuelle exceptionnelle) ou change le statut compte.
  */
 adminRouter.patch(
   "/profiles/:id/status",
@@ -141,37 +278,63 @@ adminRouter.patch(
 adminRouter.get("/dashboard", async (req: AdminRequest, res) => {
   const campusFilter = adminCampusFilter(req.adminProfile!);
   const campusId = campusFilter?.campusId;
+  const weekBounds = getWeekBounds();
 
   let profilesQuery = supabaseAdmin.from("profiles").select(
-    "id, role, account_status, stripe_connect_account_id, stripe_connect_onboarding_complete",
+    `id, role, account_status, campus_id,
+     stripe_connect_account_id, stripe_connect_onboarding_complete,
+     registration_path, siret_verification_failed, inpi_declaration_sent_at,
+     profile_setup_complete, hourly_rate,
+     first_name, last_name, created_at,
+     campus:campus_id ( name )`,
   );
   if (campusId) profilesQuery = profilesQuery.eq("campus_id", campusId);
 
   let coursesCountQuery = supabaseAdmin
     .from("courses")
-    .select("id, status", { count: "exact", head: false });
+    .select("id, status, campus_id, scheduled_at", { count: "exact", head: false });
   let coursesRecentQuery = supabaseAdmin
     .from("courses")
     .select("id, title, status, campus_id, created_at, campus:campus_id ( name )")
     .order("created_at", { ascending: false })
     .limit(20);
+  let coursesWeekQuery = supabaseAdmin
+    .from("courses")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "scheduled")
+    .gte("scheduled_at", weekBounds.start.toISOString())
+    .lte("scheduled_at", weekBounds.end.toISOString());
+
   if (campusId) {
     coursesCountQuery = coursesCountQuery.eq("campus_id", campusId);
     coursesRecentQuery = coursesRecentQuery.eq("campus_id", campusId);
+    coursesWeekQuery = coursesWeekQuery.eq("campus_id", campusId);
   }
 
   const [
     { data: profiles, error: profilesError },
     { data: allCourses, error: coursesCountError },
     { data: recentCourses, error: coursesRecentError },
-  ] = await Promise.all([profilesQuery, coursesCountQuery, coursesRecentQuery]);
+    { count: thisWeekScheduled, error: coursesWeekError },
+  ] = await Promise.all([
+    profilesQuery,
+    coursesCountQuery,
+    coursesRecentQuery,
+    coursesWeekQuery,
+  ]);
 
-  if (profilesError || coursesCountError || coursesRecentError) {
+  if (
+    profilesError ||
+    coursesCountError ||
+    coursesRecentError ||
+    coursesWeekError
+  ) {
     console.error(
       "[admin] dashboard:",
       profilesError?.message,
       coursesCountError?.message,
       coursesRecentError?.message,
+      coursesWeekError?.message,
     );
     res.status(500).json({ error: "Impossible de charger le tableau de bord" });
     return;
@@ -181,36 +344,176 @@ adminRouter.get("/dashboard", async (req: AdminRequest, res) => {
   const courseList = allCourses ?? [];
   const recentCourseList = recentCourses ?? [];
 
-  const profilesByStatus: Record<AccountStatus, number> = {
-    pending_siret: 0,
-    active: 0,
-    suspended: 0,
-  };
+  const profilesByStatus = emptyStatusCounts();
   const profilesByRole: Record<string, number> = {};
+  const profilesByRoleAndStatus: Record<string, Record<AccountStatus, number>> =
+    {};
 
   for (const p of profileList) {
     const status = p.account_status as AccountStatus;
+    const role = p.role as string;
     profilesByStatus[status] = (profilesByStatus[status] ?? 0) + 1;
-    profilesByRole[p.role as string] = (profilesByRole[p.role as string] ?? 0) + 1;
+    profilesByRole[role] = (profilesByRole[role] ?? 0) + 1;
+    if (!profilesByRoleAndStatus[role]) {
+      profilesByRoleAndStatus[role] = emptyStatusCounts();
+    }
+    profilesByRoleAndStatus[role][status] =
+      (profilesByRoleAndStatus[role][status] ?? 0) + 1;
   }
 
-  const stripeAccounts = {
-    total: profileList.length,
-    withAccount: profileList.filter((p) => p.stripe_connect_account_id).length,
-    onboardingComplete: profileList.filter(
-      (p) => p.stripe_connect_onboarding_complete,
+  const teacherProfiles = profileList.filter((p) => p.role === "teacher");
+  const stripeAccounts = summarizeStripeAccounts(profileList);
+  const stripeAccountsTeachers = summarizeStripeAccounts(teacherProfiles);
+
+  const onboarding = {
+    existingSiret: teacherProfiles.filter(
+      (p) => p.registration_path === "existing_siret",
     ).length,
-    pending: profileList.filter(
-      (p) => p.stripe_connect_account_id && !p.stripe_connect_onboarding_complete,
-    ).length,
-    withoutAccount: profileList.filter((p) => !p.stripe_connect_account_id).length,
+    newMicro: teacherProfiles.filter((p) => p.registration_path === "new_micro")
+      .length,
+    verificationFailed: teacherProfiles.filter((p) => p.siret_verification_failed)
+      .length,
+    inpiSent: teacherProfiles.filter((p) => p.inpi_declaration_sent_at).length,
   };
+
+  const pickOne = <T,>(value: unknown): T | null => {
+    if (!value) return null;
+    return (Array.isArray(value) ? value[0] : value) as T;
+  };
+
+  const recentProfiles = profileList
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.created_at as string).getTime() -
+        new Date(a.created_at as string).getTime(),
+    )
+    .slice(0, 10)
+    .map((p) => ({
+      id: p.id as string,
+      first_name: (p.first_name as string) ?? "",
+      last_name: (p.last_name as string) ?? "",
+      role: p.role,
+      account_status: p.account_status as AccountStatus,
+      created_at: p.created_at as string,
+      campus: pickOne<{ name: string }>(p.campus),
+    }));
 
   const coursesByStatus: Record<string, number> = {};
   for (const c of courseList) {
     coursesByStatus[c.status as string] =
       (coursesByStatus[c.status as string] ?? 0) + 1;
   }
+
+  let byCampus: Array<{
+    campusId: string;
+    name: string;
+    teachersActive: number;
+    studentsActive: number;
+    coursesScheduled: number;
+    pendingSiret: number;
+  }> | undefined;
+
+  if (!campusId) {
+    const campusMap = new Map<
+      string,
+      {
+        campusId: string;
+        name: string;
+        teachersActive: number;
+        studentsActive: number;
+        coursesScheduled: number;
+        pendingSiret: number;
+      }
+    >();
+
+    for (const p of profileList) {
+      const id = p.campus_id as string;
+      if (!id) continue;
+      const campus = pickOne<{ name: string }>(p.campus);
+      if (!campusMap.has(id)) {
+        campusMap.set(id, {
+          campusId: id,
+          name: campus?.name ?? "Campus",
+          teachersActive: 0,
+          studentsActive: 0,
+          coursesScheduled: 0,
+          pendingSiret: 0,
+        });
+      }
+      const row = campusMap.get(id)!;
+      if (p.role === "teacher" && p.account_status === "active") {
+        row.teachersActive += 1;
+      }
+      if (p.role === "student_provider" && p.account_status === "active") {
+        row.studentsActive += 1;
+      }
+      if (p.account_status === "pending_siret") {
+        row.pendingSiret += 1;
+      }
+    }
+
+    for (const c of courseList) {
+      const id = c.campus_id as string;
+      if (!id || c.status !== "scheduled") continue;
+      if (!campusMap.has(id)) {
+        campusMap.set(id, {
+          campusId: id,
+          name: "Campus",
+          teachersActive: 0,
+          studentsActive: 0,
+          coursesScheduled: 0,
+          pendingSiret: 0,
+        });
+      }
+      campusMap.get(id)!.coursesScheduled += 1;
+    }
+
+    byCampus = [...campusMap.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "fr"),
+    );
+  }
+
+  const teacherIds = teacherProfiles.map((p) => p.id as string);
+  const slotCounts = new Map<string, number>();
+  if (teacherIds.length > 0) {
+    const nowIso = new Date().toISOString();
+    const { data: futureSlots } = await supabaseAdmin
+      .from("tutor_slots")
+      .select("provider_id")
+      .in("provider_id", teacherIds)
+      .gt("starts_at", nowIso);
+    for (const slot of futureSlots ?? []) {
+      const providerId = slot.provider_id as string;
+      slotCounts.set(providerId, (slotCounts.get(providerId) ?? 0) + 1);
+    }
+  }
+
+  let visibleTeachers = 0;
+  let withFutureSlots = 0;
+  for (const teacher of teacherProfiles) {
+    const futureSlotCount = slotCounts.get(teacher.id as string) ?? 0;
+    if (futureSlotCount > 0) withFutureSlots += 1;
+    const status = computeMarketplaceStatus(
+      {
+        role: teacher.role as string,
+        account_status: teacher.account_status as string,
+        profile_setup_complete: teacher.profile_setup_complete,
+        stripe_connect_onboarding_complete:
+          teacher.stripe_connect_onboarding_complete,
+        hourly_rate: teacher.hourly_rate as number | null,
+      },
+      futureSlotCount,
+    );
+    if (status.visible) visibleTeachers += 1;
+  }
+
+  const marketplace = {
+    visibleTeachers,
+    activeTeachers: teacherProfiles.filter((p) => p.account_status === "active")
+      .length,
+    withFutureSlots,
+  };
 
   let transactions: Array<{
     amount_gross: unknown;
@@ -293,10 +596,12 @@ adminRouter.get("/dashboard", async (req: AdminRequest, res) => {
         total: profileList.length,
         byStatus: profilesByStatus,
         byRole: profilesByRole,
+        byRoleAndStatus: profilesByRoleAndStatus,
       },
       courses: {
         total: courseList.length,
         byStatus: coursesByStatus,
+        thisWeekScheduled: thisWeekScheduled ?? 0,
         recent: recentCourseList,
       },
       transactions: {
@@ -305,76 +610,210 @@ adminRouter.get("/dashboard", async (req: AdminRequest, res) => {
       },
       budgets,
       stripeAccounts,
+      stripeAccountsTeachers,
+      onboarding,
+      recentProfiles,
+      marketplace,
+      ...(byCampus ? { byCampus } : {}),
     },
   });
 });
 
 /**
+ * GET /api/admin/budgets
+ * Agrégats financiers par période (transactions Supabase).
+ */
+adminRouter.get("/budgets", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminBudgetQuery(req.query as Record<string, unknown>);
+
+  try {
+    const data = await fetchAdminBudgets(scopeCampusId, params);
+    res.json({ data });
+  } catch (err) {
+    console.error("[admin] budgets:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les budgets" });
+  }
+});
+
+/**
+ * GET /api/admin/transactions
+ * Liste paginée des transactions avec jointures cours / prof / campus.
+ */
+adminRouter.get("/transactions", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminTransactionsQuery(
+    req.query as Record<string, unknown>,
+  );
+
+  try {
+    const { transactions, meta } = await fetchAdminTransactions(
+      scopeCampusId,
+      params,
+    );
+    res.json({ data: transactions, meta });
+  } catch (err) {
+    console.error("[admin] transactions:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les transactions" });
+  }
+});
+
+/**
+ * GET /api/admin/schedule/summary
+ * Agrégats KPI pour le bandeau planning admin.
+ */
+adminRouter.get("/schedule/summary", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminScheduleQuery(
+    req.query as Record<string, unknown>,
+  );
+
+  try {
+    const summary = await fetchAdminScheduleSummary(scopeCampusId, params);
+    res.json({ data: summary });
+  } catch (err) {
+    console.error("[admin] schedule/summary:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les indicateurs" });
+  }
+});
+
+/**
+ * GET /api/admin/schedule/export
+ * Export CSV de la plage filtrée.
+ */
+adminRouter.get("/schedule/export", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminScheduleQuery(
+    req.query as Record<string, unknown>,
+  );
+
+  try {
+    const csv = await exportAdminScheduleCsv(scopeCampusId, params);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="planning-campus.csv"',
+    );
+    res.send("\uFEFF" + csv);
+  } catch (err) {
+    console.error("[admin] schedule/export:", (err as Error).message);
+    res.status(500).json({ error: "Impossible d'exporter le planning" });
+  }
+});
+
+/**
+ * GET /api/admin/campuses
+ * Liste des campus (filtre planning admin général).
+ */
+adminRouter.get("/campuses", async (_req: AdminRequest, res) => {
+  try {
+    const campuses = await fetchAdminCampuses();
+    res.json({ data: campuses });
+  } catch (err) {
+    console.error("[admin] campuses:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les campus" });
+  }
+});
+
+/**
  * GET /api/admin/schedule
  * Emploi du temps campus (cours planifiés).
+ * Query: from, to, campusId, status, includeCancelled, search
  */
 adminRouter.get("/schedule", async (req: AdminRequest, res) => {
   const campusFilter = adminCampusFilter(req.adminProfile!);
-  const campusId = campusFilter?.campusId;
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminScheduleQuery(
+    req.query as Record<string, unknown>,
+  );
 
-  let query = supabaseAdmin
-    .from("courses")
-    .select(
-      `
-      id, title, subject, status, scheduled_at, campus_id,
-      provider:provider_id ( first_name, last_name ),
-      client:client_id ( first_name, last_name ),
-      campus:campus_id ( name )
-    `,
-    )
-    .not("scheduled_at", "is", null)
-    .order("scheduled_at");
-
-  if (campusId) {
-    query = query.eq("campus_id", campusId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("[admin] schedule:", error.message);
+  try {
+    const events = await fetchAdminScheduleEvents(scopeCampusId, params);
+    res.json({ data: { events } });
+  } catch (err) {
+    console.error("[admin] schedule:", (err as Error).message);
     res.status(500).json({ error: "Impossible de charger le planning" });
-    return;
   }
+});
 
-  const pickOne = <T,>(value: unknown): T | null => {
-    if (!value) return null;
-    return (Array.isArray(value) ? value[0] : value) as T;
-  };
+/**
+ * GET /api/admin/courses/summary
+ * Agrégats KPI pour le registre cours admin.
+ */
+adminRouter.get("/courses/summary", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const campusId =
+    typeof req.query.campus_id === "string" && req.query.campus_id.trim()
+      ? req.query.campus_id.trim()
+      : undefined;
 
-  const events = (data ?? []).map((course) => {
-    const provider = pickOne<{ first_name: string; last_name: string }>(
-      course.provider,
+  try {
+    const summary = await fetchAdminCoursesSummary(scopeCampusId, campusId);
+    res.json({ data: summary });
+  } catch (err) {
+    console.error("[admin] courses/summary:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les indicateurs" });
+  }
+});
+
+/**
+ * GET /api/admin/courses
+ * Registre paginé des cours (filtré par campus pour admin_campus).
+ */
+adminRouter.get("/courses", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+
+  try {
+    const params = parseAdminCoursesQuery(
+      req.query as Record<string, unknown>,
+      scopeCampusId,
     );
-    const client = pickOne<{ first_name: string; last_name: string }>(
-      course.client,
+    const result = await listAdminCourses(params);
+
+    res.json({
+      data: result.rows,
+      meta: {
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+      },
+    });
+  } catch (err) {
+    console.error("[admin] courses:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les cours" });
+  }
+});
+
+/**
+ * GET /api/admin/courses/:id
+ * Fiche détail d'un cours (admin).
+ */
+adminRouter.get("/courses/:id", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const courseId = req.params.id as string;
+
+  try {
+    const detail = await fetchAdminCourseDetail(
+      courseId,
+      campusFilter?.campusId,
     );
-    const campus = pickOne<{ name: string }>(course.campus);
-    const scheduledAt = course.scheduled_at as string;
 
-    return {
-      id: course.id as string,
-      title: (course.subject as string) || (course.title as string),
-      startsAt: scheduledAt,
-      endsAt: scheduledAt,
-      kind: "course" as const,
-      status: course.status as string,
-      providerName: provider
-        ? `${provider.first_name} ${provider.last_name}`.trim()
-        : undefined,
-      clientName: client
-        ? `${client.first_name} ${client.last_name}`.trim()
-        : undefined,
-      campusName: campus?.name,
-    };
-  });
+    if (!detail) {
+      res.status(404).json({ error: "Cours introuvable ou hors périmètre" });
+      return;
+    }
 
-  res.json({ data: { events } });
+    res.json({ data: detail });
+  } catch (err) {
+    console.error("[admin] course detail:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger le cours" });
+  }
 });
 
 /**

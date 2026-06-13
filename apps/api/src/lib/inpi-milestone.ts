@@ -14,10 +14,13 @@ export async function getInpiDeclarationSentAt(
   return typeof meta === "string" ? meta : null;
 }
 
-export async function setInpiDeclarationSent(userId: string): Promise<{
-  inpi_declaration_sent_at: string;
+export async function setInpiDeclarationSent(
+  userId: string,
+  sent = true,
+): Promise<{
+  inpi_declaration_sent_at: string | null;
 }> {
-  const timestamp = new Date().toISOString();
+  const timestamp = sent ? new Date().toISOString() : null;
   const columnReady = await hasInpiDeclarationColumn();
 
   if (columnReady) {
@@ -28,11 +31,11 @@ export async function setInpiDeclarationSent(userId: string): Promise<{
       .select("inpi_declaration_sent_at")
       .maybeSingle();
 
-    if (error || !data?.inpi_declaration_sent_at) {
+    if (error || !data) {
       throw new Error(error?.message ?? "Mise à jour impossible");
     }
 
-    return { inpi_declaration_sent_at: data.inpi_declaration_sent_at };
+    return { inpi_declaration_sent_at: data.inpi_declaration_sent_at ?? null };
   }
 
   const { data: authUser, error: authError } =

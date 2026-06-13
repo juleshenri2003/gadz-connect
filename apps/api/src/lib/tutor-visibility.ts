@@ -1,18 +1,70 @@
 /**
  * Critères d'apparition dans « Trouver mon tuteur » (marketplace élèves).
- * Un prof en attente (pending_siret) n'apparaît qu'après validation RH → active.
  */
+export interface MarketplaceChecks {
+  rate: boolean;
+  futureSlots: boolean;
+  stripe: boolean;
+  profileSetup: boolean;
+}
+
+export interface MarketplaceStatus {
+  visible: boolean;
+  checks: MarketplaceChecks;
+}
+
 export function isTeacherVisibleInMarketplace(profile: {
   role: string;
   account_status: string;
   profile_setup_complete?: boolean | null;
+  stripe_connect_onboarding_complete?: boolean | null;
+  hourly_rate?: number | null;
 }): boolean {
   return (
     profile.role === "teacher" &&
     profile.account_status === "active" &&
-    Boolean(profile.profile_setup_complete)
+    Boolean(profile.profile_setup_complete) &&
+    Boolean(profile.stripe_connect_onboarding_complete) &&
+    profile.hourly_rate != null &&
+    profile.hourly_rate > 0
   );
 }
 
+export function computeMarketplaceStatus(
+  profile: {
+    role: string;
+    account_status: string;
+    profile_setup_complete?: boolean | null;
+    stripe_connect_onboarding_complete?: boolean | null;
+    hourly_rate?: number | null;
+  },
+  futureSlotCount: number,
+): MarketplaceStatus {
+  const checks: MarketplaceChecks = {
+    rate: profile.hourly_rate != null && profile.hourly_rate > 0,
+    futureSlots: futureSlotCount > 0,
+    stripe: Boolean(profile.stripe_connect_onboarding_complete),
+    profileSetup: Boolean(profile.profile_setup_complete),
+  };
+
+  const visible =
+    profile.role === "teacher" &&
+    profile.account_status === "active" &&
+    checks.rate &&
+    checks.futureSlots &&
+    checks.stripe &&
+    checks.profileSetup;
+
+  return { visible, checks };
+}
+
 export const MARKETPLACE_TUTOR_SELECT =
-  "id, first_name, last_name, role, bio, cv, cv_pdf_path, hourly_rate, subjects, account_status, campus:campus_id(name)";
+  "id, first_name, last_name, role, bio, cv, cv_pdf_path, hourly_rate, subjects, account_status, stripe_connect_onboarding_complete, profile_setup_complete, campus:campus_id(name)";
+
+export function isCvComplete(profile: {
+  cv?: string | null;
+  cv_pdf_path?: string | null;
+}): boolean {
+  if (profile.cv_pdf_path) return true;
+  return (profile.cv?.trim().length ?? 0) >= 50;
+}

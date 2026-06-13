@@ -94,19 +94,39 @@ replacementsRouter.get(
       (studentCourses ?? []).map((c) => [c.id as string, c]),
     );
 
-    const results = [];
-    for (const notif of notifications ?? []) {
-      const { count, error: proposalError } = await supabaseAdmin
+    const notificationIds = (notifications ?? []).map((n) => n.id as string);
+    const proposalCountMap = new Map<string, number>();
+
+    if (notificationIds.length > 0 && (await replacementProposalsAvailable())) {
+      const { data: proposals } = await supabaseAdmin
         .from("replacement_proposals")
-        .select("id", { count: "exact", head: true })
-        .eq("notification_id", notif.id)
+        .select("notification_id")
+        .in("notification_id", notificationIds)
         .eq("status", "pending");
 
-      if (proposalError) {
-        continue;
+      for (const row of proposals ?? []) {
+        const nid = row.notification_id as string;
+        proposalCountMap.set(nid, (proposalCountMap.get(nid) ?? 0) + 1);
       }
+    }
 
-      if ((count ?? 0) > 0) {
+    const recipientMap = new Map<string, string>();
+    if (notificationIds.length > 0) {
+      const { data: recipients } = await supabaseAdmin
+        .from("notification_recipients")
+        .select("id, notification_id")
+        .eq("user_id", studentId)
+        .in("notification_id", notificationIds);
+
+      for (const row of recipients ?? []) {
+        recipientMap.set(row.notification_id as string, row.id as string);
+      }
+    }
+
+    const results = [];
+    for (const notif of notifications ?? []) {
+      const count = proposalCountMap.get(notif.id as string) ?? 0;
+      if (count > 0) {
         const course = courseMeta.get(notif.course_id as string);
         results.push({
           ...notif,
@@ -119,6 +139,7 @@ replacementsRouter.get(
             (course?.scheduled_at as string | null) ??
             null,
           pendingProposalsCount: count,
+          recipientId: recipientMap.get(notif.id as string) ?? null,
         });
       }
     }
@@ -269,13 +290,16 @@ replacementsRouter.get(
 
     const isClient = isNotificationClient(notification, profile.id);
     const isTeacher = profile.role === "teacher";
+    const isDeclarant = notification.declared_by === profile.id;
+    const isAdmin =
+      profile.role === "admin_campus" || profile.role === "admin_general";
 
-    if (!isClient && !isTeacher) {
+    if (!isClient && !isTeacher && !isAdmin) {
       res.status(403).json({ error: "Accès refusé" });
       return;
     }
 
-    if (isClient) {
+    if (isClient || isDeclarant || isAdmin) {
       const { data, error } = await supabaseAdmin
         .from("replacement_proposals")
         .select(
@@ -302,34 +326,34 @@ replacementsRouter.get(
       return;
     }
 
-    let query = supabaseAdmin
-      .from("replacement_proposals")
-      .select(
-        `
-        id, notification_id, original_course_id, proposed_provider_id,
-        message, status, created_at,
-        proposed_provider:proposed_provider_id (
-          first_name, last_name, bio, subjects, hourly_rate
+    if (isTeacher) {
+      const { data, error } = await supabaseAdmin
+        .from("replacement_proposals")
+        .select(
+          `
+          id, notification_id, original_course_id, proposed_provider_id,
+          message, status, created_at,
+          proposed_provider:proposed_provider_id (
+            first_name, last_name, bio, subjects, hourly_rate
+          )
+        `,
         )
-      `,
-      )
-      .eq("notification_id", notification.id)
-      .order("created_at");
+        .eq("notification_id", notification.id)
+        .eq("proposed_provider_id", profile.id)
+        .order("created_at");
 
-    if (isClient) {
-      query = query.eq("status", "pending");
-    } else if (isTeacher) {
-      query = query.eq("proposed_provider_id", profile.id);
-    }
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
 
-    const { data, error } = await query;
-
-    if (error) {
-      res.status(500).json({ error: error.message });
+      res.json({
+        data: (data ?? []).map((r) => mapProposal(r as Record<string, unknown>)),
+      });
       return;
     }
 
-    res.json({ data: (data ?? []).map((r) => mapProposal(r as Record<string, unknown>)) });
+    res.status(403).json({ error: "Accès refusé" });
   },
 );
 

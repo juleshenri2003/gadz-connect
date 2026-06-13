@@ -16,8 +16,65 @@ type TutorRow = {
   subjects: string[];
   account_status: string;
   profile_setup_complete?: boolean | null;
+  stripe_connect_onboarding_complete?: boolean | null;
   campus: { name: string } | null;
 };
+
+export type TutorRowWithAvailability = TutorRow & {
+  available_slot_count: number;
+  next_available_slot_at: string | null;
+};
+
+type SlotAvailability = {
+  count: number;
+  next: string | null;
+};
+
+async function fetchSlotAvailabilityByProvider(
+  providerIds: string[],
+): Promise<Map<string, SlotAvailability>> {
+  const result = new Map<string, SlotAvailability>();
+  for (const id of providerIds) {
+    result.set(id, { count: 0, next: null });
+  }
+
+  if (providerIds.length === 0) return result;
+
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("tutor_slots")
+    .select("provider_id, starts_at")
+    .in("provider_id", providerIds)
+    .eq("booked", false)
+    .gt("starts_at", nowIso)
+    .order("starts_at");
+
+  if (error || !data) return result;
+
+  for (const row of data) {
+    const providerId = row.provider_id as string;
+    const entry = result.get(providerId);
+    if (!entry) continue;
+    entry.count += 1;
+    if (!entry.next) entry.next = row.starts_at as string;
+  }
+
+  return result;
+}
+
+function attachSlotAvailability(
+  rows: TutorRow[],
+  availability: Map<string, SlotAvailability>,
+): TutorRowWithAvailability[] {
+  return rows.map((row) => {
+    const slots = availability.get(row.id) ?? { count: 0, next: null };
+    return {
+      ...row,
+      available_slot_count: slots.count,
+      next_available_slot_at: slots.next,
+    };
+  });
+}
 
 const TUTOR_SELECT_WITH_CV_PDF = MARKETPLACE_TUTOR_SELECT;
 const TUTOR_SELECT_WITHOUT_CV_PDF = MARKETPLACE_TUTOR_SELECT.replace(
@@ -40,7 +97,10 @@ function asTutorRow(data: unknown): TutorRow {
 export async function fetchCampusTutors(
   campusId: string,
   excludeUserId: string,
-): Promise<{ data: TutorRow[]; error: { message: string } | null }> {
+): Promise<{
+  data: TutorRowWithAvailability[];
+  error: { message: string } | null;
+}> {
   const withPdf = await supabaseAdmin
     .from("profiles")
     .select(TUTOR_SELECT_WITH_CV_PDF)
@@ -52,7 +112,16 @@ export async function fetchCampusTutors(
     .order("last_name");
 
   if (!withPdf.error) {
-    return { data: asTutorRows(withPdf.data), error: null };
+    const visible = asTutorRows(withPdf.data).filter((row) =>
+      isTeacherVisibleInMarketplace(row),
+    );
+    const availability = await fetchSlotAvailabilityByProvider(
+      visible.map((row) => row.id),
+    );
+    return {
+      data: attachSlotAvailability(visible, availability),
+      error: null,
+    };
   }
 
   if (!isMissingColumnError(withPdf.error)) {
@@ -73,18 +142,29 @@ export async function fetchCampusTutors(
     return { data: [], error: { message: withoutPdf.error.message } };
   }
 
-  const rows = asTutorRows(withoutPdf.data).map((row) => ({
-    ...row,
-    cv_pdf_path: null,
-  }));
+  const rows = asTutorRows(withoutPdf.data)
+    .map((row) => ({
+      ...row,
+      cv_pdf_path: null,
+    }))
+    .filter((row) => isTeacherVisibleInMarketplace(row));
 
-  return { data: rows, error: null };
+  const availability = await fetchSlotAvailabilityByProvider(
+    rows.map((row) => row.id),
+  );
+  return {
+    data: attachSlotAvailability(rows, availability),
+    error: null,
+  };
 }
 
 export async function fetchCampusTutorById(
   campusId: string,
   tutorId: string,
-): Promise<{ data: TutorRow | null; error: { message: string } | null }> {
+): Promise<{
+  data: TutorRowWithAvailability | null;
+  error: { message: string } | null;
+}> {
   const withPdf = await supabaseAdmin
     .from("profiles")
     .select(TUTOR_SELECT_WITH_CV_PDF)
@@ -94,9 +174,14 @@ export async function fetchCampusTutorById(
 
   if (!withPdf.error && withPdf.data) {
     const row = asTutorRow(withPdf.data);
-    return isTeacherVisibleInMarketplace(row)
-      ? { data: row, error: null }
-      : { data: null, error: null };
+    if (!isTeacherVisibleInMarketplace(row)) {
+      return { data: null, error: null };
+    }
+    const availability = await fetchSlotAvailabilityByProvider([row.id]);
+    return {
+      data: attachSlotAvailability([row], availability)[0] ?? null,
+      error: null,
+    };
   }
 
   if (withPdf.error && !isMissingColumnError(withPdf.error)) {
@@ -124,9 +209,15 @@ export async function fetchCampusTutorById(
     cv_pdf_path: null,
   };
 
-  return isTeacherVisibleInMarketplace(row)
-    ? { data: row, error: null }
-    : { data: null, error: null };
+  if (!isTeacherVisibleInMarketplace(row)) {
+    return { data: null, error: null };
+  }
+
+  const availability = await fetchSlotAvailabilityByProvider([row.id]);
+  return {
+    data: attachSlotAvailability([row], availability)[0] ?? null,
+    error: null,
+  };
 }
 
 export async function fetchTutorCvPdfPath(

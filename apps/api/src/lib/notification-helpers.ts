@@ -320,3 +320,18 @@ export function isNotificationClient(
     (course?.client_id as string | null | undefined);
   return clientId === userId;
 }
+
+/** Notification personnelle lors de l'activation automatique du compte prestataire. */
+export async function notifyAccountActivated(
+  userId: string,
+  campusId: string,
+): Promise<void> {
+  await notifyUsers([userId], {
+    campusId,
+    kind: "account_activated",
+    title: "Compte prestataire activé",
+    message:
+      "Votre SIRET a été enregistré et votre compte est actif. Configurez Stripe et publiez vos créneaux pour recevoir des réservations.",
+    declaredBy: userId,
+  });
+}

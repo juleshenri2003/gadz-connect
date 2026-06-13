@@ -2,6 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import {
+  loadAccountStatus,
+  requireTeacherNotSuspended,
+} from "../middleware/account-status.js";
 import { ensureProfileForUser } from "../lib/profiles.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import {
@@ -18,7 +22,11 @@ stripeRouter.use(requireAuth);
  * POST /api/stripe/connect/account
  * Crée un compte Stripe Connect Express et l'associe au profil.
  */
-stripeRouter.post("/connect/account", async (req: AuthenticatedRequest, res) => {
+stripeRouter.post(
+  "/connect/account",
+  loadAccountStatus,
+  requireTeacherNotSuspended,
+  async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
     res.status(503).json({
       error:
@@ -88,7 +96,8 @@ stripeRouter.post("/connect/account", async (req: AuthenticatedRequest, res) => 
   }
 
   res.json({ data: { accountId } });
-});
+  },
+);
 
 const onboardingLinkSchema = z.object({
   accountId: z.string().startsWith("acct_"),
@@ -98,7 +107,11 @@ const onboardingLinkSchema = z.object({
  * POST /api/stripe/connect/onboarding-link
  * Génère un Account Link pour finaliser l'onboarding Express.
  */
-stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, res) => {
+stripeRouter.post(
+  "/connect/onboarding-link",
+  loadAccountStatus,
+  requireTeacherNotSuspended,
+  async (req: AuthenticatedRequest, res) => {
   if (!stripe) {
     res.status(503).json({
       error:
@@ -142,7 +155,8 @@ stripeRouter.post("/connect/onboarding-link", async (req: AuthenticatedRequest, 
   });
 
   res.json({ data: { url: accountLink.url } });
-});
+  },
+);
 
 /**
  * GET /api/stripe/connect/status
@@ -213,3 +227,43 @@ stripeRouter.get("/connect/status", async (req: AuthenticatedRequest, res) => {
     },
   });
 });
+
+/**
+ * POST /api/stripe/connect/dashboard-link
+ * Génère un lien de connexion vers le dashboard Stripe Express.
+ */
+stripeRouter.post(
+  "/connect/dashboard-link",
+  loadAccountStatus,
+  requireTeacherNotSuspended,
+  async (req: AuthenticatedRequest, res) => {
+    if (!stripe) {
+      res.status(503).json({
+        error:
+          "Stripe non configuré — ajoutez STRIPE_SECRET_KEY (sk_test_…) dans apps/api/.env",
+      });
+      return;
+    }
+
+    const user = req.user!;
+    const userId = user.id;
+
+    await ensureProfileForUser(user);
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("stripe_connect_account_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const accountId = profile?.stripe_connect_account_id as string | undefined;
+    if (!accountId) {
+      res.status(400).json({ error: "Aucun compte Stripe associé" });
+      return;
+    }
+
+    const loginLink = await stripe.accounts.createLoginLink(accountId);
+
+    res.json({ data: { url: loginLink.url } });
+  },
+);

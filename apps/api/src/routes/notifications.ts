@@ -3,6 +3,10 @@ import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
+  computeTeacherActionCount,
+  enrichNotificationsForUser,
+} from "../lib/notification-enrichment.js";
+import {
   findOpenProfUnavailableNotification,
   getActiveCampusTeachers,
   getSiteAdministratorIds,
@@ -30,39 +34,95 @@ async function getProfile(userId: string) {
   return data;
 }
 
+const NOTIFICATIONS_SELECT_WITH_CLIENT = `
+  id,
+  read_at,
+  created_at,
+  notification:campus_notifications (
+    id,
+    kind,
+    title,
+    message,
+    scheduled_at,
+    replacement_status,
+    reason,
+    created_at,
+    declared_by,
+    course_id,
+    campus:campus_id ( name ),
+    declarant:declared_by ( first_name, last_name, role ),
+    course:course_id (
+      subject,
+      client_id,
+      client:client_id ( first_name, last_name )
+    )
+  )
+`;
+
+const NOTIFICATIONS_SELECT_BASE = `
+  id,
+  read_at,
+  created_at,
+  notification:campus_notifications (
+    id,
+    kind,
+    title,
+    message,
+    scheduled_at,
+    replacement_status,
+    reason,
+    created_at,
+    declared_by,
+    course_id,
+    campus:campus_id ( name ),
+    declarant:declared_by ( first_name, last_name, role ),
+    course:course_id ( subject, client_id )
+  )
+`;
+
+function isSchemaJoinError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("Could not find a relationship") ||
+    message.includes("schema cache")
+  );
+}
+
+async function fetchNotificationRecipients(userId: string) {
+  const withClient = await supabaseAdmin
+    .from("notification_recipients")
+    .select(NOTIFICATIONS_SELECT_WITH_CLIENT)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!withClient.error) return withClient;
+
+  if (!isSchemaJoinError(withClient.error.message)) {
+    return withClient;
+  }
+
+  console.warn(
+    "[notifications] jointure client indisponible — repli sans nom élève:",
+    withClient.error.message,
+  );
+
+  return supabaseAdmin
+    .from("notification_recipients")
+    .select(NOTIFICATIONS_SELECT_BASE)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+}
+
 /**
  * GET /api/notifications
  */
 notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.id;
+  const profile = await getProfile(userId);
 
-  const { data, error } = await supabaseAdmin
-    .from("notification_recipients")
-    .select(
-      `
-      id,
-      read_at,
-      created_at,
-      notification:campus_notifications (
-        id,
-        kind,
-        title,
-        message,
-        scheduled_at,
-        replacement_status,
-        reason,
-        created_at,
-        declared_by,
-        course_id,
-        campus:campus_id ( name ),
-        declarant:declared_by ( first_name, last_name, role ),
-        course:course_id ( subject, client_id )
-      )
-    `,
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const { data, error } = await fetchNotificationRecipients(userId);
 
   if (error) {
     console.error("[notifications] list:", error.message);
@@ -76,9 +136,20 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
     const course = Array.isArray(raw.course) ? raw.course[0] : raw.course;
     const courseRow = course as
-      | { subject?: string | null; client_id?: string | null }
+      | {
+          subject?: string | null;
+          client_id?: string | null;
+          client?:
+            | { first_name?: string | null; last_name?: string | null }
+            | { first_name?: string | null; last_name?: string | null }[]
+            | null;
+        }
       | null
       | undefined;
+    const courseClient = courseRow?.client;
+    const clientRow = Array.isArray(courseClient)
+      ? courseClient[0]
+      : courseClient;
 
     const { course: _course, ...notification } = raw;
 
@@ -94,11 +165,20 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
           (notification.client_id as string | undefined) ??
           courseRow?.client_id ??
           null,
+        client:
+          clientRow?.first_name || clientRow?.last_name ? clientRow : null,
       },
     };
   });
 
-  res.json({ data: rows });
+  const enriched = await enrichNotificationsForUser(
+    rows as Array<{
+      read_at: string | null;
+      notification: Record<string, unknown> | null;
+    }>,
+    profile,
+  );
+  res.json({ data: enriched });
 });
 
 /**
@@ -117,6 +197,19 @@ notificationsRouter.get("/unread-count", async (req: AuthenticatedRequest, res) 
   }
 
   res.json({ data: { count: count ?? 0 } });
+});
+
+/**
+ * GET /api/notifications/action-count
+ */
+notificationsRouter.get("/action-count", async (req: AuthenticatedRequest, res) => {
+  try {
+    const count = await computeTeacherActionCount(req.user!.id);
+    res.json({ data: { count } });
+  } catch (err) {
+    console.error("[notifications] action-count:", err);
+    res.status(500).json({ error: "Impossible de calculer les actions requises" });
+  }
 });
 
 /**

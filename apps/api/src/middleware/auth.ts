@@ -5,6 +5,10 @@ import { supabaseAdmin } from "../lib/supabase.js";
 export interface AuthenticatedRequest extends Request {
   user?: User;
   accessToken?: string;
+  profileGuard?: {
+    role: string;
+    account_status: string;
+  };
 }
 
 export async function requireAuth(

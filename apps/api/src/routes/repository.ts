@@ -88,26 +88,66 @@ repositoryRouter.get("/folders", async (req: AuthenticatedRequest, res) => {
   const { data: folders, error } = await supabaseAdmin
     .from("student_subject_folders")
     .select("id, subject, created_at")
-    .eq("student_id", profile.id)
-    .order("subject");
+    .eq("student_id", profile.id);
 
   if (error) {
     res.status(500).json({ error: error.message });
     return;
   }
 
-  const enriched = [];
-  for (const folder of folders ?? []) {
-    const { count } = await supabaseAdmin
-      .from("course_summaries")
-      .select("id", { count: "exact", head: true })
-      .eq("folder_id", folder.id);
+  const folderIds = (folders ?? []).map((f) => f.id as string);
+  const statsByFolderId = new Map<
+    string,
+    { summaryCount: number; lastSummaryAt: string | null; latestTitle: string | null }
+  >();
 
-    enriched.push({
-      ...folder,
-      summaryCount: count ?? 0,
-    });
+  if (folderIds.length > 0) {
+    const { data: summaries, error: summariesError } = await supabaseAdmin
+      .from("course_summaries")
+      .select("folder_id, published_at, title")
+      .in("folder_id", folderIds)
+      .order("published_at", { ascending: false });
+
+    if (summariesError) {
+      res.status(500).json({ error: summariesError.message });
+      return;
+    }
+
+    for (const row of summaries ?? []) {
+      const folderId = row.folder_id as string;
+      const existing = statsByFolderId.get(folderId);
+      if (!existing) {
+        statsByFolderId.set(folderId, {
+          summaryCount: 1,
+          lastSummaryAt: row.published_at as string,
+          latestTitle: row.title as string,
+        });
+      } else {
+        existing.summaryCount += 1;
+      }
+    }
   }
+
+  const enriched = (folders ?? []).map((folder) => {
+    const stats = statsByFolderId.get(folder.id as string);
+    return {
+      ...folder,
+      summaryCount: stats?.summaryCount ?? 0,
+      lastSummaryAt: stats?.lastSummaryAt ?? null,
+      latestTitle: stats?.latestTitle ?? null,
+    };
+  });
+
+  enriched.sort((a, b) => {
+    if (!a.lastSummaryAt && !b.lastSummaryAt) {
+      return a.subject.localeCompare(b.subject, "fr");
+    }
+    if (!a.lastSummaryAt) return 1;
+    if (!b.lastSummaryAt) return -1;
+    return (
+      new Date(b.lastSummaryAt).getTime() - new Date(a.lastSummaryAt).getTime()
+    );
+  });
 
   res.json({ data: enriched });
 });
@@ -145,7 +185,8 @@ repositoryRouter.get(
       .select(
         `
         id, title, content, published_at, course_id,
-        provider:provider_id ( first_name, last_name )
+        provider:provider_id ( first_name, last_name ),
+        course:course_id ( scheduled_at )
       `,
       )
       .eq("folder_id", folder.id)
@@ -166,6 +207,51 @@ repositoryRouter.get(
 );
 
 /**
+ * GET /api/repository/summaries/recent
+ */
+repositoryRouter.get(
+  "/summaries/recent",
+  async (req: AuthenticatedRequest, res) => {
+    const profile = await getProfile(req.user!.id);
+    if (!profile) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    if (profile.role !== "student_provider") {
+      res.status(403).json({ error: "Réservé aux élèves" });
+      return;
+    }
+
+    const rawLimit = Number.parseInt(String(req.query.limit ?? "5"), 10);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), 20)
+      : 5;
+
+    const { data, error } = await supabaseAdmin
+      .from("course_summaries")
+      .select(
+        `
+        id, title, content, published_at, course_id, folder_id,
+        folder:folder_id ( id, subject ),
+        provider:provider_id ( first_name, last_name ),
+        course:course_id ( scheduled_at )
+      `,
+      )
+      .eq("student_id", profile.id)
+      .order("published_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ data: data ?? [] });
+  },
+);
+
+/**
  * GET /api/repository/summaries/:id
  */
 repositoryRouter.get(
@@ -177,7 +263,8 @@ repositoryRouter.get(
         `
         id, title, content, published_at, course_id, folder_id, student_id, provider_id,
         folder:folder_id ( subject ),
-        provider:provider_id ( first_name, last_name )
+        provider:provider_id ( first_name, last_name ),
+        course:course_id ( scheduled_at )
       `,
       )
       .eq("id", req.params.id)
@@ -337,7 +424,7 @@ repositoryRouter.get(
       .eq("provider_id", profile.id)
       .in("status", ["completed", "scheduled"])
       .not("client_id", "is", null)
-      .order("scheduled_at", { ascending: false });
+      .order("scheduled_at", { ascending: true });
 
     if (error) {
       res.status(500).json({ error: error.message });

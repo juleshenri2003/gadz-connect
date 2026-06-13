@@ -1,4 +1,6 @@
-/** Adresses autorisées pour la plateforme RH (pilotage admin). */
+/** Adresses autorisées pour la plateforme RH (pilotage admin).
+ *  Variable d'environnement : RH_ALLOWED_EMAILS (liste séparée par des virgules).
+ */
 export function getRhAllowedEmails(): string[] {
   const raw =
     process.env.RH_ALLOWED_EMAILS ?? "jules.henri@ensam.eu";

@@ -25,6 +25,8 @@ const PROFILE_SELECT_BASE = `
 
 export type ProfileRow = Record<string, unknown> & {
   inpi_declaration_sent_at?: string | null;
+  registration_path?: string | null;
+  siret_verification_failed?: boolean;
   cv?: string | null;
   cv_pdf_path?: string | null;
 };
@@ -58,11 +60,28 @@ export async function fetchProfileByUserId(userId: string): Promise<{
 }> {
   const full = await queryProfile(
     userId,
-    ", cv, cv_pdf_path, inpi_declaration_sent_at",
+    ", cv, cv_pdf_path, inpi_declaration_sent_at, registration_path, siret_verification_failed",
   );
   if (!full.error) return full;
 
   if (full.error.code !== "42703") return full;
+
+  const withInpi = await queryProfile(
+    userId,
+    ", cv, cv_pdf_path, inpi_declaration_sent_at",
+  );
+  if (!withInpi.error) {
+    return {
+      data: {
+        ...(withInpi.data as ProfileRow),
+        registration_path: null,
+        siret_verification_failed: false,
+      },
+      error: null,
+    };
+  }
+
+  if (withInpi.error.code !== "42703") return withInpi;
 
   const withCvPdf = await queryProfile(userId, ", cv, cv_pdf_path");
   if (!withCvPdf.error) {
@@ -70,6 +89,8 @@ export async function fetchProfileByUserId(userId: string): Promise<{
       data: {
         ...(withCvPdf.data as ProfileRow),
         inpi_declaration_sent_at: null,
+        registration_path: null,
+        siret_verification_failed: false,
       },
       error: null,
     };
@@ -84,6 +105,8 @@ export async function fetchProfileByUserId(userId: string): Promise<{
         ...(withCv.data as ProfileRow),
         cv_pdf_path: null,
         inpi_declaration_sent_at: null,
+        registration_path: null,
+        siret_verification_failed: false,
       },
       error: null,
     };
@@ -100,16 +123,23 @@ export async function fetchProfileByUserId(userId: string): Promise<{
       cv: null,
       cv_pdf_path: null,
       inpi_declaration_sent_at: null,
+      registration_path: null,
+      siret_verification_failed: false,
     },
     error: null,
   };
 }
 
+let inpiColumnReady: boolean | null = null;
+
 export async function hasInpiDeclarationColumn(): Promise<boolean> {
+  if (inpiColumnReady !== null) return inpiColumnReady;
+
   const { error } = await supabaseAdmin
     .from("profiles")
     .select("inpi_declaration_sent_at")
     .limit(1);
 
-  return !error || error.code !== "42703";
+  inpiColumnReady = !error || error.code !== "42703";
+  return inpiColumnReady;
 }
