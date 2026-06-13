@@ -6,6 +6,8 @@ export type UserRole =
 
 export type AccountStatus = "pending_siret" | "active" | "suspended";
 
+export type RegistrationPath = "existing_siret" | "new_micro";
+
 export type CourseStatus =
   | "scheduled"
   | "completed"
@@ -36,6 +38,8 @@ export interface Profile {
   status_acre: boolean;
   versement_liberatoire: boolean;
   account_status: AccountStatus;
+  registration_path: RegistrationPath | null;
+  siret_verification_failed: boolean;
   micro_enterprise_activity: MicroEnterpriseActivity | null;
   urssaf_periodicity: UrssafPeriodicity | null;
   stripe_connect_account_id: string | null;
@@ -95,4 +99,57 @@ export interface OnboardingMicroEnterpriseForm {
   activity: MicroEnterpriseActivity;
   urssafPeriodicity: UrssafPeriodicity;
   versementLiberatoire: boolean;
+}
+
+export interface TeacherFinancialMonthSummary {
+  encaisseBrut: number;
+  encaisseNet: number;
+  enAttenteBrut: number;
+  enAttenteNet: number;
+  coursTermines: number;
+}
+
+export interface TeacherFinancialAllTimeSummary {
+  encaisseNet: number;
+  volumeBrut: number;
+}
+
+export interface TeacherFinancialForecast {
+  brut: number;
+  net: number;
+  count: number;
+}
+
+export interface TeacherFinancialUrssafSummary {
+  due: boolean;
+  periodicity: UrssafPeriodicity | null;
+  amountToDeclare: number;
+  undeclaredCount: number;
+}
+
+export interface TeacherFinancialSummary {
+  month: TeacherFinancialMonthSummary;
+  allTime: TeacherFinancialAllTimeSummary;
+  forecast: TeacherFinancialForecast;
+  urssaf: TeacherFinancialUrssafSummary;
+}
+
+export interface TeacherTransactionCourse {
+  id: string;
+  subject: string | null;
+  title: string;
+  scheduled_at: string | null;
+  client: { first_name: string; last_name: string } | null;
+}
+
+export interface TeacherTransactionItem {
+  id: string;
+  amount_gross: number;
+  commission_sasu: number;
+  taxes_urssaf: number;
+  net_payout: number;
+  status_stripe: TransactionStripeStatus;
+  status_urssaf: TransactionUrssafStatus;
+  created_at: string;
+  course: TeacherTransactionCourse;
 }
