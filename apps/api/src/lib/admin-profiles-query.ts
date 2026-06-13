@@ -192,17 +192,6 @@ function matchesPresetFilter(
   }
 }
 
-function matchesRoleFilter(
-  row: AdminProfileListRow,
-  role: AdminProfilesListParams["role"],
-): boolean {
-  if (!role) return true;
-  if (role === "admin") {
-    return row.role === "admin_campus" || row.role === "admin_general";
-  }
-  return row.role === role;
-}
-
 function sortProfiles(rows: AdminProfileListRow[]): AdminProfileListRow[] {
   const statusOrder: Record<AccountStatus, number> = {
     pending_siret: 0,

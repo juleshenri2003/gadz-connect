@@ -391,7 +391,7 @@ export async function fetchAdminScheduleSummary(
 
   let openSlots: number | undefined;
   if (params.from && params.to) {
-    let slotsQuery = supabaseAdmin
+    const slotsQuery = supabaseAdmin
       .from("tutor_slots")
       .select("id, provider_id")
       .eq("booked", false)
