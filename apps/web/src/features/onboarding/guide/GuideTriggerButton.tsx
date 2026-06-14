@@ -1,4 +1,5 @@
 import { Button, cn } from "@gadz-connect/ui";
+import { useSidebarCollapsed } from "@/features/layout/sidebarCollapse";
 import { useOnboardingGuide } from "./OnboardingGuideContext";
 
 function GuideIcon({ className }: { className?: string }) {
@@ -21,6 +22,7 @@ function GuideIcon({ className }: { className?: string }) {
 }
 
 export function GuideTriggerButton() {
+  const collapsed = useSidebarCollapsed();
   const { openGuide, progress, isLoading } = useOnboardingGuide();
 
   if (isLoading || !progress) {
@@ -33,9 +35,9 @@ export function GuideTriggerButton() {
     <Button
       type="button"
       variant="outline"
-      size="sm"
+      size={collapsed ? "icon" : "sm"}
       className={cn(
-        "gap-1.5",
+        collapsed ? "relative size-10 shrink-0" : "gap-1.5",
         isComplete
           ? "border-success/20 text-success hover:bg-success-bg"
           : "border-brand-100 text-brand-700 hover:bg-brand-50",
@@ -47,18 +49,35 @@ export function GuideTriggerButton() {
           : `Ouvrir le guide — ${progress.completedCount} sur ${progress.totalCount} étapes complétées`
       }
     >
-      <GuideIcon className="h-4 w-4 shrink-0" />
-      <span>Guide</span>
-      <span
-        className={cn(
-          "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-          isComplete
-            ? "bg-success-bg text-success"
-            : "bg-brand-100 text-brand-700",
-        )}
-      >
-        {isComplete ? "✓" : `${progress.completedCount}/${progress.totalCount}`}
-      </span>
+      <GuideIcon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} />
+      {!collapsed ? (
+        <>
+          <span>Guide</span>
+          <span
+            className={cn(
+              "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+              isComplete
+                ? "bg-success-bg text-success"
+                : "bg-brand-100 text-brand-700",
+            )}
+          >
+            {isComplete
+              ? "✓"
+              : `${progress.completedCount}/${progress.totalCount}`}
+          </span>
+        </>
+      ) : (
+        <span
+          className={cn(
+            "absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold",
+            isComplete
+              ? "bg-success-bg text-success"
+              : "bg-brand-100 text-brand-700",
+          )}
+        >
+          {isComplete ? "✓" : progress.completedCount}
+        </span>
+      )}
     </Button>
   );
 }

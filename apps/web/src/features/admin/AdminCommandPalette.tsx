@@ -2,6 +2,7 @@ import { Button, cn } from "@gadz-connect/ui";
 import { Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSidebarCollapsed } from "@/features/layout/sidebarCollapse";
 
 const ADMIN_COMMANDS = [
   { label: "Tableau de bord", to: "/admin" },
@@ -13,6 +14,7 @@ const ADMIN_COMMANDS = [
 ] as const;
 
 export function AdminCommandPaletteTrigger() {
+  const collapsed = useSidebarCollapsed();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -45,15 +47,23 @@ export function AdminCommandPaletteTrigger() {
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="hidden gap-2 text-ink-400 md:flex"
+        size={collapsed ? "icon" : "sm"}
+        className={cn(
+          "hidden text-ink-400 md:flex",
+          collapsed ? "size-10 shrink-0" : "gap-2",
+        )}
         onClick={() => setOpen(true)}
+        aria-label="Rechercher (⌘K)"
       >
-        <Search className="h-4 w-4" />
-        <span>Rechercher</span>
-        <kbd className="rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-medium text-ink-400">
-          ⌘K
-        </kbd>
+        <Search className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} />
+        {!collapsed ? (
+          <>
+            <span>Rechercher</span>
+            <kbd className="rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-medium text-ink-400">
+              ⌘K
+            </kbd>
+          </>
+        ) : null}
       </Button>
     );
   }

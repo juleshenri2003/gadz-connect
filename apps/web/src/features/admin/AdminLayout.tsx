@@ -47,7 +47,6 @@ export function AdminLayout() {
       userRole={me ? ROLE_LABELS[me.role] : undefined}
       nav={NAV}
       spaceVariant="admin"
-      headerHint="Console d'administration — données Supabase en temps réel"
       footerLabel="Quitter le pilotage"
       onFooterClick={() => void handleLeave()}
       headerExtra={<AdminCommandPaletteTrigger />}

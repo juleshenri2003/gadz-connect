@@ -5,7 +5,6 @@ import { useProviderProgress } from "@/features/onboarding/progress/useProviderP
 import { GuideModal } from "@/features/onboarding/guide/GuideModal";
 import { OnboardingGuideProvider } from "@/features/onboarding/guide/OnboardingGuideContext";
 import { GuideTriggerButton } from "@/features/onboarding/guide/GuideTriggerButton";
-import { NotificationNavBadge } from "@/features/notifications/NotificationNavBadge";
 import { AppShell } from "@/features/layout/AppShell";
 import { buildStudentNav, buildTutorNav } from "./providerNav";
 
@@ -47,7 +46,7 @@ export function ProviderLayout() {
   return (
     <OnboardingGuideProvider>
       <AppShell
-        title={student ? "Espace élèves" : "Espace prestataire"}
+        title={student ? "Espace élèves" : "Espace prof"}
         subtitle={
           student
             ? "Arts et Métiers — tutorat"
@@ -57,19 +56,9 @@ export function ProviderLayout() {
         userRole={role ? ROLE_LABELS[role] : undefined}
         nav={nav}
         spaceVariant={student ? "student" : "teacher"}
-        headerHint={
-          student
-            ? "Réservez des cours de tutorat sur votre campus"
-            : "Votre espace professionnel — données en temps réel"
-        }
         footerLabel="Déconnexion"
         onFooterClick={() => void handleSignOut()}
-        headerExtra={
-          <>
-            {student ? <GuideTriggerButton /> : null}
-            <NotificationNavBadge to="/app/alertes" />
-          </>
-        }
+        headerExtra={student ? <GuideTriggerButton /> : undefined}
       />
       <GuideModal />
     </OnboardingGuideProvider>

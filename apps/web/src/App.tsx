@@ -6,7 +6,6 @@ import { AdminLayout } from "@/features/admin/AdminLayout";
 import { ProviderLayout } from "@/features/provider/ProviderLayout";
 import { AuthCallbackPage } from "@/pages/auth/AuthCallbackPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
-import { HomePage } from "@/pages/HomePage";
 import { StripeReturnPage } from "@/pages/stripe/StripeReturnPage";
 import { RhLoginPage } from "@/pages/rh/RhLoginPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
@@ -33,8 +32,8 @@ import { TutorOnlyRoute } from "@/pages/provider/TutorOnlyRoute";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/auth/login" element={<Navigate to="/" replace />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
         path="/onboarding/micro-entreprise"
