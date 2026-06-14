@@ -1,6 +1,6 @@
 import { Button, Card, CardContent } from "@gadz-connect/ui";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useAdminCampuses, useAdminMe } from "@/features/admin/useAdmin";
 import { AdminAgendaList } from "@/features/scheduling/AdminAgendaList";
@@ -16,7 +16,6 @@ import {
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import { API_URL } from "@/lib/api";
 import {
-  buildAdminPlanningHref,
   formatWeekParam,
   getScheduleRange,
   parseAdminScheduleUrl,

@@ -25,7 +25,6 @@ import {
   getStudentNotificationTitle,
   getUniqueCampusNames,
   isCancellationKind,
-  isSiteAdminRole,
   isValidAdminFilter,
   KIND_LABELS,
   matchesCampusFilter,
@@ -57,7 +56,6 @@ export function NotificationsPage() {
   const [campusFilter, setCampusFilter] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
-  const isStudentRole = profile?.role ? isStudent(profile.role) : false;
   const isAdminGeneral = profile?.role === "admin_general";
   const planningPath = getPlanningPath(isAdminRoute);
   const scopeItems = (data ?? []).filter((item) =>

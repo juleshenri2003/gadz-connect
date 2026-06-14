@@ -2,7 +2,6 @@ import { cn } from "@gadz-connect/ui";
 import { StatCard } from "@/features/admin/StatCard";
 import type { AdminCoursePreset } from "@/features/admin/types";
 import type { AdminCoursesSummary } from "@/features/admin/types";
-import { PRESET_FILTER_LABELS } from "./courseFilters";
 
 interface CoursesKpiStripProps {
   summary: AdminCoursesSummary | undefined;
