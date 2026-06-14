@@ -89,42 +89,25 @@ export function AdminCampusBreakdown({ rows }: AdminCampusBreakdownProps) {
 }
 
 interface AdminCoursesAtRiskProps {
-  awaitingReplacement: number;
   cancelled: number;
 }
 
-export function AdminCoursesAtRisk({
-  awaitingReplacement,
-  cancelled,
-}: AdminCoursesAtRiskProps) {
-  if (awaitingReplacement === 0 && cancelled === 0) return null;
+export function AdminCoursesAtRisk({ cancelled }: AdminCoursesAtRiskProps) {
+  if (cancelled === 0) return null;
 
   return (
     <section className="rounded-md border border-warning/20 bg-warning-bg/60 p-5">
       <h3 className="font-semibold text-warning">Cours à surveiller</h3>
       <ul className="mt-3 space-y-2 text-sm text-warning">
-        {awaitingReplacement > 0 ? (
-          <li>
-            {awaitingReplacement} cours en attente de remplaçant —{" "}
-            <Link
-              to="/admin/planning?status=awaiting_replacement"
-              className="font-medium underline"
-            >
-              voir le planning
-            </Link>
-          </li>
-        ) : null}
-        {cancelled > 0 ? (
-          <li>
-            {cancelled} cours annulé(s) —{" "}
-            <Link
-              to="/admin/planning?status=cancelled&history=1"
-              className="font-medium underline"
-            >
-              voir le planning
-            </Link>
-          </li>
-        ) : null}
+        <li>
+          {cancelled} séance(s) annulée(s) —{" "}
+          <Link
+            to="/admin/planning?status=cancelled&history=1"
+            className="font-medium underline"
+          >
+            voir le planning
+          </Link>
+        </li>
       </ul>
     </section>
   );

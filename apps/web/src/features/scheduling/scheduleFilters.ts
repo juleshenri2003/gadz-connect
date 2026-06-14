@@ -27,7 +27,3 @@ export function filterScheduleEvents(
   if (showHistory) return events;
   return events.filter((event) => !isHistoryEvent(event));
 }
-
-export function hasAwaitingReplacement(events: ScheduleEvent[]): boolean {
-  return events.some((event) => event.status === "awaiting_replacement");
-}

@@ -1,6 +1,6 @@
 import { Button, cn, Input, Skeleton } from "@gadz-connect/ui";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { formatEuro } from "@/features/admin/format";
 import { useOnboardingGuide } from "@/features/onboarding/guide/OnboardingGuideContext";
 import {
@@ -70,10 +70,16 @@ export function TutorList({
   showFilters = false,
   showGuideEmptyState = false,
 }: TutorListProps) {
+  const [searchParams] = useSearchParams();
+  const initialSubject = searchParams.get("subject")?.trim() || null;
+  const initialQuery = searchParams.get("q")?.trim() ?? "";
+
   const { data: tutors, isLoading, isError } = useTutors();
   const { openGuideAt } = useOnboardingGuide();
-  const [query, setQuery] = useState("");
-  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [subjectFilter, setSubjectFilter] = useState<string | null>(
+    initialSubject,
+  );
 
   const sortedTutors = useMemo(
     () => sortTutorsByAvailability(tutors ?? []),

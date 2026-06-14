@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { ProviderTaskBanner } from "@/features/dashboard/ProviderTaskBanner";
 import { isStudentCampusEmpty } from "@/features/dashboard/studentDashboardTasks";
-import { StudentPendingReplacementBanner } from "@/features/replacements/StudentPendingReplacementBanner";
 
 interface StudentUrgentBannersProps {
   tutorCount: number;
@@ -26,7 +25,6 @@ export function StudentUrgentBanners({ tutorCount }: StudentUrgentBannersProps) 
           — de nouveaux professeurs peuvent s&apos;inscrire.
         </div>
       ) : null}
-      <StudentPendingReplacementBanner />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { buildAdminAlertHref } from "@/features/notifications/notificationUtils";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
-import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
+import type { DashboardProgress } from "./dashboardTypes";
 
 export function computeAdminPilotageTasks(
   profiles: Array<{
@@ -10,9 +10,8 @@ export function computeAdminPilotageTasks(
   }> | undefined,
   notifications: CampusNotificationItem[] | undefined,
   suspendedCount = 0,
-  awaitingReplacementCount = 0,
 ): DashboardProgress {
-  const tasks: DashboardTask[] = [];
+  const tasks: DashboardProgress["tasks"] = [];
 
   const verificationFailed =
     profiles?.filter((p) => p.siret_verification_failed) ?? [];
@@ -43,35 +42,6 @@ export function computeAdminPilotageTasks(
     });
   }
 
-  const openReplacements =
-    notifications?.filter(
-      (n) =>
-        n.notification?.kind === "prof_unavailable" &&
-        n.notification.replacement_status === "open",
-    ) ?? [];
-
-  if (openReplacements.length > 0) {
-    const firstOpen = openReplacements[0];
-    tasks.push({
-      id: "review-replacements",
-      title: `${openReplacements.length} remplacement(s) en cours`,
-      description:
-        "Superviser les indisponibilités prof et le choix des remplaçants",
-      href: buildAdminAlertHref(firstOpen?.id, "in_progress"),
-      status: "todo",
-    });
-  }
-
-  if (awaitingReplacementCount > 0) {
-    tasks.push({
-      id: "courses-awaiting-replacement",
-      title: `${awaitingReplacementCount} cours en attente de remplaçant`,
-      description: "Cours dont le statut est « awaiting_replacement »",
-      href: "/admin/planning?status=awaiting_replacement",
-      status: "todo",
-    });
-  }
-
   if (suspendedCount > 0) {
     tasks.push({
       id: "review-suspended",
@@ -84,7 +54,7 @@ export function computeAdminPilotageTasks(
 
   const unreadCount =
     notifications?.filter((n) => !n.read_at).length ?? 0;
-  if (unreadCount > 0 && openReplacements.length === 0) {
+  if (unreadCount > 0) {
     tasks.push({
       id: "read-alerts",
       title: `${unreadCount} alerte(s) non lue(s)`,

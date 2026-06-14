@@ -6,7 +6,6 @@ const STATUS_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "scheduled", label: "Planifié" },
-  { value: "awaiting_replacement", label: "Remplacement" },
   { value: "completed", label: "Terminé" },
   { value: "cancelled", label: "Annulé" },
 ];

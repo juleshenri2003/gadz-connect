@@ -89,10 +89,6 @@ export function AdminCoursesPage() {
   const showInitialSkeleton =
     isLoading && !data && summaryQuery.isLoading && !summaryQuery.data;
 
-  const hasAwaitingReplacementInList = courses.some(
-    (course) => course.status === "awaiting_replacement",
-  );
-
   if (showInitialSkeleton) {
     return <CoursesPageSkeleton />;
   }
@@ -125,24 +121,6 @@ export function AdminCoursesPage() {
         activePreset={filters.preset}
         onPresetChange={handlePresetChange}
       />
-
-      {(filters.preset === "awaiting_replacement" ||
-        hasAwaitingReplacementInList) &&
-      (summaryQuery.data?.awaitingReplacement ?? 0) > 0 ? (
-        <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning">
-          Un ou plusieurs cours sont en attente de remplacement.{" "}
-          <Link
-            to={buildAdminPlanningHref({ status: ["awaiting_replacement"] })}
-            className="font-medium underline"
-          >
-            Voir dans le planning →
-          </Link>{" "}
-          ·{" "}
-          <Link to="/admin/alertes" className="font-medium underline">
-            Alertes campus →
-          </Link>
-        </div>
-      ) : null}
 
       <CoursesFilterBar
         filters={filters}

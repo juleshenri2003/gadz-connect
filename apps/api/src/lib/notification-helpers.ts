@@ -67,20 +67,6 @@ export async function insertCampusNotification(
   return fallback as { id: string };
 }
 
-export async function findOpenProfUnavailableNotification(
-  courseId: string,
-): Promise<{ id: string } | null> {
-  const { data } = await supabaseAdmin
-    .from("campus_notifications")
-    .select("id")
-    .eq("course_id", courseId)
-    .eq("kind", "prof_unavailable")
-    .eq("replacement_status", "open")
-    .maybeSingle();
-
-  return data ? (data as { id: string }) : null;
-}
-
 export async function insertNotificationRecipients(
   notificationId: string,
   userIds: string[],
@@ -127,7 +113,7 @@ export async function notifyUsers(
       message: payload.message,
       scheduled_at: payload.scheduledAt ?? null,
       declared_by: payload.declaredBy,
-      replacement_status: payload.replacementStatus ?? "open",
+      replacement_status: payload.replacementStatus ?? "dismissed",
     })
     .select("id")
     .single();
@@ -145,32 +131,6 @@ export async function notifyUsers(
   return notification.id as string;
 }
 
-export async function getActiveCampusTeachers(
-  campusId: string,
-  excludeUserId?: string,
-): Promise<string[]> {
-  let query = supabaseAdmin
-    .from("profiles")
-    .select("id")
-    .eq("campus_id", campusId)
-    .eq("role", "teacher")
-    .eq("account_status", "active")
-    .eq("profile_setup_complete", true);
-
-  if (excludeUserId) {
-    query = query.neq("id", excludeUserId);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[replacements] teachers:", error.message);
-    return [];
-  }
-
-  return (data ?? []).map((r) => r.id as string);
-}
-
-/** Admins plateforme (admin_general, admin_campus du campus, e-mails RH). */
 export async function getSiteAdministratorIds(
   campusId: string,
   excludeUserId?: string,
@@ -220,105 +180,6 @@ export async function getSiteAdministratorIds(
   }
 
   return uniqueRecipientIds([...ids], excludeUserId);
-}
-
-export type NotificationWithCourse = Record<string, unknown> & {
-  id: string;
-  course_id: string | null;
-  course?: unknown;
-  client_id?: string | null;
-  subject?: string | null;
-  original_provider_id?: string | null;
-};
-
-export function courseFromNotification(
-  notification: NotificationWithCourse,
-): Record<string, unknown> | null {
-  const course = notification.course;
-  if (!course) return null;
-  return (Array.isArray(course) ? course[0] : course) as Record<string, unknown>;
-}
-
-export function enrichNotificationWithCourse(
-  notification: NotificationWithCourse,
-): NotificationWithCourse {
-  const course = courseFromNotification(notification);
-  if (!course) return notification;
-
-  return {
-    ...notification,
-    client_id:
-      (notification.client_id as string | null | undefined) ??
-      (course.client_id as string | null) ??
-      null,
-    subject:
-      (notification.subject as string | null | undefined) ??
-      (course.subject as string | null) ??
-      null,
-    original_provider_id:
-      (notification.original_provider_id as string | null | undefined) ??
-      (course.provider_id as string | null) ??
-      null,
-    scheduled_at:
-      (notification.scheduled_at as string | null | undefined) ??
-      (course.scheduled_at as string | null) ??
-      null,
-  };
-}
-
-export async function loadCampusNotification(
-  notificationId: string,
-): Promise<NotificationWithCourse | null> {
-  const { data, error } = await supabaseAdmin
-    .from("campus_notifications")
-    .select(
-      `
-      id, kind, replacement_status, campus_id, course_id,
-      declared_by, scheduled_at, reason, title, message,
-      course:course_id (
-        id, status, slot_id, client_id, provider_id, subject, scheduled_at,
-        slot:slot_id ( starts_at, ends_at )
-      )
-    `,
-    )
-    .eq("id", notificationId)
-    .maybeSingle();
-
-  if (error || !data) {
-    if (error) {
-      console.error("[notifications] load:", error.message);
-    }
-    return null;
-  }
-
-  return enrichNotificationWithCourse(data as NotificationWithCourse);
-}
-
-export async function replacementProposalsAvailable(): Promise<boolean> {
-  const { error } = await supabaseAdmin
-    .from("replacement_proposals")
-    .select("id")
-    .limit(0);
-  return !error;
-}
-
-export async function replacementTeacherDeclinesAvailable(): Promise<boolean> {
-  const { error } = await supabaseAdmin
-    .from("replacement_teacher_declines")
-    .select("notification_id")
-    .limit(0);
-  return !error;
-}
-
-export function isNotificationClient(
-  notification: NotificationWithCourse,
-  userId: string,
-): boolean {
-  const course = courseFromNotification(notification);
-  const clientId =
-    (notification.client_id as string | null | undefined) ??
-    (course?.client_id as string | null | undefined);
-  return clientId === userId;
 }
 
 /** Notification personnelle lors de l'activation automatique du compte prestataire. */

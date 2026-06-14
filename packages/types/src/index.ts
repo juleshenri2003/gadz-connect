@@ -11,8 +11,7 @@ export type RegistrationPath = "existing_siret" | "new_micro";
 export type CourseStatus =
   | "scheduled"
   | "completed"
-  | "cancelled"
-  | "awaiting_replacement";
+  | "cancelled";
 
 export type TransactionStripeStatus =
   | "pending"

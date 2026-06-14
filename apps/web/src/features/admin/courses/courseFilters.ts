@@ -3,8 +3,7 @@ import type { AdminCoursePreset } from "@/features/admin/types";
 export type CourseStatusFilter =
   | "scheduled"
   | "completed"
-  | "cancelled"
-  | "awaiting_replacement";
+  | "cancelled";
 
 export interface CourseFiltersState {
   search: string;
@@ -17,7 +16,6 @@ export interface CourseFiltersState {
 
 export const PRESET_FILTER_LABELS: Record<AdminCoursePreset, string> = {
   missing_summary: "Comptes-rendus manquants",
-  awaiting_replacement: "Remplacement en cours",
   this_week: "Planifiées cette semaine",
   cancelled: "Annulées",
 };
@@ -29,7 +27,6 @@ export const STATUS_FILTER_OPTIONS: Array<{
   { value: "scheduled", label: "Planifié" },
   { value: "completed", label: "Terminé" },
   { value: "cancelled", label: "Annulé" },
-  { value: "awaiting_replacement", label: "Remplacement" },
 ];
 
 export const DEFAULT_COURSE_FILTERS: CourseFiltersState = {
@@ -109,9 +106,6 @@ export function getActiveFilterLabel(
 export function getEmptyStateMessage(filters: CourseFiltersState): string {
   if (filters.preset === "missing_summary") {
     return "Aucune session passée sans compte-rendu.";
-  }
-  if (filters.preset === "awaiting_replacement") {
-    return "Aucun cours en attente de remplaçant.";
   }
   if (filters.preset === "this_week") {
     return "Aucune session planifiée cette semaine.";

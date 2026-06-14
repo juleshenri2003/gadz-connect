@@ -2,10 +2,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@gadz-connect/ui";
 import { StatCard } from "@/features/admin/StatCard";
 import type { AdminScheduleSummary } from "@/features/scheduling/types";
-import {
-  buildAdminAlertHref,
-  buildAdminPlanningHref,
-} from "@/features/scheduling/adminScheduleUtils";
+import { buildAdminPlanningHref } from "@/features/scheduling/adminScheduleUtils";
 
 interface AdminScheduleKpiBandProps {
   summary: AdminScheduleSummary | undefined;
@@ -16,8 +13,8 @@ interface AdminScheduleKpiBandProps {
 
 function KpiSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
           className="h-24 animate-pulse rounded-md border border-line bg-paper"
@@ -42,7 +39,7 @@ export function AdminScheduleKpiBand({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           accent="indigo"
           label="Sessions sur la période"
@@ -50,25 +47,15 @@ export function AdminScheduleKpiBand({
           hint={`${scheduledCount} planifiée${scheduledCount > 1 ? "s" : ""}`}
         />
         <StatCard
-          accent="amber"
-          label="En attente de remplaçant"
-          value={summary.awaitingReplacement}
-          hint={
-            summary.awaitingReplacement > 0
-              ? "Cours à superviser"
-              : "Aucun incident"
-          }
-        />
-        <StatCard
-          accent="amber"
-          label="Remplacements ouverts"
-          value={summary.openReplacements}
-          hint="Alertes campus actives"
-        />
-        <StatCard
           label="Comptes-rendus manquants"
           value={summary.missingSummaries}
           hint="Sessions passées sans CR"
+        />
+        <StatCard
+          accent="amber"
+          label="Séances annulées"
+          value={cancelledCount}
+          hint={cancelledCount > 0 ? "Sur la période filtrée" : "Aucune annulation"}
         />
       </div>
 
@@ -90,25 +77,6 @@ export function AdminScheduleKpiBand({
             className="rounded-full border border-line bg-paper px-3 py-1 text-ink-600 hover:bg-paper"
           >
             {cancelledCount} annulé{cancelledCount > 1 ? "s" : ""}
-          </Link>
-        ) : null}
-        {summary.awaitingReplacement > 0 ? (
-          <Link
-            to={buildAdminPlanningHref({
-              campusId,
-              status: ["awaiting_replacement"],
-            })}
-            className="font-medium text-warning underline"
-          >
-            Filtrer les remplacements →
-          </Link>
-        ) : null}
-        {summary.openReplacements > 0 ? (
-          <Link
-            to={buildAdminAlertHref()}
-            className="font-medium text-brand-700 underline"
-          >
-            Voir les alertes campus →
           </Link>
         ) : null}
       </div>

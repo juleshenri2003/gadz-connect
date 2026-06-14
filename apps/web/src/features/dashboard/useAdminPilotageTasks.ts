@@ -11,7 +11,6 @@ export function useAdminPilotageTasks() {
     profilesQuery.data?.profiles,
     notificationsQuery.data,
     dashboardQuery.data?.profiles.byStatus.suspended ?? 0,
-    dashboardQuery.data?.courses.byStatus.awaiting_replacement ?? 0,
   );
 
   const isLoading =

@@ -5,7 +5,6 @@ const DEFAULT_SESSION_MS = 60 * 60 * 1000;
 
 export type AdminCoursePreset =
   | "missing_summary"
-  | "awaiting_replacement"
   | "this_week"
   | "cancelled";
 
@@ -44,8 +43,7 @@ export interface AdminCourseListRow {
   has_summary: boolean;
   missing_summary: boolean;
   stripe_status: string | null;
-  replacement_notification_id: string | null;
-  replacement_proposal_count: number;
+  cancellation_notification_id: string | null;
   created_at: string;
 }
 
@@ -60,7 +58,6 @@ export interface AdminCoursesSummary {
   total: number;
   byStatus: Record<string, number>;
   thisWeekScheduled: number;
-  awaitingReplacement: number;
   missingSummaries: number;
   cancelled: number;
 }
@@ -158,46 +155,22 @@ async function loadSummaryMetaByCourseId(
   return map;
 }
 
-async function loadReplacementMetaByCourseId(
+async function loadCancellationNotificationByCourseId(
   courseIds: string[],
-): Promise<Map<string, { notificationId: string; proposalCount: number }>> {
-  const map = new Map<
-    string,
-    { notificationId: string; proposalCount: number }
-  >();
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
   if (courseIds.length === 0) return map;
 
   const { data: notifications } = await supabaseAdmin
     .from("campus_notifications")
     .select("id, course_id")
     .in("course_id", courseIds)
-    .eq("kind", "prof_unavailable");
-
-  const notificationIds = (notifications ?? []).map((n) => n.id as string);
-  const proposalCountByNotification = new Map<string, number>();
-
-  if (notificationIds.length > 0) {
-    const { data: proposals } = await supabaseAdmin
-      .from("replacement_proposals")
-      .select("notification_id")
-      .in("notification_id", notificationIds);
-
-    for (const p of proposals ?? []) {
-      const nid = p.notification_id as string;
-      proposalCountByNotification.set(
-        nid,
-        (proposalCountByNotification.get(nid) ?? 0) + 1,
-      );
-    }
-  }
+    .in("kind", ["prof_unavailable", "student_unavailable"]);
 
   for (const n of notifications ?? []) {
     const courseId = n.course_id as string;
     if (!courseId) continue;
-    map.set(courseId, {
-      notificationId: n.id as string,
-      proposalCount: proposalCountByNotification.get(n.id as string) ?? 0,
-    });
+    map.set(courseId, n.id as string);
   }
 
   return map;
@@ -240,7 +213,7 @@ function resolveSessionTimes(course: RawCourseRow): {
 function enrichCourseRow(
   course: RawCourseRow,
   summaryMeta: Map<string, { id: string }>,
-  replacementMeta: Map<string, { notificationId: string; proposalCount: number }>,
+  cancellationMeta: Map<string, string>,
   transactionMeta: Map<string, string>,
   now = Date.now(),
 ): AdminCourseListRow {
@@ -253,7 +226,7 @@ function enrichCourseRow(
   const campus = pickOne<{ name: string }>(course.campus);
   const { starts_at, ends_at } = resolveSessionTimes(course);
   const summary = summaryMeta.get(course.id);
-  const replacement = replacementMeta.get(course.id);
+  const cancellationNotificationId = cancellationMeta.get(course.id);
   const endMs = ends_at ? new Date(ends_at).getTime() : 0;
   const past = endMs > 0 && endMs < now;
   const has_summary = summary != null;
@@ -277,8 +250,7 @@ function enrichCourseRow(
     has_summary,
     missing_summary,
     stripe_status: transactionMeta.get(course.id) ?? null,
-    replacement_notification_id: replacement?.notificationId ?? null,
-    replacement_proposal_count: replacement?.proposalCount ?? 0,
+    cancellation_notification_id: cancellationNotificationId ?? null,
     created_at: course.created_at,
   };
 }
@@ -312,8 +284,6 @@ function matchesPreset(
   switch (preset) {
     case "missing_summary":
       return row.missing_summary;
-    case "awaiting_replacement":
-      return row.status === "awaiting_replacement";
     case "this_week": {
       if (!row.starts_at) return false;
       const ms = new Date(row.starts_at).getTime();
@@ -335,10 +305,9 @@ function sortCourses(
   sort: AdminCourseSort = "scheduled_at_desc",
 ): AdminCourseListRow[] {
   const statusOrder: Record<string, number> = {
-    awaiting_replacement: 0,
-    scheduled: 1,
-    completed: 2,
-    cancelled: 3,
+    scheduled: 0,
+    completed: 1,
+    cancelled: 2,
   };
 
   return rows.slice().sort((a, b) => {
@@ -404,14 +373,14 @@ async function loadEnrichedCourses(
   const courses = (data ?? []) as RawCourseRow[];
   const courseIds = courses.map((c) => c.id);
 
-  const [summaryMeta, replacementMeta, transactionMeta] = await Promise.all([
+  const [summaryMeta, cancellationMeta, transactionMeta] = await Promise.all([
     loadSummaryMetaByCourseId(courseIds),
-    loadReplacementMetaByCourseId(courseIds),
+    loadCancellationNotificationByCourseId(courseIds),
     loadTransactionStatusByCourseId(courseIds),
   ]);
 
   return courses.map((course) =>
-    enrichCourseRow(course, summaryMeta, replacementMeta, transactionMeta),
+    enrichCourseRow(course, summaryMeta, cancellationMeta, transactionMeta),
   );
 }
 
@@ -457,13 +426,11 @@ export async function fetchAdminCoursesSummary(
 
   const byStatus: Record<string, number> = {};
   let thisWeekScheduled = 0;
-  let awaitingReplacement = 0;
   let missingSummaries = 0;
   let cancelled = 0;
 
   for (const row of rows) {
     byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
-    if (row.status === "awaiting_replacement") awaitingReplacement++;
     if (row.missing_summary) missingSummaries++;
     if (row.status === "cancelled") cancelled++;
     if (
@@ -480,7 +447,6 @@ export async function fetchAdminCoursesSummary(
     total: rows.length,
     byStatus,
     thisWeekScheduled,
-    awaitingReplacement,
     missingSummaries,
     cancelled,
   };
@@ -504,16 +470,16 @@ export async function fetchAdminCourseDetail(
     return null;
   }
 
-  const [summaryMeta, replacementMeta, transactionMeta] = await Promise.all([
+  const [summaryMeta, cancellationMeta, transactionMeta] = await Promise.all([
     loadSummaryMetaByCourseId([courseId]),
-    loadReplacementMetaByCourseId([courseId]),
+    loadCancellationNotificationByCourseId([courseId]),
     loadTransactionStatusByCourseId([courseId]),
   ]);
 
   const row = enrichCourseRow(
     course,
     summaryMeta,
-    replacementMeta,
+    cancellationMeta,
     transactionMeta,
   );
   const summary = summaryMeta.get(courseId);
@@ -554,7 +520,6 @@ export function parseAdminCoursesQuery(
   const presetRaw = query.preset as string | undefined;
   const preset =
     presetRaw === "missing_summary" ||
-    presetRaw === "awaiting_replacement" ||
     presetRaw === "this_week" ||
     presetRaw === "cancelled"
       ? presetRaw

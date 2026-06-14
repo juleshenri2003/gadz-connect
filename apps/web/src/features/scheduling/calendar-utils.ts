@@ -80,7 +80,6 @@ export const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
   completed: "Terminé",
   cancelled: "Annulé",
-  awaiting_replacement: "Remplacement",
 };
 
 export function courseStatusLabel(status?: string): string | undefined {
@@ -127,9 +126,6 @@ export function eventStyles(
   startsAt?: string,
   endsAt?: string,
 ): string {
-  if (status === "awaiting_replacement") {
-    return "border-warning/30 bg-warning-bg text-warning";
-  }
   if (status === "cancelled") {
     return "border-line bg-paper text-ink-400 line-through";
   }
@@ -157,7 +153,6 @@ export function eventKindLabel(
   kind: ScheduleEvent["kind"],
   status?: string,
 ): string {
-  if (status === "awaiting_replacement") return "Remplacement en cours";
   if (status === "completed") return "Terminé";
   if (status === "cancelled") return "Annulé";
   if (status === "scheduled" && (kind === "course" || kind === "slot_booked")) {

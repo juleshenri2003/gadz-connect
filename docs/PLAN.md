@@ -16,9 +16,13 @@ Document de référence produit. Voir le dépôt pour l'état d'implémentation 
 
 ## V2 / V3
 
-- Module 5 — Planning iCal ADE + remplacement enseignants
+- Module 5 — Planning iCal ADE
 - Module 6 — Administration campus (supervision exceptionnelle, exports)
 - Module 7 — Multi-écoles
+
+## Indisponibilité / annulation de séance
+
+Prof ou élève qui ne peut pas assurer une séance : le cours passe en `cancelled`, le créneau est libéré sur le marketplace. L'élève peut réserver un autre tuteur via `/app/cours` (filtre matière depuis l'alerte).
 
 ## Flux SIRET professeur
 

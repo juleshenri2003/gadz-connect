@@ -23,25 +23,25 @@ export function DeclareUnavailableButton({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const declare = useDeclareUnavailable();
-  const isStudent = audience === "student";
+  const isStudentAudience = audience === "student";
 
-  const repairAlerts = courseStatus === "awaiting_replacement";
+  if (courseStatus !== "scheduled") {
+    return null;
+  }
 
   async function handleConfirm() {
     setErrorMessage(null);
     try {
-      const result = await declare.mutateAsync({
+      await declare.mutateAsync({
         courseId,
         reason: reason.trim() || undefined,
       });
       setOpen(false);
       setReason("");
       setSuccessMessage(
-        isStudent
-          ? "Votre absence est signalée — le cours est annulé et le campus est alerté."
-          : repairAlerts
-            ? `Alertes renvoyées — ${result.recipientsCount} membre(s) notifié(s).`
-            : `Indisponibilité déclarée — ${result.recipientsCount} membre(s) notifié(s) pour un remplacement.`,
+        isStudentAudience
+          ? "Séance annulée — le créneau est libéré."
+          : "Séance annulée — l'élève est notifié et peut réserver un autre tuteur.",
       );
     } catch (err) {
       setErrorMessage((err as Error).message);
@@ -54,11 +54,7 @@ export function DeclareUnavailableButton({
     );
   }
 
-  const buttonLabel = isStudent
-    ? "Je ne peux pas venir"
-    : repairAlerts
-      ? "Renvoyer les alertes"
-      : "Indisponible";
+  const buttonLabel = "Annuler la séance";
 
   return (
     <>
@@ -81,20 +77,8 @@ export function DeclareUnavailableButton({
         onClose={() => {
           if (!declare.isPending) setOpen(false);
         }}
-        title={
-          isStudent
-            ? "Signaler que vous ne pouvez pas venir"
-            : repairAlerts
-              ? "Renvoyer les alertes campus"
-              : "Signaler une indisponibilité"
-        }
-        description={
-          isStudent
-            ? `Vous ne pourrez pas assister au cours « ${eventTitle} ».`
-            : repairAlerts
-              ? `Les alertes n'ont peut-être pas été envoyées pour « ${eventTitle} ».`
-              : `Vous ne pourrez pas assurer « ${eventTitle} ».`
-        }
+        title="Annuler la séance"
+        description={`Vous ne pourrez pas assurer « ${eventTitle} ».`}
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -103,24 +87,22 @@ export function DeclareUnavailableButton({
               disabled={declare.isPending}
               onClick={() => setOpen(false)}
             >
-              Annuler
+              Retour
             </Button>
             <Button
               type="button"
               disabled={declare.isPending}
               onClick={() => void handleConfirm()}
             >
-              {declare.isPending ? "Envoi…" : "Confirmer"}
+              {declare.isPending ? "Annulation…" : "Confirmer l'annulation"}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-ink-600">
-          {isStudent
-            ? "Le cours sera annulé et les professeurs de votre campus seront alertés. Le créneau sera libéré."
-            : repairAlerts
-              ? "Les alertes seront renvoyées à l'élève, aux profs du campus et à l'équipe RH."
-              : "L'élève et les professeurs de votre campus seront alertés pour un remplacement."}
+          {isStudentAudience
+            ? "La séance sera annulée et le créneau libéré sur le marketplace."
+            : "La séance sera annulée, le créneau libéré, et l'élève pourra réserver un autre tuteur sur la marketplace."}
         </p>
         <div className="mt-4 space-y-1">
           <Label htmlFor={`reason-${courseId}`}>Motif (optionnel)</Label>

@@ -29,9 +29,7 @@ export function TeacherAgendaFeed({ events }: TeacherAgendaFeedProps) {
         to: planningWeekLink(events),
       }}
       renderEventActions={(event) =>
-        event.courseId &&
-        (event.status === "scheduled" ||
-          event.status === "awaiting_replacement") ? (
+        event.courseId && event.status === "scheduled" ? (
           <DeclareUnavailableButton
             courseId={event.courseId}
             eventTitle={event.title}

@@ -132,19 +132,6 @@ export function AdminScheduleEventDetail({
             <dd className="mt-0.5 text-ink-900">{event.campusName}</dd>
           </div>
         ) : null}
-        {event.replacementProposalCount != null &&
-        event.replacementProposalCount > 0 ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-400">
-              Propositions de remplacement
-            </dt>
-            <dd className="mt-0.5 text-ink-900">
-              {event.replacementProposalCount} professeur
-              {event.replacementProposalCount > 1 ? "s" : ""} intéressé
-              {event.replacementProposalCount > 1 ? "s" : ""}
-            </dd>
-          </div>
-        ) : null}
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-ink-400">
             Identifiant cours
@@ -156,9 +143,9 @@ export function AdminScheduleEventDetail({
       </dl>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {event.status === "awaiting_replacement" ? (
+        {event.cancellationNotificationId ? (
           <Button size="sm" variant="outline" asChild>
-            <Link to={buildAdminAlertHref(event.replacementNotificationId)}>
+            <Link to={buildAdminAlertHref(event.cancellationNotificationId)}>
               Voir l&apos;alerte campus
             </Link>
           </Button>

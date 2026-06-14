@@ -19,8 +19,7 @@ export interface ScheduleEvent {
   clientName?: string;
   campusId?: string;
   campusName?: string;
-  replacementNotificationId?: string;
-  replacementProposalCount?: number;
+  cancellationNotificationId?: string;
 }
 
 export interface ScheduleQueryOptions {
@@ -39,8 +38,6 @@ export interface AdminScheduleSummary {
   totalSessions: number;
   byStatus: Record<string, number>;
   byCampus: Array<{ campusId: string; campusName: string; count: number }>;
-  awaitingReplacement: number;
-  openReplacements: number;
   missingSummaries: number;
   openSlots?: number;
 }

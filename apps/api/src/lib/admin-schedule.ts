@@ -20,8 +20,7 @@ export interface AdminScheduleEvent {
   campusId?: string;
   hasSummary?: boolean;
   summaryId?: string;
-  replacementNotificationId?: string;
-  replacementProposalCount?: number;
+  cancellationNotificationId?: string;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -36,8 +35,6 @@ export interface AdminScheduleSummary {
   totalSessions: number;
   byStatus: Record<string, number>;
   byCampus: Array<{ campusId: string; campusName: string; count: number }>;
-  awaitingReplacement: number;
-  openReplacements: number;
   missingSummaries: number;
   openSlots?: number;
 }
@@ -113,45 +110,22 @@ async function loadSummaryMetaByCourseId(
   return map;
 }
 
-async function loadReplacementMetaByCourseId(
+async function loadCancellationNotificationByCourseId(
   courseIds: string[],
-): Promise<
-  Map<string, { notificationId: string; proposalCount: number }>
-> {
-  const map = new Map<string, { notificationId: string; proposalCount: number }>();
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
   if (courseIds.length === 0) return map;
 
   const { data: notifications } = await supabaseAdmin
     .from("campus_notifications")
     .select("id, course_id")
     .in("course_id", courseIds)
-    .eq("kind", "prof_unavailable");
-
-  const notificationIds = (notifications ?? []).map((n) => n.id as string);
-  const proposalCountByNotification = new Map<string, number>();
-
-  if (notificationIds.length > 0) {
-    const { data: proposals } = await supabaseAdmin
-      .from("replacement_proposals")
-      .select("notification_id")
-      .in("notification_id", notificationIds);
-
-    for (const p of proposals ?? []) {
-      const nid = p.notification_id as string;
-      proposalCountByNotification.set(
-        nid,
-        (proposalCountByNotification.get(nid) ?? 0) + 1,
-      );
-    }
-  }
+    .in("kind", ["prof_unavailable", "student_unavailable"]);
 
   for (const n of notifications ?? []) {
     const courseId = n.course_id as string;
     if (!courseId) continue;
-    map.set(courseId, {
-      notificationId: n.id as string,
-      proposalCount: proposalCountByNotification.get(n.id as string) ?? 0,
-    });
+    map.set(courseId, n.id as string);
   }
 
   return map;
@@ -219,7 +193,7 @@ function buildCoursesQuery(
 function mapCourseToEvent(
   course: CourseRow,
   summaryMeta: Map<string, { id: string }>,
-  replacementMeta: Map<string, { notificationId: string; proposalCount: number }>,
+  cancellationMeta: Map<string, string>,
 ): AdminScheduleEvent {
   const provider = pickOne<{ first_name: string; last_name: string }>(
     course.provider,
@@ -234,7 +208,7 @@ function mapCourseToEvent(
   const endsAt = slot?.ends_at ?? defaultEndFromStart(startsAt);
   const courseId = course.id;
   const summary = summaryMeta.get(courseId);
-  const replacement = replacementMeta.get(courseId);
+  const cancellationNotificationId = cancellationMeta.get(courseId);
 
   return {
     id: courseId,
@@ -245,8 +219,7 @@ function mapCourseToEvent(
     campusId: course.campus_id,
     hasSummary: summary != null,
     summaryId: summary?.id,
-    replacementNotificationId: replacement?.notificationId,
-    replacementProposalCount: replacement?.proposalCount,
+    cancellationNotificationId,
     title: course.subject || course.title,
     startsAt,
     endsAt,
@@ -288,13 +261,13 @@ export async function fetchAdminScheduleEvents(
   const courses = (data ?? []) as CourseRow[];
   const courseIds = courses.map((c) => c.id);
 
-  const [summaryMeta, replacementMeta] = await Promise.all([
+  const [summaryMeta, cancellationMeta] = await Promise.all([
     loadSummaryMetaByCourseId(courseIds),
-    loadReplacementMetaByCourseId(courseIds),
+    loadCancellationNotificationByCourseId(courseIds),
   ]);
 
   let events = courses.map((course) =>
-    mapCourseToEvent(course, summaryMeta, replacementMeta),
+    mapCourseToEvent(course, summaryMeta, cancellationMeta),
   );
 
   if (params.search) {
@@ -335,14 +308,12 @@ export async function fetchAdminScheduleSummary(
     string,
     { campusId: string; campusName: string; count: number }
   >();
-  let awaitingReplacement = 0;
   let missingSummaries = 0;
   const now = Date.now();
 
   for (const course of courses) {
     const status = course.status;
     byStatus[status] = (byStatus[status] ?? 0) + 1;
-    if (status === "awaiting_replacement") awaitingReplacement++;
 
     const campus = pickOne<{ id: string; name: string }>(course.campus);
     const campusId = course.campus_id;
@@ -368,26 +339,6 @@ export async function fetchAdminScheduleSummary(
     scopeCampusId,
     params.campusId,
   );
-
-  let openReplacementsQuery = supabaseAdmin
-    .from("campus_notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("kind", "prof_unavailable")
-    .eq("replacement_status", "open");
-
-  if (effectiveCampusId) {
-    openReplacementsQuery = openReplacementsQuery.eq(
-      "campus_id",
-      effectiveCampusId,
-    );
-  }
-
-  const { count: openReplacements, error: openError } =
-    await openReplacementsQuery;
-
-  if (openError) {
-    throw new Error(openError.message);
-  }
 
   let openSlots: number | undefined;
   if (params.from && params.to) {
@@ -424,8 +375,6 @@ export async function fetchAdminScheduleSummary(
     byCampus: [...byCampusMap.values()].sort((a, b) =>
       a.campusName.localeCompare(b.campusName, "fr"),
     ),
-    awaitingReplacement,
-    openReplacements: openReplacements ?? 0,
     missingSummaries,
     openSlots,
   };

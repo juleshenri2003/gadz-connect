@@ -11,17 +11,6 @@ export function getRoleStatusCount(
   return dashboard.profiles.byRoleAndStatus[role]?.[status] ?? 0;
 }
 
-export function countOpenReplacementTasks(
-  tasks: Array<{ id: string; status: string }>,
-): number {
-  return tasks.filter(
-    (task) =>
-      task.status === "todo" &&
-      (task.id === "review-replacements" ||
-        task.id === "courses-awaiting-replacement"),
-  ).length;
-}
-
 export function getUpcomingAdminEvents(
   events: ScheduleEvent[] | undefined,
   limit = 5,
@@ -42,7 +31,6 @@ const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
   completed: "Terminé",
   cancelled: "Annulé",
-  awaiting_replacement: "En attente de remplaçant",
 };
 
 export function courseStatusLabel(status: string): string {

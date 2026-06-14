@@ -17,7 +17,7 @@ export function AdminTaskBanner() {
       scope="admin-pilotage"
       tasks={tasks}
       title="Pilotage RH — actions prioritaires"
-      subtitle="Traitez les validations, remplacements et alertes campus dans l'ordre"
+      subtitle="Traitez les validations SIRET, alertes campus et dossiers suspendus dans l'ordre"
       sequential
     />
   );

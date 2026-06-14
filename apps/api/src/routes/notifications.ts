@@ -7,8 +7,6 @@ import {
   enrichNotificationsForUser,
 } from "../lib/notification-enrichment.js";
 import {
-  findOpenProfUnavailableNotification,
-  getActiveCampusTeachers,
   getSiteAdministratorIds,
   insertCampusNotification,
   insertNotificationRecipients,
@@ -285,21 +283,8 @@ notificationsRouter.post(
     }
 
     const kind = isProvider ? "prof_unavailable" : "student_unavailable";
-    const repairMissingNotification =
-      kind === "prof_unavailable" && course.status === "awaiting_replacement";
 
-    if (repairMissingNotification) {
-      const existing = await findOpenProfUnavailableNotification(
-        course.id as string,
-      );
-      if (existing) {
-        res.status(400).json({
-          error:
-            "Remplacement déjà en cours — consultez Alertes campus pour le suivi",
-        });
-        return;
-      }
-    } else if (course.status !== "scheduled") {
+    if (course.status !== "scheduled") {
       res.status(400).json({
         error: "Ce cours n'est plus planifié (déjà annulé ou terminé)",
       });
@@ -331,15 +316,12 @@ notificationsRouter.post(
     const subject =
       (course.subject as string) || (course.title as string) || "Cours";
 
-    const title =
-      kind === "prof_unavailable"
-        ? `Remplacement professeur — ${subject}`
-        : `Remplacement élève — ${subject}`;
+    const title = `Séance annulée — ${subject}`;
 
     const message =
       kind === "prof_unavailable"
-        ? `${declarantName} est indisponible pour le cours « ${subject} » prévu le ${scheduledLabel} avec ${clientName}. Le cours est en attente de remplacement : l'élève sera alerté pour choisir un remplaçant parmi les propositions des professeurs du campus.`
-        : `${declarantName} est indisponible pour le cours « ${subject} » prévu le ${scheduledLabel} avec ${providerName}. Merci de proposer un remplacement si possible.`;
+        ? `${declarantName} a annulé le cours « ${subject} » prévu le ${scheduledLabel} avec ${clientName}. Le créneau est libéré — l'élève peut réserver un autre tuteur sur la marketplace.`
+        : `${declarantName} a annulé le cours « ${subject} » prévu le ${scheduledLabel} avec ${providerName}. Le créneau est libéré.`;
 
     const notificationPayload: Record<string, unknown> = {
       campus_id: course.campus_id,
@@ -349,7 +331,7 @@ notificationsRouter.post(
       message,
       scheduled_at: course.scheduled_at,
       declared_by: profile.id,
-      replacement_status: kind === "prof_unavailable" ? "open" : "dismissed",
+      replacement_status: "dismissed",
       reason: parsed.data.reason ?? null,
       original_provider_id: course.provider_id,
       client_id: course.client_id,
@@ -367,61 +349,41 @@ notificationsRouter.post(
       return;
     }
 
-    let recipientIds: string[] = [];
+    const admins = await getSiteAdministratorIds(
+      course.campus_id as string,
+      profile.id,
+    );
 
-    if (kind === "prof_unavailable") {
-      const teachers = await getActiveCampusTeachers(
-        course.campus_id as string,
-        profile.id,
-      );
-      const admins = await getSiteAdministratorIds(
-        course.campus_id as string,
-        profile.id,
-      );
-      recipientIds = uniqueRecipientIds([
-        profile.id,
-        ...(course.client_id ? [course.client_id as string] : []),
-        ...teachers,
-        ...admins,
-      ]);
-    } else {
-      const { data: campusMembers } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("campus_id", course.campus_id)
-        .neq("id", profile.id);
-      recipientIds = (campusMembers ?? []).map((m) => m.id as string);
-    }
+    const recipientIds = uniqueRecipientIds([
+      ...(kind === "prof_unavailable"
+        ? [
+            ...(course.client_id ? [course.client_id as string] : []),
+            ...(course.provider_id ? [course.provider_id as string] : []),
+          ]
+        : [
+            ...(course.provider_id ? [course.provider_id as string] : []),
+            ...(course.client_id ? [course.client_id as string] : []),
+          ]),
+      ...admins,
+    ]);
 
     await insertNotificationRecipients(notification.id, recipientIds);
 
-    if (kind === "prof_unavailable" && !repairMissingNotification) {
-      const { error: statusError } = await supabaseAdmin
-        .from("courses")
-        .update({ status: "awaiting_replacement" })
-        .eq("id", course.id);
+    const { error: cancelError } = await supabaseAdmin
+      .from("courses")
+      .update({ status: "cancelled" })
+      .eq("id", course.id);
 
-      if (statusError) {
-        res.status(500).json({ error: statusError.message });
-        return;
-      }
-    } else if (kind === "student_unavailable") {
-      const { error: cancelError } = await supabaseAdmin
-        .from("courses")
-        .update({ status: "cancelled" })
-        .eq("id", course.id);
+    if (cancelError) {
+      res.status(500).json({ error: cancelError.message });
+      return;
+    }
 
-      if (cancelError) {
-        res.status(500).json({ error: cancelError.message });
-        return;
-      }
-
-      if (course.slot_id) {
-        await supabaseAdmin
-          .from("tutor_slots")
-          .update({ booked: false, booked_by: null })
-          .eq("id", course.slot_id);
-      }
+    if (course.slot_id) {
+      await supabaseAdmin
+        .from("tutor_slots")
+        .update({ booked: false, booked_by: null })
+        .eq("id", course.slot_id);
     }
 
     res.status(201).json({

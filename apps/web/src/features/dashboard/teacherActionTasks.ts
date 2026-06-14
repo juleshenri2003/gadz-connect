@@ -1,7 +1,6 @@
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
-import { buildAlertFocusHref } from "@/features/notifications/notificationUtils";
-import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
+import type { DashboardProgress } from "./dashboardTypes";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 
 interface StripeStatus {
@@ -16,27 +15,13 @@ function shouldShowUrssafReminder(
   return [0, 3, 6, 9].includes(month);
 }
 
-function isTeacherToAnswer(
-  item: CampusNotificationItem,
-  profileId: string,
-): boolean {
-  const n = item.notification;
-  if (!n) return false;
-  return (
-    n.kind === "prof_unavailable" &&
-    n.replacement_status === "open" &&
-    n.declared_by !== profileId &&
-    (n.teacher_response ?? "none") === "none"
-  );
-}
-
 export function computeTeacherActionTasks(
   profile: MyProfile,
   stripe: StripeStatus | undefined,
   notifications: CampusNotificationItem[] | undefined,
   futureSlotCount: number,
 ): DashboardProgress {
-  const tasks: DashboardTask[] = [];
+  const tasks: DashboardProgress["tasks"] = [];
 
   if (profile.account_status !== "active") {
     return {
@@ -46,42 +31,6 @@ export function computeTeacherActionTasks(
       percent: 100,
       isComplete: true,
     };
-  }
-
-  const openReplacements =
-    notifications?.filter((n) => isTeacherToAnswer(n, profile.id)) ?? [];
-
-  for (const item of openReplacements) {
-    const subject = item.notification?.subject ?? "Cours";
-    const notificationId = item.notification?.id ?? item.id;
-    tasks.push({
-      id: `propose-${notificationId}`,
-      title: `Proposer un remplacement — ${subject}`,
-      description:
-        "Un collègue est indisponible : proposez de reprendre le cours au même horaire",
-      href: buildAlertFocusHref(item.id, notificationId),
-      status: "todo",
-    });
-  }
-
-  const ownOpen =
-    notifications?.filter(
-      (n) =>
-        n.notification?.kind === "prof_unavailable" &&
-        n.notification.replacement_status === "open" &&
-        n.notification.declared_by === profile.id,
-    ) ?? [];
-
-  for (const item of ownOpen) {
-    const subject = item.notification?.subject ?? "Cours";
-    const notificationId = item.notification?.id ?? item.id;
-    tasks.push({
-      id: `track-${notificationId}`,
-      title: `Suivre le remplacement — ${subject}`,
-      description: "Votre indisponibilité : suivez les propositions reçues",
-      href: buildAlertFocusHref(item.id, notificationId),
-      status: "todo",
-    });
   }
 
   if (!stripe?.onboardingComplete) {
@@ -121,13 +70,7 @@ export function computeTeacherActionTasks(
     });
   }
 
-  const unreadOther =
-    notifications?.filter(
-      (n) =>
-        !n.read_at &&
-        n.notification?.kind !== "prof_unavailable" &&
-        n.notification?.kind !== "replacement_proposed",
-    ) ?? [];
+  const unreadOther = notifications?.filter((n) => !n.read_at) ?? [];
 
   if (unreadOther.length > 0) {
     tasks.push({

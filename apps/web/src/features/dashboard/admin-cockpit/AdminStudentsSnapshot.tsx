@@ -5,13 +5,9 @@ import { getRoleStatusCount } from "./adminCockpitUtils";
 
 interface AdminStudentsSnapshotProps {
   dashboard: AdminDashboardData;
-  openReplacements: number;
 }
 
-export function AdminStudentsSnapshot({
-  dashboard,
-  openReplacements,
-}: AdminStudentsSnapshotProps) {
+export function AdminStudentsSnapshot({ dashboard }: AdminStudentsSnapshotProps) {
   const active = getRoleStatusCount(dashboard, "student_provider", "active");
   const suspended = getRoleStatusCount(
     dashboard,
@@ -55,18 +51,6 @@ export function AdminStudentsSnapshot({
           <dd className="text-2xl font-bold tabular-nums">{suspended}</dd>
         </div>
       </dl>
-
-      {openReplacements > 0 ? (
-        <div className="mt-4 rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-sm text-warning">
-          {openReplacements} remplacement(s) ouvert(s) à superviser.
-          <Link
-            to="/admin/alertes"
-            className="ml-1 font-medium underline"
-          >
-            Voir les alertes
-          </Link>
-        </div>
-      ) : null}
     </section>
   );
 }

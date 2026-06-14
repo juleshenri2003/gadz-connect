@@ -10,7 +10,7 @@ describe("parseAdminCoursesQuery", () => {
     const params = parseAdminCoursesQuery(
       {
         search: "  maths  ",
-        status: "scheduled,awaiting_replacement",
+        status: "scheduled,cancelled",
         preset: "missing_summary",
         page: "2",
         limit: "25",
@@ -23,7 +23,7 @@ describe("parseAdminCoursesQuery", () => {
     );
 
     assert.equal(params.search, "maths");
-    assert.deepEqual(params.status, ["scheduled", "awaiting_replacement"]);
+    assert.deepEqual(params.status, ["scheduled", "cancelled"]);
     assert.equal(params.preset, "missing_summary");
     assert.equal(params.page, 2);
     assert.equal(params.limit, 25);

@@ -99,8 +99,7 @@ export interface AdminCourseRow {
   has_summary: boolean;
   missing_summary: boolean;
   stripe_status: string | null;
-  replacement_notification_id: string | null;
-  replacement_proposal_count: number;
+  cancellation_notification_id: string | null;
   created_at: string;
 }
 
@@ -120,14 +119,12 @@ export interface AdminCoursesSummary {
   total: number;
   byStatus: Record<string, number>;
   thisWeekScheduled: number;
-  awaitingReplacement: number;
   missingSummaries: number;
   cancelled: number;
 }
 
 export type AdminCoursePreset =
   | "missing_summary"
-  | "awaiting_replacement"
   | "this_week"
   | "cancelled";
 

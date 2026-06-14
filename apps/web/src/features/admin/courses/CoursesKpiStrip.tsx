@@ -83,20 +83,6 @@ export function CoursesKpiStrip({
         }
       />
       <KpiCard
-        label="Remplacement"
-        value={summary.awaitingReplacement}
-        accent="amber"
-        hint={PRESET_FILTER_LABELS.awaiting_replacement}
-        active={activePreset === "awaiting_replacement"}
-        onClick={() =>
-          onPresetChange(
-            activePreset === "awaiting_replacement"
-              ? null
-              : "awaiting_replacement",
-          )
-        }
-      />
-      <KpiCard
         label="CR manquants"
         value={summary.missingSummaries}
         accent="amber"

@@ -1,7 +1,6 @@
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { useTutors } from "@/features/marketplace/useTutors";
 import { useNotifications } from "@/features/notifications/useNotifications";
-import { usePendingReplacementsForStudent } from "@/features/replacements/useReplacements";
 import { useMySchedule } from "@/features/scheduling/useSchedule";
 import { computeStudentActionTasks } from "./studentActionTasks";
 
@@ -10,7 +9,6 @@ export function useStudentActionTasks() {
   const scheduleQuery = useMySchedule();
   const tutorsQuery = useTutors();
   const notificationsQuery = useNotifications();
-  const pendingQuery = usePendingReplacementsForStudent();
 
   const profile = profileQuery.data;
   const progress = profile
@@ -19,7 +17,6 @@ export function useStudentActionTasks() {
         scheduleQuery.data?.events,
         tutorsQuery.data?.length ?? 0,
         notificationsQuery.data,
-        pendingQuery.data,
       )
     : {
         tasks: [],

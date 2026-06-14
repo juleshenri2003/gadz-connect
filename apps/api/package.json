@@ -15,16 +15,12 @@
     "seed-professor": "tsx scripts/seed-professor.ts",
     "seed-professor-pending": "tsx scripts/seed-professor-pending.ts",
     "seed-professor-personas": "tsx scripts/seed-professor-personas.ts",
-    "test": "tsx --test tests/tutor-visibility.test.ts tests/sirene-verify.test.ts tests/tutor-financial.test.ts tests/admin-profiles-query.test.ts tests/admin-budget.test.ts",
+    "test": "tsx --test tests/tutor-visibility.test.ts tests/sirene-verify.test.ts tests/tutor-financial.test.ts tests/admin-profiles-query.test.ts tests/admin-budget.test.ts tests/admin-courses-query.test.ts",
     "apply-migration-005": "tsx scripts/apply-migration-005.ts",
     "seed-student": "tsx scripts/seed-student.ts",
     "align-demo-campus": "tsx scripts/align-demo-campus.ts",
-    "apply-migration-008-009": "tsx scripts/apply-migration-008-009.ts",
-    "fix-replacement-enums": "tsx scripts/fix-replacement-enums.ts",
-    "repair-replacement-notifications": "tsx scripts/repair-replacement-notifications.ts",
     "repair-orphan-slots": "tsx scripts/repair-orphan-slots.ts",
-    "repair-demo": "tsx scripts/repair-orphan-slots.ts && tsx scripts/repair-replacement-notifications.ts",
-    "seed-replacement-demo": "tsx scripts/seed-replacement-demo.ts"
+    "repair-demo": "tsx scripts/repair-orphan-slots.ts"
   },
   "dependencies": {
     "@gadz-connect/types": "workspace:*",

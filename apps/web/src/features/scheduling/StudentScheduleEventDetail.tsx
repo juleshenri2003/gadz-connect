@@ -6,7 +6,10 @@ import {
   isEventPast,
 } from "@/features/scheduling/calendar-utils";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
-import { formatNotificationDate } from "@/features/notifications/notificationUtils";
+import {
+  buildMarketplaceSubjectHref,
+  formatNotificationDate,
+} from "@/features/notifications/notificationUtils";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 
 interface StudentScheduleEventDetailProps {
@@ -56,13 +59,15 @@ export function StudentScheduleEventDetail({
           <span className="font-medium text-ink-900">Horaire :</span>{" "}
           {formatEventTime(event.startsAt, event.endsAt)}
         </p>
-        {event.status === "awaiting_replacement" ? (
-          <p className="rounded-md border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning">
-            Remplacement en cours — consultez{" "}
-            <Link to="/app/alertes" className="font-medium underline">
-              Alertes campus
-            </Link>{" "}
-            pour choisir un remplaçant.
+        {event.status === "cancelled" ? (
+          <p className="rounded-md border border-line bg-paper px-3 py-2 text-xs text-ink-600">
+            Cette séance a été annulée.{" "}
+            <Link
+              to={buildMarketplaceSubjectHref(event.title)}
+              className="font-medium text-brand-700 underline"
+            >
+              Trouver un autre tuteur
+            </Link>
           </p>
         ) : null}
         {canDeclareUnavailable ? (

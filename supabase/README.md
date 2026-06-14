@@ -11,15 +11,18 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 5. `migrations/005_onboarding_progress.sql` (jalon INPI onboarding prof)
 6. `migrations/006_profile_cv.sql` (CV texte professeur)
 7. `migrations/007_cv_pdf_storage.sql` (CV PDF + bucket Storage `cv-pdfs`)
-8. `migrations/008_replacement_workflow.sql` (remplacement prof + propositions)
+8. `migrations/008_replacement_workflow.sql` (legacy — tables orphelines, workflow remplacement retiré)
 9. `migrations/009_student_repository.sql` (répertoire matières élève)
-10. `migrations/010_replacement_teacher_responses.sql` (refus prof sur alerte)
+10. `migrations/010_replacement_teacher_responses.sql` (legacy)
+11. `migrations/011_registration_path.sql`
+12. `migrations/012_cancel_awaiting_replacement.sql` (normalise cours `awaiting_replacement` → `cancelled`)
 
-Ou en local (avec `DATABASE_URL` dans `apps/api/.env`) :
+Indisponibilité prof/élève : annulation simple + créneau libéré ; l'élève rebook via la marketplace.
+
+Or en local (avec `DATABASE_URL` dans `apps/api/.env`) :
 
 ```bash
-pnpm --filter @gadz-connect/api apply-migration-008-009
-pnpm --filter @gadz-connect/api repair-demo
+pnpm --filter @gadz-connect/api repair-orphan-slots
 ```
 
 ## 2. Magic Link (Auth)

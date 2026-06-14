@@ -42,9 +42,8 @@ export function courseRowToScheduleEvent(
     campusName: course.campus?.name,
     hasSummary: course.has_summary,
     summaryId: "summary_id" in course ? (course.summary_id ?? undefined) : undefined,
-    replacementNotificationId:
-      course.replacement_notification_id ?? undefined,
-    replacementProposalCount: course.replacement_proposal_count,
+    cancellationNotificationId:
+      course.cancellation_notification_id ?? undefined,
     title: course.subject || course.title,
     startsAt,
     endsAt,

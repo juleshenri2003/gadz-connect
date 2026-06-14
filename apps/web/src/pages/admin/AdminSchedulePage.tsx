@@ -29,7 +29,7 @@ import {
   courseStatusLabel,
   isEventPast,
 } from "@/features/scheduling/calendar-utils";
-import { filterScheduleEvents, hasAwaitingReplacement } from "@/features/scheduling/scheduleFilters";
+import { filterScheduleEvents } from "@/features/scheduling/scheduleFilters";
 
 const VIEW_STORAGE_KEY = "gadz-admin-schedule-view";
 
@@ -124,7 +124,6 @@ export function AdminSchedulePage() {
     () => filterScheduleEvents(rawEvents, showHistory),
     [rawEvents, showHistory],
   );
-  const replacementPending = hasAwaitingReplacement(events);
 
   function patchParams(
     patch: Record<string, string | undefined>,
@@ -200,7 +199,6 @@ export function AdminSchedulePage() {
 
   function renderEventSubtitle(event: ScheduleEvent): string | undefined {
     const status = courseStatusLabel(event.status);
-    if (event.status === "awaiting_replacement") return "Remplacement en cours";
     return status && status !== "Planifié" ? status : undefined;
   }
 
@@ -273,26 +271,6 @@ export function AdminSchedulePage() {
         campusId={campusId}
         isGlobalScope={isGlobalScope}
       />
-
-      {replacementPending ? (
-        <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning">
-          Un ou plusieurs cours sont en attente de remplacement sur la période
-          affichée.{" "}
-          <Link
-            to={buildAdminPlanningHref({
-              campusId,
-              status: ["awaiting_replacement"],
-            })}
-            className="font-medium underline"
-          >
-            Filtrer les cours concernés →
-          </Link>{" "}
-          ·{" "}
-          <Link to="/admin/alertes" className="font-medium underline">
-            Alertes campus →
-          </Link>
-        </div>
-      ) : null}
 
       <AdminScheduleFilters
         campuses={campuses}

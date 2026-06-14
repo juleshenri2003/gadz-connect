@@ -96,9 +96,6 @@ export function SchedulePage() {
   }
 
   function renderTeacherMeta(event: ScheduleEvent): string | undefined {
-    if (event.status === "awaiting_replacement") {
-      return "Remplacement en cours";
-    }
     if (event.kind === "slot_available") return "Ouvert aux réservations";
     return undefined;
   }
@@ -112,18 +109,6 @@ export function SchedulePage() {
         return next;
       },
       { replace: true },
-    );
-  }
-
-  function renderReplacementLink(event: ScheduleEvent) {
-    if (event.status !== "awaiting_replacement") return null;
-    return (
-      <Link
-        to="/app/alertes"
-        className="mt-2 inline-block text-xs font-medium text-warning underline"
-      >
-        Voir les alertes campus
-      </Link>
     );
   }
 
@@ -255,12 +240,7 @@ export function SchedulePage() {
               events={studentCourseEvents}
               variant="full"
               onEventClick={setSelectedEvent}
-              renderEventActions={(event) => (
-                <>
-                  {renderReplacementLink(event)}
-                  {renderStudentSummaryBadge(event)}
-                </>
-              )}
+              renderEventActions={(event) => renderStudentSummaryBadge(event)}
             />
           ) : !student && teacherView === "list" ? (
             <TeacherAgendaList
@@ -268,7 +248,6 @@ export function SchedulePage() {
               variant="full"
               showHistory={showHistory}
               onEventClick={setSelectedEvent}
-              renderEventActions={renderReplacementLink}
             />
           ) : (
             <WeekCalendar
@@ -292,12 +271,9 @@ export function SchedulePage() {
                 student ? renderStudentSubtitle : renderTeacherSubtitle
               }
               renderEventMeta={student ? undefined : renderTeacherMeta}
-              renderEventActions={(event) => (
-                <>
-                  {renderReplacementLink(event)}
-                  {student ? renderStudentSummaryBadge(event) : null}
-                </>
-              )}
+              renderEventActions={(event) =>
+                student ? renderStudentSummaryBadge(event) : null
+              }
             />
           )}
         </CardContent>

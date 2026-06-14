@@ -12,7 +12,6 @@ import {
   getUpcomingEvents,
   isConfirmedSession,
 } from "@/features/dashboard/teacher-cockpit/teacherCockpitUtils";
-import { hasAwaitingReplacement } from "@/features/scheduling/scheduleFilters";
 import type { ScheduleEvent } from "./types";
 
 interface TeacherScheduleHeaderProps {
@@ -41,7 +40,6 @@ export function TeacherScheduleHeader({
           versementLiberatoire,
         )
       : null;
-  const replacementPending = hasAwaitingReplacement(events);
 
   return (
     <div className="space-y-4">
@@ -66,15 +64,6 @@ export function TeacherScheduleHeader({
           </Button>
         </div>
       </div>
-
-      {replacementPending ? (
-        <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning">
-          Un ou plusieurs cours sont en attente de remplacement.{" "}
-          <Link to="/app/alertes" className="font-medium underline">
-            Voir les alertes campus →
-          </Link>
-        </div>
-      ) : null}
 
       {showQuickPublish ? (
         <TeacherSlotQuickPublish embedded />

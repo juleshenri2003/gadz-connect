@@ -2,18 +2,16 @@ import { Link } from "react-router-dom";
 import { StatCard } from "@/features/admin/StatCard";
 import { formatEuro } from "@/features/admin/format";
 import type { AdminDashboardData } from "@/features/admin/types";
-import {
-  getRoleStatusCount,
-} from "./adminCockpitUtils";
+import { getRoleStatusCount } from "./adminCockpitUtils";
 
 interface AdminPilotageStatsRowProps {
   dashboard: AdminDashboardData;
-  openReplacements: number;
+  unreadAlerts: number;
 }
 
 export function AdminPilotageStatsRow({
   dashboard,
-  openReplacements,
+  unreadAlerts,
 }: AdminPilotageStatsRowProps) {
   const teachersActive = getRoleStatusCount(dashboard, "teacher", "active");
   const teachersPending = getRoleStatusCount(
@@ -26,8 +24,7 @@ export function AdminPilotageStatsRow({
     "student_provider",
     "active",
   );
-  const awaitingReplacement =
-    dashboard.courses.byStatus.awaiting_replacement ?? 0;
+  const cancelled = dashboard.courses.byStatus.cancelled ?? 0;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
@@ -91,12 +88,12 @@ export function AdminPilotageStatsRow({
       <Link to="/admin/alertes" className="block transition hover:opacity-90">
         <StatCard
           accent="amber"
-          label="Remplacements ouverts"
-          value={openReplacements}
+          label="Alertes non lues"
+          value={unreadAlerts}
           hint={
-            awaitingReplacement > 0
-              ? `${awaitingReplacement} cours en attente de remplaçant`
-              : "Alertes campus à superviser"
+            cancelled > 0
+              ? `${cancelled} séance(s) annulée(s)`
+              : "Annulations et informations campus"
           }
         />
       </Link>

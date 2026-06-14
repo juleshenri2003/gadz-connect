@@ -126,15 +126,7 @@ export function TeacherScheduleEventDetail({
       </dl>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {event.status === "awaiting_replacement" ? (
-          <Button size="sm" variant="outline" asChild>
-            <Link to="/app/alertes">Voir les alertes campus</Link>
-          </Button>
-        ) : null}
-
-        {event.courseId &&
-        (event.status === "scheduled" ||
-          event.status === "awaiting_replacement") ? (
+        {event.courseId && event.status === "scheduled" ? (
           <DeclareUnavailableButton
             courseId={event.courseId}
             eventTitle={event.title}

@@ -39,8 +39,11 @@ export function CoursesTable({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Registre des sessions</CardTitle>
-        <CardDescription>
+        <CardDescription className="hidden lg:block">
           Cliquez sur une ligne pour ouvrir la fiche détail
+        </CardDescription>
+        <CardDescription className="lg:hidden">
+          Touchez une carte pour ouvrir la fiche détail
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -65,7 +68,7 @@ export function CoursesTable({
           <>
             <ul className="divide-y divide-line lg:hidden">
               {courses.map((course) => (
-                <li key={course.id} className="border-b border-line last:border-0">
+                <li key={course.id}>
                   <button
                     type="button"
                     className="flex w-full flex-col gap-2 p-4 text-left active:bg-paper"
@@ -97,27 +100,13 @@ export function CoursesTable({
                         </>
                       ) : null}
                     </div>
-                    {(course.missing_summary ||
-                      course.status === "awaiting_replacement" ||
-                      course.replacement_proposal_count > 0) && (
+                    {course.missing_summary ? (
                       <div className="flex flex-wrap gap-1">
-                        {course.missing_summary ? (
-                          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                            CR manquant
-                          </span>
-                        ) : null}
-                        {course.status === "awaiting_replacement" ? (
-                          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                            Remplacement
-                          </span>
-                        ) : null}
-                        {course.replacement_proposal_count > 0 ? (
-                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
-                            {course.replacement_proposal_count} prop.
-                          </span>
-                        ) : null}
+                        <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                          CR manquant
+                        </span>
                       </div>
-                    )}
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -178,16 +167,6 @@ export function CoursesTable({
                         {course.missing_summary ? (
                           <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
                             CR manquant
-                          </span>
-                        ) : null}
-                        {course.status === "awaiting_replacement" ? (
-                          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                            Remplacement
-                          </span>
-                        ) : null}
-                        {course.replacement_proposal_count > 0 ? (
-                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
-                            {course.replacement_proposal_count} prop.
                           </span>
                         ) : null}
                       </div>

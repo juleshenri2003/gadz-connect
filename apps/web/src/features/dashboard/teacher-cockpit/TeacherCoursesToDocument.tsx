@@ -9,7 +9,6 @@ const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
   completed: "Terminé",
   cancelled: "Annulé",
-  awaiting_replacement: "Remplacement en cours",
 };
 
 function formatSessionDate(iso: string | null): string {
@@ -61,7 +60,7 @@ export function TeacherCoursesToDocument({
           <h3 className="font-semibold text-ink-900">Cours à documenter</h3>
           <p className="mt-1 text-sm text-ink-600">
             {variant === "full"
-              ? "Déposez un résumé après chaque cours — il sera classé dans le répertoire matière de l'élève (y compris après un remplacement)."
+              ? "Déposez un résumé après chaque cours — il sera classé dans le répertoire matière de l'élève."
               : "Déposez le résumé de vos séances passées."}
           </p>
         </>

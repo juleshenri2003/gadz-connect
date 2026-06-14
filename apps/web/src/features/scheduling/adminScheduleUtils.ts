@@ -10,7 +10,6 @@ export type AdminScheduleViewMode = "week" | "list" | "month";
 
 export type AdminScheduleStatusFilter =
   | "scheduled"
-  | "awaiting_replacement"
   | "completed"
   | "cancelled";
 
@@ -61,16 +60,14 @@ export function formatMonthLabel(anchor: Date): string {
 
 export interface DaySummary {
   total: number;
-  replacements: number;
+  cancelled: number;
 }
 
 export function summarizeDayEvents(events: ScheduleEvent[], day: Date): DaySummary {
   const dayEvents = eventsForDay(events, day);
   return {
     total: dayEvents.length,
-    replacements: dayEvents.filter(
-      (e) => e.status === "awaiting_replacement",
-    ).length,
+    cancelled: dayEvents.filter((e) => e.status === "cancelled").length,
   };
 }
 

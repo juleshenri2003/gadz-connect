@@ -69,15 +69,6 @@ function AgendaListItem({
             >
               {eventKindLabel(event.kind, event.status)}
             </span>
-            {event.status === "awaiting_replacement" ? (
-              <Link
-                to="/app/alertes"
-                className="text-xs font-medium text-warning underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Voir les alertes
-              </Link>
-            ) : null}
             {past ? (
               <span className="text-[10px] font-medium uppercase tracking-wide text-ink-400">
                 Passé
