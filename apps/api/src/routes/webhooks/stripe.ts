@@ -59,7 +59,7 @@ async function handlePaymentIntentSucceeded(
     .eq("course_id", courseId)
     .maybeSingle();
 
-  let transactionId: string | null = existing?.id ?? null;
+  const transactionId: string | null = existing?.id ?? null;
 
   if (existing) {
     await supabaseAdmin

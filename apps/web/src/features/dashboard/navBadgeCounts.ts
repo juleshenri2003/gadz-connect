@@ -53,7 +53,7 @@ export function computeNavBadgeCounts(
     if (task.status !== "todo" || task.readOnly || !task.href) continue;
     const path = resolveNavPathForTaskHref(task.href, navPaths);
     if (path && path in counts) {
-      counts[path] += 1;
+      counts[path] = (counts[path] ?? 0) + 1;
     }
   }
 
