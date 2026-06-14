@@ -10,7 +10,7 @@ import {
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -30,8 +30,27 @@ const accountTypeSchema = z.enum([
   "teacher_awaiting_siret",
 ]);
 
-const setupSchema = z
-  .object({
+const CV_PLACEHOLDER = `Exemple :
+• Formation : Arts et Métiers — spécialité mécanique (promo 20XX)
+• Expériences : 2 ans de tutorat en maths et physique
+• Compétences : SolidWorks, Python, accompagnement projet
+• Langues : français (natif), anglais (B2)`;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64 ?? "");
+    };
+    reader.onerror = () => reject(new Error("Lecture du fichier impossible"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildSetupSchema() {
+  return z.object({
     firstName: z.string().min(1, "Prénom requis"),
     lastName: z.string().min(1, "Nom requis"),
     campusId: z.string().uuid("Choisissez un campus"),
@@ -49,20 +68,10 @@ const setupSchema = z
         path: ["microEnterpriseConfirmed"],
       });
     }
-    if (isTeacher) {
-      const trimmed = data.cv?.trim() ?? "";
-      if (trimmed.length < 50) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Décrivez votre parcours (minimum 50 caractères) — les élèves consulteront ce CV pour vous choisir",
-          path: ["cv"],
-        });
-      }
-    }
   });
+}
 
-type SetupForm = z.infer<typeof setupSchema>;
+type SetupForm = z.infer<ReturnType<typeof buildSetupSchema>>;
 
 const ACCOUNT_OPTIONS = [
   {
@@ -88,17 +97,16 @@ const ACCOUNT_OPTIONS = [
   },
 ];
 
-const CV_PLACEHOLDER = `Exemple :
-• Formation : Arts et Métiers — spécialité mécanique (promo 20XX)
-• Expériences : 2 ans de tutorat en maths et physique
-• Compétences : SolidWorks, Python, accompagnement projet
-• Langues : français (natif), anglais (B2)`;
-
 export function ProfileSetupPage() {
   const { getAccessToken } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [cvPdfFile, setCvPdfFile] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const setupSchema = useMemo(() => buildSetupSchema(), []);
 
   const { data: campuses, isLoading } = useQuery({
     queryKey: ["campus"],
@@ -113,6 +121,7 @@ export function ProfileSetupPage() {
     trigger,
     formState: { errors, isSubmitting },
     setError,
+    clearErrors,
   } = useForm<SetupForm>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
@@ -122,6 +131,17 @@ export function ProfileSetupPage() {
 
   const accountType = watch("accountType");
   const isTeacher = accountType && accountType !== "student";
+
+  function validateTeacherCv(cv?: string): boolean {
+    if (!isTeacher) return true;
+    const hasText = (cv?.trim() ?? "").length >= 50;
+    if (cvPdfFile || hasText) return true;
+    setError("cv", {
+      message:
+        "Déposez un CV PDF ou décrivez votre parcours (minimum 50 caractères)",
+    });
+    return false;
+  }
 
   async function goToIdentity() {
     const valid = await trigger(["accountType", "microEnterpriseConfirmed"]);
@@ -142,6 +162,8 @@ export function ProfileSetupPage() {
     const token = getAccessToken();
     if (!token) return;
 
+    if (!validateTeacherCv(values.cv)) return;
+
     const role =
       values.accountType === "student" ? "student_provider" : "teacher";
 
@@ -150,6 +172,11 @@ export function ProfileSetupPage() {
         values.accountType === "teacher_existing_siret"
           ? "existing_siret"
           : "new_micro";
+
+      let pdfBase64: string | undefined;
+      if (role === "teacher" && cvPdfFile) {
+        pdfBase64 = await fileToBase64(cvPdfFile);
+      }
 
       await apiFetch("/api/profile/setup", {
         method: "PATCH",
@@ -160,7 +187,11 @@ export function ProfileSetupPage() {
           campusId: values.campusId,
           role,
           ...(role === "teacher"
-            ? { cv: values.cv?.trim(), registrationPath }
+            ? {
+                cv: values.cv?.trim() || undefined,
+                registrationPath,
+                pdfBase64,
+              }
             : {}),
         }),
       });
@@ -183,6 +214,21 @@ export function ProfileSetupPage() {
     } catch (err) {
       setError("root", { message: (err as Error).message });
     }
+  }
+
+  function onPdfSelected(file: File | undefined) {
+    setPdfError(null);
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setPdfError("Format accepté : PDF uniquement");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPdfError("Fichier trop volumineux — maximum 5 Mo");
+      return;
+    }
+    setCvPdfFile(file);
+    clearErrors("cv");
   }
 
   return (
@@ -208,7 +254,7 @@ export function ProfileSetupPage() {
               ? "Élève ou intervenant — le parcours s'adapte à votre situation."
               : step === 2
                 ? "Prénom, nom et campus Arts et Métiers."
-                : "Présentez votre parcours — les élèves le consulteront avant de réserver."}
+                : "Déposez votre CV en PDF ou décrivez votre parcours — les élèves le consulteront avant de réserver."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -331,8 +377,8 @@ export function ProfileSetupPage() {
 
                 {isTeacher ? (
                   <p className="rounded-lg bg-paper p-3 text-xs text-ink-600">
-                    Étape suivante : rédaction de votre CV (visible par les
-                    élèves), puis onboarding micro-entreprise.
+                    Étape suivante : déposez votre CV (PDF ou texte), puis
+                    onboarding micro-entreprise.
                   </p>
                 ) : null}
 
@@ -364,8 +410,61 @@ export function ProfileSetupPage() {
               </>
             ) : (
               <>
+                <div className="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">
+                      CV en PDF (recommandé)
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      Déposez votre CV au format PDF (max. 5 Mo). Un seul
+                      fichier à la fois.
+                    </p>
+                  </div>
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={(e) => onPdfSelected(e.target.files?.[0])}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => pdfInputRef.current?.click()}
+                    >
+                      {cvPdfFile ? "Changer de PDF" : "Choisir un PDF"}
+                    </Button>
+                    {cvPdfFile ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setCvPdfFile(null);
+                          setPdfError(null);
+                          if (pdfInputRef.current) pdfInputRef.current.value = "";
+                        }}
+                      >
+                        Retirer
+                      </Button>
+                    ) : null}
+                  </div>
+                  {cvPdfFile ? (
+                    <p className="text-xs font-medium text-green-800">
+                      PDF sélectionné : {cvPdfFile.name}
+                    </p>
+                  ) : null}
+                  {pdfError ? (
+                    <p className="text-sm text-red-600">{pdfError}</p>
+                  ) : null}
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="cv">CV — parcours et compétences</Label>
+                  <Label htmlFor="cv">
+                    CV texte {cvPdfFile ? "(optionnel)" : "— ou saisie libre"}
+                  </Label>
                   <textarea
                     id="cv"
                     rows={10}
@@ -374,9 +473,9 @@ export function ProfileSetupPage() {
                     {...register("cv")}
                   />
                   <p className="text-xs text-ink-400">
-                    Formation, expériences de tutorat ou professionnelles,
-                    matières maîtrisées, langues… Les élèves pourront lire ce
-                    CV avant de réserver un créneau.
+                    {cvPdfFile
+                      ? "Vous pouvez ajouter un complément texte, ou ne garder que le PDF."
+                      : "Formation, expériences, matières maîtrisées, langues… Minimum 50 caractères si pas de PDF."}
                   </p>
                   {errors.cv ? (
                     <p className="text-sm text-danger">{errors.cv.message}</p>

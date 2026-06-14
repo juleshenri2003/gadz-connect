@@ -12,7 +12,9 @@
     "build:api": "pnpm --filter @gadz-connect/api build",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm --filter @gadz-connect/types build && pnpm run -r typecheck",
-    "clean": "pnpm run -r clean && rm -rf node_modules"
+    "clean": "pnpm run -r clean && rm -rf node_modules",
+    "stripe-listen": "pnpm --filter @gadz-connect/api stripe-listen",
+    "stripe-check": "pnpm --filter @gadz-connect/api stripe-check"
   },
   "engines": {
     "node": ">=20.0.0",

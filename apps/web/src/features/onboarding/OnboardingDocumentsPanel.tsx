@@ -54,7 +54,7 @@ export function OnboardingDocumentsPanel() {
           Documents complémentaires (optionnel)
         </h3>
         <p className="mt-1 text-sm text-brand-700/80">
-          Le parcours interactif ci-dessus remplace le PDF Méthodo. Vous pouvez
+          Le parcours interactif ci-dessus remplace l'ancien PDF Méthodo. Vous pouvez
           toutefois télécharger votre récapitulatif personnalisé ou le dossier
           ACRE.
         </p>
@@ -68,7 +68,7 @@ export function OnboardingDocumentsPanel() {
           disabled={loading !== null}
           onClick={() => void handleDownload("guide")}
         >
-          {loading === "guide" ? "Génération…" : "Guide PDF complet (tuyss)"}
+          {loading === "guide" ? "Génération…" : "Guide PDF personnalisé"}
         </Button>
         <Button
           type="button"

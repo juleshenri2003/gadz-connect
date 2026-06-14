@@ -6,6 +6,7 @@ import {
   isEmailLoginEnabled,
   performEmailLogin,
 } from "../lib/email-login.js";
+import { listDemoAccounts } from "../lib/demo-accounts.js";
 import { ensureProfileForUser } from "../lib/profiles.js";
 import { isRhAllowedEmail } from "../lib/rh-access.js";
 import { supabaseAuth } from "../lib/supabase.js";
@@ -180,6 +181,7 @@ authRouter.post("/logout", (_req, res) => {
 
 const emailLoginSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(1, "Mot de passe requis"),
   campusId: z.string().uuid().optional(),
 });
 
@@ -202,7 +204,11 @@ async function handleEmailLogin(
   }
 
   const email = parsed.data.email.trim().toLowerCase();
-  const result = await performEmailLogin(email, parsed.data.campusId);
+  const result = await performEmailLogin(
+    email,
+    parsed.data.password,
+    parsed.data.campusId,
+  );
 
   if (!result.ok) {
     res.status(result.status).json({ error: result.message });
@@ -216,6 +222,19 @@ async function handleEmailLogin(
     },
   });
 }
+
+/**
+ * GET /api/auth/demo-accounts
+ * Liste les comptes démo et mots de passe (dev / ALLOW_EMAIL_LOGIN uniquement).
+ */
+authRouter.get("/demo-accounts", (_req, res) => {
+  if (!isEmailLoginEnabled()) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  res.json({ data: listDemoAccounts() });
+});
 
 /**
  * POST /api/auth/email-login

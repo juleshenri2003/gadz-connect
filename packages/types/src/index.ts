@@ -10,6 +10,7 @@ export type RegistrationPath = "existing_siret" | "new_micro";
 
 export type CourseStatus =
   | "scheduled"
+  | "payment_pending"
   | "completed"
   | "cancelled";
 
@@ -34,6 +35,8 @@ export interface Profile {
   role: UserRole;
   campus_id: string;
   siret: string | null;
+  is_autoentrepreneur_verified: boolean;
+  micro_enterprise_address: string | null;
   status_acre: boolean;
   versement_liberatoire: boolean;
   account_status: AccountStatus;
@@ -151,4 +154,20 @@ export interface TeacherTransactionItem {
   status_urssaf: TransactionUrssafStatus;
   created_at: string;
   course: TeacherTransactionCourse;
+}
+
+export type InvoiceType = "parent" | "student";
+
+export interface PaymentInvoice {
+  id: string;
+  transaction_id: string;
+  course_id: string;
+  invoice_type: InvoiceType;
+  invoice_number: string;
+  amount: number;
+  storage_path: string;
+  provider_profile_id: string | null;
+  client_profile_id: string | null;
+  parent_email_sent_at: string | null;
+  created_at: string;
 }

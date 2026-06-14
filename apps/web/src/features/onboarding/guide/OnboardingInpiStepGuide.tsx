@@ -22,7 +22,7 @@ export function OnboardingInpiStepGuide({
   onOpenIdChange,
 }: OnboardingInpiStepGuideProps = {}) {
   const firstStepId =
-    INPI_STEPS.find((step) => step.id === "access")?.id ?? INPI_STEPS[0]?.id ?? "";
+    INPI_STEPS.find((step) => step.id === "connect")?.id ?? INPI_STEPS[0]?.id ?? "";
   const [internalOpenId, setInternalOpenId] = useState<string>(firstStepId);
   const openId = controlledOpenId ?? internalOpenId;
 

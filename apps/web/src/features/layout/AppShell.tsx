@@ -21,6 +21,7 @@ import {
   useSidebarCollapseToggle,
 } from "./sidebarCollapse";
 import { AppLogo } from "./AppLogo";
+import { NavCountBadge } from "./NavCountBadge";
 
 const MOBILE_PRIMARY_COUNT = 4;
 
@@ -105,6 +106,19 @@ function MobileBottomNav({
                           {item.badge}
                         </span>
                       ) : null}
+                      {item.taskCount ? (
+                        <span
+                          className={cn(
+                            "absolute -top-1",
+                            item.badge ? "-left-2" : "-right-2",
+                          )}
+                        >
+                          <NavCountBadge
+                            count={item.taskCount}
+                            className="h-4 min-w-4 text-[8px]"
+                          />
+                        </span>
+                      ) : null}
                     </span>
                     <span className="max-w-full truncate">{navShortLabel(item)}</span>
                   </>
@@ -186,6 +200,9 @@ function MobileBottomNav({
                         {item.badge}
                       </span>
                     ) : null}
+                    {item.taskCount ? (
+                      <NavCountBadge count={item.taskCount} />
+                    ) : null}
                   </NavLink>
                 );
               })}
@@ -209,6 +226,8 @@ export interface AppNavItem {
   shortLabel?: string;
   /** Badge optionnel (ex. progression 2/6) */
   badge?: string;
+  /** Compteur d'actions à faire (badge rouge sidebar) */
+  taskCount?: number;
   end?: boolean;
   disabled?: boolean;
   icon?: LucideIcon;
@@ -334,9 +353,29 @@ function SidebarNavItem({
         {({ isActive }) => (
           <>
             {activeMarker(isActive)}
-            {Icon ? <Icon className={iconClassName(isActive)} /> : null}
+            <span className="relative shrink-0">
+              {Icon ? <Icon className={iconClassName(isActive)} /> : null}
+              {collapsed && item.taskCount ? (
+                <span className="absolute -right-1 -top-1">
+                  <NavCountBadge
+                    count={item.taskCount}
+                    className="h-4 min-w-4 text-[8px]"
+                  />
+                </span>
+              ) : null}
+            </span>
             {!collapsed ? (
-              <span className="truncate">{item.label}</span>
+              <>
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.badge ? (
+                  <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                    {item.badge}
+                  </span>
+                ) : null}
+                {item.taskCount ? (
+                  <NavCountBadge count={item.taskCount} />
+                ) : null}
+              </>
             ) : null}
           </>
         )}

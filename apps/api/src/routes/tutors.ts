@@ -8,7 +8,13 @@ import {
   requireActiveTeacher,
 } from "../middleware/account-status.js";
 import { createCvPdfSignedUrl } from "../lib/cv-pdf.js";
-import { calculateFiscalBreakdown } from "../lib/fiscal.js";
+import { createInvoiceSignedUrl } from "../lib/billing/invoice-storage.js";
+import {
+  finalizeBookingSlot,
+  prepareBooking,
+  shouldUseStripePayment,
+} from "../lib/booking.js";
+import { stripe } from "../lib/stripe.js";
 import {
   fetchCampusTutorById,
   fetchCampusTutors,
@@ -541,6 +547,88 @@ tutorsRouter.get("/me/transactions", async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * GET /api/tutors/me/invoices
+ * Factures émises par l'auto-entreprise du prestataire (comptabilité URSSAF).
+ */
+tutorsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.id;
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    res.status(404).json({ error: "Profil introuvable" });
+    return;
+  }
+
+  if (profile.role !== "teacher") {
+    res.status(403).json({ error: "Réservé aux enseignants" });
+    return;
+  }
+
+  const { data: invoices, error } = await supabaseAdmin
+    .from("payment_invoices")
+    .select(
+      "id, invoice_number, invoice_type, amount, created_at, course_id, parent_email_sent_at, course:course_id ( subject, title, scheduled_at )",
+    )
+    .eq("provider_profile_id", userId)
+    .eq("invoice_type", "student")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.json({ data: invoices ?? [] });
+});
+
+/**
+ * GET /api/tutors/me/invoices/:id/url
+ * URL signée pour télécharger une facture étudiant.
+ */
+tutorsRouter.get(
+  "/me/invoices/:id/url",
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.user!.id;
+    const invoiceId = req.params.id;
+
+    const { data: invoice, error } = await supabaseAdmin
+      .from("payment_invoices")
+      .select("id, storage_path, provider_profile_id, invoice_type")
+      .eq("id", invoiceId)
+      .maybeSingle();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    if (!invoice || invoice.provider_profile_id !== userId) {
+      res.status(404).json({ error: "Facture introuvable" });
+      return;
+    }
+
+    if (invoice.invoice_type !== "student") {
+      res.status(403).json({ error: "Accès réservé aux factures prestataire" });
+      return;
+    }
+
+    try {
+      const url = await createInvoiceSignedUrl(invoice.storage_path as string);
+      res.json({ data: { url } });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Impossible de générer le lien";
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+/**
  * GET /api/tutors/:id/cv-pdf/url
  * Lien signé pour consulter le CV PDF d'un tuteur (même campus).
  */
@@ -616,7 +704,9 @@ tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
 
   const { data: tutor } = await supabaseAdmin
     .from("profiles")
-    .select("id, campus_id, role, account_status, profile_setup_complete")
+    .select(
+      "id, campus_id, role, account_status, profile_setup_complete, stripe_connect_onboarding_complete, hourly_rate",
+    )
     .eq("id", req.params.id)
     .eq("campus_id", caller.campus_id)
     .maybeSingle();
@@ -645,6 +735,7 @@ tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
 /**
  * POST /api/tutors/bookings
  * Réserve un créneau et crée le cours + transaction.
+ * Avec Stripe configuré : PaymentIntent + confirmation webhook avant réservation finale.
  */
 tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   const parsed = bookingSchema.safeParse(req.body);
@@ -653,61 +744,21 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const client = await getCallerProfile(req.user!.id);
-  if (!client) {
-    res.status(404).json({ error: "Profil introuvable" });
-    return;
-  }
-
-  const { data: slot, error: slotError } = await supabaseAdmin
-    .from("tutor_slots")
-    .select("id, provider_id, starts_at, ends_at, booked")
-    .eq("id", parsed.data.slotId)
-    .maybeSingle();
-
-  if (slotError || !slot || slot.booked) {
-    res.status(404).json({ error: "Créneau indisponible" });
-    return;
-  }
-
-  if (slot.provider_id === client.id) {
-    res.status(400).json({ error: "Vous ne pouvez pas réserver votre propre créneau" });
-    return;
-  }
-
-  const { data: tutor } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, campus_id, hourly_rate, status_acre, versement_liberatoire, first_name, last_name, role, account_status, profile_setup_complete",
-    )
-    .eq("id", slot.provider_id)
-    .eq("campus_id", client.campus_id)
-    .maybeSingle();
-
-  if (!tutor || !isTeacherVisibleInMarketplace(tutor)) {
-    res.status(400).json({ error: "Ce tuteur n'est pas disponible" });
-    return;
-  }
-
-  if (!tutor.hourly_rate) {
-    res.status(400).json({ error: "Ce tuteur n'a pas défini de tarif horaire" });
-    return;
-  }
-
-  const durationHours =
-    (new Date(slot.ends_at).getTime() - new Date(slot.starts_at).getTime()) /
-    (1000 * 60 * 60);
-  const amountGross = Math.round(tutor.hourly_rate * durationHours * 100) / 100;
-
-  const fiscal = calculateFiscalBreakdown({
-    amountGross,
-    statusAcre: tutor.status_acre,
-    versementLiberatoire: tutor.versement_liberatoire,
+  const prepared = await prepareBooking({
+    slotId: parsed.data.slotId,
+    subject: parsed.data.subject,
+    clientUserId: req.user!.id,
   });
 
-  const subject =
-    parsed.data.subject ??
-    `Tutorat avec ${tutor.first_name} ${tutor.last_name}`.trim();
+  if (!prepared.ok) {
+    res.status(prepared.status).json({ error: prepared.error });
+    return;
+  }
+
+  const { slot, client, tutor, subject, fiscal } = prepared.data;
+  const useStripe = shouldUseStripePayment(tutor.stripe_connect_account_id);
+
+  const courseStatus = useStripe ? "payment_pending" : "scheduled";
 
   const { data: course, error: courseError } = await supabaseAdmin
     .from("courses")
@@ -720,7 +771,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       subject,
       scheduled_at: slot.starts_at,
       slot_id: slot.id,
-      status: "scheduled",
+      status: courseStatus,
     })
     .select("id")
     .single();
@@ -730,11 +781,70 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  if (useStripe && stripe && tutor.stripe_connect_account_id) {
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(fiscal.amountGross * 100),
+        currency: "eur",
+        application_fee_amount: Math.round(fiscal.commissionSasu * 100),
+        transfer_data: {
+          destination: tutor.stripe_connect_account_id,
+        },
+        metadata: {
+          course_id: course.id,
+          slot_id: slot.id,
+          client_id: client.id,
+        },
+        automatic_payment_methods: { enabled: true },
+      });
+
+      const { error: txError } = await supabaseAdmin.from("transactions").insert({
+        course_id: course.id,
+        amount_gross: fiscal.amountGross,
+        commission_sasu: fiscal.commissionSasu,
+        taxes_urssaf: fiscal.taxesUrssaf,
+        net_payout: fiscal.netPayout,
+        status_stripe: "pending",
+        status_urssaf: "pending",
+        stripe_payment_intent_id: paymentIntent.id,
+      });
+
+      if (txError || !paymentIntent.client_secret) {
+        await supabaseAdmin.from("courses").delete().eq("id", course.id);
+        res.status(500).json({
+          error: txError?.message ?? "Impossible de créer le paiement Stripe",
+        });
+        return;
+      }
+
+      res.status(201).json({
+        data: {
+          requiresPayment: true,
+          clientSecret: paymentIntent.client_secret,
+          courseId: course.id,
+          amountGross: fiscal.amountGross,
+          netPayout: fiscal.netPayout,
+          subject,
+          scheduledAt: slot.starts_at,
+          endsAt: slot.ends_at,
+        },
+      });
+      return;
+    } catch (err) {
+      await supabaseAdmin.from("courses").delete().eq("id", course.id);
+      const message =
+        err instanceof Error ? err.message : "Erreur Stripe";
+      console.error("[tutors] payment intent:", message);
+      res.status(502).json({ error: message });
+      return;
+    }
+  }
+
   const { error: txError } = await supabaseAdmin.from("transactions").insert({
     course_id: course.id,
     amount_gross: fiscal.amountGross,
     commission_sasu: fiscal.commissionSasu,
-    taxes_urssaf: fiscal.taxesUrssaf + fiscal.taxesLiberatoire,
+    taxes_urssaf: fiscal.taxesUrssaf,
     net_payout: fiscal.netPayout,
     status_stripe: "pending",
     status_urssaf: "pending",
@@ -746,13 +856,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { error: bookError } = await supabaseAdmin
-    .from("tutor_slots")
-    .update({ booked: true, booked_by: client.id })
-    .eq("id", slot.id)
-    .eq("booked", false);
-
-  if (bookError) {
+  const slotResult = await finalizeBookingSlot(slot.id, client.id);
+  if (!slotResult.ok) {
     await supabaseAdmin.from("courses").delete().eq("id", course.id);
     res.status(500).json({ error: "Créneau déjà réservé" });
     return;
@@ -760,6 +865,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
 
   res.status(201).json({
     data: {
+      requiresPayment: false,
       courseId: course.id,
       amountGross: fiscal.amountGross,
       netPayout: fiscal.netPayout,

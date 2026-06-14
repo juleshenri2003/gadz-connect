@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { getDemoAccount } from "./demo-accounts.js";
 import { ensureProfileForUser } from "./profiles.js";
 import { isSchoolEmail, schoolEmailError } from "./school-email.js";
 import { supabaseAdmin, supabaseAuth } from "./supabase.js";
@@ -37,8 +38,82 @@ export async function syncProfileCampus(
   return { ok: true };
 }
 
+async function ensureAuthUserWithPassword(
+  email: string,
+  password: string,
+): Promise<{ ok: true; userId: string } | { ok: false; message: string }> {
+  const { data: existingUsers, error: listError } =
+    await supabaseAdmin.auth.admin.listUsers();
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const existing = existingUsers.users.find(
+    (u) => u.email?.toLowerCase() === email,
+  );
+
+  if (!existing) {
+    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (error || !created.user) {
+      return {
+        ok: false,
+        message: error?.message ?? "Impossible de créer le compte",
+      };
+    }
+    return { ok: true, userId: created.user.id };
+  }
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+    password,
+  });
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  return { ok: true, userId: existing.id };
+}
+
+async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<
+  | {
+      ok: true;
+      session: {
+        access_token: string;
+        refresh_token: string;
+        expires_at?: number;
+        user: User;
+      };
+    }
+  | { ok: false; message: string }
+> {
+  if (!supabaseAuth) {
+    return { ok: false, message: "Auth Supabase non configurée" };
+  }
+
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.session?.user) {
+    return {
+      ok: false,
+      message: error?.message ?? "E-mail ou mot de passe incorrect",
+    };
+  }
+
+  return { ok: true, session: data.session };
+}
+
 export async function performEmailLogin(
   email: string,
+  password: string,
   campusId?: string,
 ): Promise<
   | {
@@ -57,72 +132,52 @@ export async function performEmailLogin(
     return { ok: false, status: 503, message: "Auth Supabase non configurée" };
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
+
   if (
     process.env.NODE_ENV === "production" &&
     process.env.ALLOW_EMAIL_LOGIN === "true" &&
-    !isSchoolEmail(email)
+    !isSchoolEmail(normalizedEmail)
   ) {
     return { ok: false, status: 403, message: schoolEmailError() };
   }
 
-  const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-  let userId = existingUsers.users.find(
-    (u) => u.email?.toLowerCase() === email,
-  )?.id;
+  let signIn = await signInWithPassword(normalizedEmail, password);
 
-  if (!userId) {
-    const { data: created, error: createError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-      });
-    if (createError || !created.user) {
-      console.error("[auth] email-login createUser:", createError?.message);
-      return {
-        ok: false,
-        status: 500,
-        message: "Impossible de créer le compte",
-      };
+  if (!signIn.ok) {
+    const demo = getDemoAccount(normalizedEmail);
+    const canBootstrap =
+      demo &&
+      password === demo.password &&
+      process.env.NODE_ENV === "development";
+
+    if (canBootstrap) {
+      const ensured = await ensureAuthUserWithPassword(
+        normalizedEmail,
+        password,
+      );
+      if (!ensured.ok) {
+        return { ok: false, status: 500, message: ensured.message };
+      }
+      signIn = await signInWithPassword(normalizedEmail, password);
     }
-    userId = created.user.id;
   }
 
-  const { data: linkData, error: linkError } =
-    await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-    });
-
-  const hashedToken = linkData?.properties?.hashed_token;
-  if (linkError || !hashedToken) {
-    console.error("[auth] email-login:", linkError?.message);
-    return {
-      ok: false,
-      status: 500,
-      message: "Impossible d'établir la session",
-    };
-  }
-
-  const { data: otpData, error: otpError } = await supabaseAuth.auth.verifyOtp({
-    token_hash: hashedToken,
-    type: "magiclink",
-  });
-
-  if (otpError || !otpData.session?.user) {
+  if (!signIn.ok) {
     return {
       ok: false,
       status: 401,
-      message: otpError?.message ?? "Session invalide",
+      message: "E-mail ou mot de passe incorrect",
     };
   }
 
-  const ensured = await ensureProfileForUser(otpData.session.user);
+  const ensured = await ensureProfileForUser(signIn.session.user);
   if (!ensured.ok) {
     return { ok: false, status: 500, message: ensured.message };
   }
 
   if (campusId) {
-    const synced = await syncProfileCampus(otpData.session.user.id, campusId);
+    const synced = await syncProfileCampus(signIn.session.user.id, campusId);
     if (!synced.ok) {
       return { ok: false, status: 400, message: synced.message };
     }
@@ -131,12 +186,12 @@ export async function performEmailLogin(
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("profile_setup_complete")
-    .eq("id", otpData.session.user.id)
+    .eq("id", signIn.session.user.id)
     .maybeSingle();
 
   return {
     ok: true,
-    session: otpData.session,
+    session: signIn.session,
     profileSetupComplete: Boolean(profile?.profile_setup_complete),
   };
 }

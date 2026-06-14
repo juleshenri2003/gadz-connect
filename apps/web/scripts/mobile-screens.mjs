@@ -13,6 +13,10 @@ const browser = await chromium.launch();
 
 async function devLogin(page) {
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  const passwordInput = page.locator("#password");
+  if (await passwordInput.isVisible().catch(() => false)) {
+    await passwordInput.fill("Prof-EnAttente!");
+  }
   const continueBtn = page.getByRole("button", { name: "Continuer" });
   if (await continueBtn.isVisible()) {
     await continueBtn.click();

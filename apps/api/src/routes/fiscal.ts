@@ -43,11 +43,11 @@ fiscalRouter.get("/calculate/demo", (_req, res) => {
   res.json({
     data: result,
     breakdown: {
-      label: "Cours 40 € — commission 5 € — URSSAF 21,1 % — net virement",
+      label: `Cours 40 € — commission ${result.commissionSasu} € — URSSAF 21,1 % — net virement`,
       steps: [
         "Montant brut : 40,00 €",
-        "Commission SASU : −5,00 €",
-        "Base cotisable : 35,00 €",
+        `Commission SASU : −${result.commissionSasu.toFixed(2)} €`,
+        `Base cotisable : ${result.baseAfterCommission.toFixed(2)} €`,
         `Cotisations URSSAF (21,1 %) : −${result.taxesUrssaf.toFixed(2)} €`,
         `Net virement prestataire : ${result.netPayout.toFixed(2)} €`,
       ],

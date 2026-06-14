@@ -214,6 +214,17 @@ export function useDeleteSlot() {
   });
 }
 
+export interface BookingResult {
+  requiresPayment: boolean;
+  clientSecret?: string;
+  courseId: string;
+  amountGross: number;
+  netPayout: number;
+  subject: string;
+  scheduledAt: string;
+  endsAt: string;
+}
+
 export function useBookSlot() {
   const { getAccessToken } = useAuth();
   const queryClient = useQueryClient();
@@ -222,16 +233,7 @@ export function useBookSlot() {
     mutationFn: async (body: { slotId: string; subject?: string }) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");
-      const res = await apiFetch<{
-        data: {
-          courseId: string;
-          amountGross: number;
-          netPayout: number;
-          subject: string;
-          scheduledAt: string;
-          endsAt: string;
-        };
-      }>("/api/tutors/bookings", {
+      const res = await apiFetch<{ data: BookingResult }>("/api/tutors/bookings", {
         method: "POST",
         token,
         body: JSON.stringify(body),

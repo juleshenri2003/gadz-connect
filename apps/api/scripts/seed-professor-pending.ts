@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 const PROF_EMAIL = "prof.enattente@ensam.eu";
 
 import { getDemoCampusId } from "./lib/demo-campus.js";
+import { ensureDemoUserPassword } from "./lib/demo-auth.js";
 
 const admin = createClient(
   process.env.SUPABASE_URL!,
@@ -21,26 +22,13 @@ async function main() {
     process.exit(1);
   }
 
-  const { data: existingUsers } = await admin.auth.admin.listUsers();
-  let userId = existingUsers.users.find(
-    (u) => u.email?.toLowerCase() === PROF_EMAIL,
-  )?.id;
-
-  if (!userId) {
-    const { data: created, error } = await admin.auth.admin.createUser({
-      email: PROF_EMAIL,
-      email_confirm: true,
-      user_metadata: { first_name: "Paul", last_name: "Bernard" },
-    });
-    if (error || !created.user) {
-      console.error("createUser:", error?.message);
-      process.exit(1);
-    }
-    userId = created.user.id;
-    console.log("Utilisateur auth créé:", PROF_EMAIL);
-  } else {
-    console.log("Utilisateur auth existant:", PROF_EMAIL);
+  const auth = await ensureDemoUserPassword(admin, PROF_EMAIL);
+  if (!auth.ok) {
+    console.error("auth:", auth.message);
+    process.exit(1);
   }
+  const userId = auth.userId;
+  console.log("Utilisateur auth prêt:", PROF_EMAIL);
 
   const profilePayload = {
     id: userId,
@@ -86,6 +74,7 @@ async function main() {
   console.log("");
   console.log("── Prof en attente SIRET ──");
   console.log("E-mail   :", PROF_EMAIL);
+  console.log("Mot de passe : Prof-EnAttente!");
   console.log("Statut   : pending_siret (onboarding fait, SIRET non déclaré)");
   console.log("");
   console.log("Test :");

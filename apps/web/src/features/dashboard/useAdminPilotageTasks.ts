@@ -1,6 +1,9 @@
 import { useAdminDashboard, useAdminProfiles } from "@/features/admin/useAdmin";
 import { useNotifications } from "@/features/notifications/useNotifications";
-import { computeAdminPilotageTasks } from "./adminPilotageTasks";
+import {
+  computeAdminNavBadgeCounts,
+  computeAdminPilotageTasks,
+} from "./adminPilotageTasks";
 
 export function useAdminPilotageTasks() {
   const dashboardQuery = useAdminDashboard();
@@ -8,6 +11,12 @@ export function useAdminPilotageTasks() {
   const notificationsQuery = useNotifications();
 
   const progress = computeAdminPilotageTasks(
+    profilesQuery.data?.profiles,
+    notificationsQuery.data,
+    dashboardQuery.data?.profiles.byStatus.suspended ?? 0,
+  );
+
+  const badgeCounts = computeAdminNavBadgeCounts(
     profilesQuery.data?.profiles,
     notificationsQuery.data,
     dashboardQuery.data?.profiles.byStatus.suspended ?? 0,
@@ -21,6 +30,7 @@ export function useAdminPilotageTasks() {
   return {
     progress,
     tasks: progress.tasks,
+    badgeCounts,
     isLoading,
     isError:
       dashboardQuery.isError ||

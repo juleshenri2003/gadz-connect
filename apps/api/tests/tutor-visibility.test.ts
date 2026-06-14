@@ -13,6 +13,8 @@ describe("isTeacherVisibleInMarketplace", () => {
     profile_setup_complete: true,
     stripe_connect_onboarding_complete: true,
     hourly_rate: 35,
+    siret: "73282932000074",
+    is_autoentrepreneur_verified: true,
   };
 
   it("returns true when all criteria met", () => {
@@ -51,6 +53,8 @@ describe("computeMarketplaceStatus", () => {
     profile_setup_complete: true,
     stripe_connect_onboarding_complete: true,
     hourly_rate: 40,
+    siret: "73282932000074",
+    is_autoentrepreneur_verified: true,
   };
 
   it("returns visible when all checks pass", () => {

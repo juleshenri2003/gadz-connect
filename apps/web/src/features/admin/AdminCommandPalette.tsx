@@ -7,7 +7,7 @@ import { useSidebarCollapsed } from "@/features/layout/sidebarCollapse";
 const ADMIN_COMMANDS = [
   { label: "Tableau de bord", to: "/admin" },
   { label: "Emploi du temps", to: "/admin/planning" },
-  { label: "Alertes campus", to: "/admin/alertes" },
+  { label: "Alertes", to: "/admin/alertes" },
   { label: "Utilisateurs", to: "/admin/utilisateurs" },
   { label: "Budgets", to: "/admin/budgets" },
   { label: "Cours", to: "/admin/cours" },

@@ -14,6 +14,8 @@ import {
   useTutorSlots,
   type TutorSlot,
 } from "@/features/marketplace/useTutors";
+import { BookingPaymentForm } from "@/features/stripe/BookingPaymentForm";
+import { useStripeConfig } from "@/features/stripe/useStripeConfig";
 
 const SUBJECT_OTHER = "__other__";
 
@@ -42,10 +44,21 @@ export function TutorDetailPage() {
   const { data: slots } = useTutorSlots(id ?? "");
   const { data: cvPdfUrl } = useTutorCvPdfUrl(id ?? "", Boolean(tutor?.has_cv_pdf));
   const bookSlot = useBookSlot();
+  const { data: stripeConfig } = useStripeConfig();
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(
+    null,
+  );
+  const [pendingBooking, setPendingBooking] = useState<{
+    subject: string;
+    amountGross: number;
+    netPayout: number;
+    scheduledAt: string;
+    endsAt: string;
+  } | null>(null);
   const [booked, setBooked] = useState<{
     subject: string;
     amountGross: number;
@@ -96,6 +109,34 @@ export function TutorDetailPage() {
       slotId: selectedSlot,
       subject: resolvedSubject,
     });
+
+    if (
+      result.requiresPayment &&
+      result.clientSecret &&
+      stripeConfig?.configured &&
+      stripeConfig.publishableKey
+    ) {
+      setPendingBooking({
+        subject: result.subject,
+        amountGross: result.amountGross,
+        netPayout: result.netPayout,
+        scheduledAt: result.scheduledAt,
+        endsAt: result.endsAt,
+      });
+      setPaymentClientSecret(result.clientSecret);
+      return;
+    }
+
+    showBookingSuccess(result);
+  }
+
+  function showBookingSuccess(result: {
+    subject: string;
+    amountGross: number;
+    netPayout: number;
+    scheduledAt: string;
+    endsAt: string;
+  }) {
     const name = tutor
       ? `${tutor.first_name} ${tutor.last_name}`.trim()
       : "Votre tuteur";
@@ -108,6 +149,13 @@ export function TutorDetailPage() {
       tutorName: name,
     });
     setConfirmOpen(false);
+    setPaymentClientSecret(null);
+    setPendingBooking(null);
+  }
+
+  function handlePaymentSuccess() {
+    if (!pendingBooking) return;
+    showBookingSuccess(pendingBooking);
   }
 
   if (isLoading) {
@@ -148,8 +196,7 @@ export function TutorDetailPage() {
             Montant : {formatEuro(booked.amountGross)}
           </p>
           <p className="mt-2 text-sm text-success">
-            Le paiement vous sera demandé prochainement via Stripe. Votre cours
-            apparaît déjà dans votre emploi du temps.
+            Votre cours apparaît dans votre emploi du temps.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -353,10 +400,37 @@ export function TutorDetailPage() {
               </dd>
             </div>
             <p className="text-xs text-ink-400">
-              Le paiement Stripe sera demandé ultérieurement. La réservation
-              crée votre cours dans l&apos;emploi du temps.
+              {stripeConfig?.configured
+                ? "Le paiement par carte sera demandé à la confirmation."
+                : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
             </p>
           </dl>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(paymentClientSecret && pendingBooking)}
+        onClose={() => {
+          setPaymentClientSecret(null);
+          setPendingBooking(null);
+        }}
+        title="Paiement sécurisé"
+        description="Réglez votre cours pour confirmer la réservation."
+      >
+        {paymentClientSecret &&
+        pendingBooking &&
+        stripeConfig?.publishableKey ? (
+          <BookingPaymentForm
+            publishableKey={stripeConfig.publishableKey}
+            clientSecret={paymentClientSecret}
+            amountLabel={formatEuro(pendingBooking.amountGross)}
+            onSuccess={handlePaymentSuccess}
+            onCancel={() => {
+              setPaymentClientSecret(null);
+              setPendingBooking(null);
+              setConfirmOpen(false);
+            }}
+          />
         ) : null}
       </Modal>
     </div>

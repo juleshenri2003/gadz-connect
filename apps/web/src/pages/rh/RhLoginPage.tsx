@@ -18,8 +18,10 @@ import { apiFetch } from "@/lib/api";
 
 const RH_EMAIL = "jules.henri@ensam.eu";
 const IS_DEV = import.meta.env.DEV;
+const USE_EMAIL_LOGIN =
+  import.meta.env.DEV || import.meta.env.VITE_USE_EMAIL_LOGIN === "true";
 
-const loginSchema = z.object({
+const magicLinkSchema = z.object({
   email: z
     .string()
     .email("Adresse e-mail invalide")
@@ -29,11 +31,16 @@ const loginSchema = z.object({
     ),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+const passwordLoginSchema = magicLinkSchema.extend({
+  password: z.string().min(1, "Mot de passe requis"),
+});
+
+type MagicLinkForm = z.infer<typeof magicLinkSchema>;
+type PasswordLoginForm = z.infer<typeof passwordLoginSchema>;
 
 export function RhLoginPage() {
   const navigate = useNavigate();
-  const { devLogin } = useAuth();
+  const { emailLogin } = useAuth();
   const [sent, setSent] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [devLoading, setDevLoading] = useState(false);
@@ -42,16 +49,19 @@ export function RhLoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: RH_EMAIL },
+  } = useForm<PasswordLoginForm>({
+    resolver: zodResolver(USE_EMAIL_LOGIN ? passwordLoginSchema : magicLinkSchema),
+    defaultValues: {
+      email: RH_EMAIL,
+      password: "",
+    },
   });
 
   const isRateLimit =
     serverError?.toLowerCase().includes("rate limit") ||
     serverError?.toLowerCase().includes("trop de tentatives");
 
-  async function onSubmit({ email }: LoginForm) {
+  async function onMagicLinkSubmit({ email }: MagicLinkForm) {
     setServerError(null);
     const redirectTo = `${window.location.origin}/auth/callback`;
     sessionStorage.setItem("gadz_auth_redirect", "/admin");
@@ -71,10 +81,10 @@ export function RhLoginPage() {
     }
   }
 
-  async function handleDevLogin() {
+  async function onPasswordSubmit({ email, password }: PasswordLoginForm) {
     setServerError(null);
     setDevLoading(true);
-    const { error } = await devLogin(RH_EMAIL);
+    const { error } = await emailLogin(email, password);
     setDevLoading(false);
     if (error) {
       setServerError(error);
@@ -95,19 +105,6 @@ export function RhLoginPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-ink-600">
             <p>Après connexion, vous serez redirigé vers le pilotage RH.</p>
-            {IS_DEV ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={devLoading}
-                onClick={() => void handleDevLogin()}
-              >
-                {devLoading
-                  ? "Connexion…"
-                  : "Connexion dev (sans e-mail)"}
-              </Button>
-            ) : null}
           </CardContent>
         </Card>
       </main>
@@ -127,7 +124,12 @@ export function RhLoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={handleSubmit(
+              USE_EMAIL_LOGIN ? onPasswordSubmit : onMagicLinkSubmit,
+            )}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="email">E-mail autorisé</Label>
               <Input
@@ -141,6 +143,30 @@ export function RhLoginPage() {
                 <p className="text-sm text-danger">{errors.email.message}</p>
               )}
             </div>
+
+            {USE_EMAIL_LOGIN ? (
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Pilotage-RH!"
+                  autoComplete="current-password"
+                  {...register("password")}
+                />
+                {errors.password ? (
+                  <p className="text-sm text-danger">
+                    {errors.password.message}
+                  </p>
+                ) : null}
+                {IS_DEV ? (
+                  <p className="text-xs text-ink-400">
+                    Démo locale : <span className="font-mono">Pilotage-RH!</span>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {serverError && (
               <div className="space-y-2">
                 <p className="text-sm text-danger">{serverError}</p>
@@ -155,28 +181,17 @@ export function RhLoginPage() {
             <Button
               type="submit"
               className="w-full bg-brand-600 hover:bg-brand-700"
-              disabled={isSubmitting}
+              disabled={isSubmitting || devLoading}
             >
-              Recevoir le lien magique RH
+              {USE_EMAIL_LOGIN
+                ? devLoading
+                  ? "Connexion…"
+                  : "Se connecter"
+                : isSubmitting
+                  ? "Envoi…"
+                  : "Recevoir le lien magique RH"}
             </Button>
           </form>
-
-          {IS_DEV ? (
-            <div className="border-t border-line pt-4">
-              <p className="mb-2 text-xs text-ink-400">
-                Développement local — connexion directe sans envoi d&apos;e-mail
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={devLoading}
-                onClick={() => void handleDevLogin()}
-              >
-                {devLoading ? "Connexion…" : "Connexion dev → pilotage RH"}
-              </Button>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </main>

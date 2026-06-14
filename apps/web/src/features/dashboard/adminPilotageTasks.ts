@@ -58,7 +58,7 @@ export function computeAdminPilotageTasks(
     tasks.push({
       id: "read-alerts",
       title: `${unreadCount} alerte(s) non lue(s)`,
-      description: "Consulter les alertes campus du pilotage",
+      description: "Consulter les alertes du pilotage",
       href: buildAdminAlertHref(),
       status: "todo",
     });
@@ -86,4 +86,42 @@ export function computeAdminPilotageTasks(
     percent,
     isComplete: tasks.every((t) => t.status === "done"),
   };
+}
+
+const ADMIN_NAV_PATHS = [
+  "/admin",
+  "/admin/planning",
+  "/admin/alertes",
+  "/admin/utilisateurs",
+  "/admin/budgets",
+  "/admin/cours",
+] as const;
+
+/** Compteurs sidebar RH — basés sur les éléments réels, pas le nombre de tâches bandeau. */
+export function computeAdminNavBadgeCounts(
+  profiles:
+    | Array<{
+        account_status: string;
+        siret_verification_failed?: boolean;
+      }>
+    | undefined,
+  notifications: CampusNotificationItem[] | undefined,
+  suspendedCount = 0,
+): Record<string, number> {
+  const counts = Object.fromEntries(
+    ADMIN_NAV_PATHS.map((p) => [p, 0]),
+  ) as Record<string, number>;
+
+  const pendingMembers =
+    profiles?.filter((p) => p.account_status === "pending_siret").length ?? 0;
+  const verificationFailed =
+    profiles?.filter((p) => p.siret_verification_failed).length ?? 0;
+
+  counts["/admin/utilisateurs"] =
+    pendingMembers + suspendedCount + verificationFailed;
+
+  counts["/admin/alertes"] =
+    notifications?.filter((n) => !n.read_at).length ?? 0;
+
+  return counts;
 }

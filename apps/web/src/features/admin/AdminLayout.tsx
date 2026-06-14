@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { applyNavBadges } from "@/features/dashboard/navBadgeCounts";
+import { useAdminPilotageTasks } from "@/features/dashboard/useAdminPilotageTasks";
 import { AppShell } from "@/features/layout/AppShell";
 import { AdminCommandPaletteTrigger } from "./AdminCommandPalette";
 import { useAdminMe } from "./useAdmin";
@@ -16,7 +18,7 @@ import { ROLE_LABELS } from "./format";
 const NAV = [
   { to: "/admin", label: "Tableau de bord", shortLabel: "Accueil", end: true, icon: LayoutDashboard },
   { to: "/admin/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
-  { to: "/admin/alertes", label: "Alertes campus", shortLabel: "Alertes", icon: Bell },
+  { to: "/admin/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
   { to: "/admin/utilisateurs", label: "Utilisateurs", shortLabel: "Membres", icon: Users },
   { to: "/admin/budgets", label: "Budgets", shortLabel: "Budgets", icon: Wallet },
   { to: "/admin/cours", label: "Cours", shortLabel: "Cours", icon: BookOpen },
@@ -26,11 +28,14 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { data: me } = useAdminMe();
+  const { badgeCounts } = useAdminPilotageTasks();
 
   async function handleLeave() {
     await signOut();
     navigate("/", { replace: true });
   }
+
+  const nav = applyNavBadges(NAV, badgeCounts);
 
   const userName =
     me?.first_name || me?.last_name
@@ -45,7 +50,7 @@ export function AdminLayout() {
       subtitle="Administration inter-campus"
       userName={userName}
       userRole={me ? ROLE_LABELS[me.role] : undefined}
-      nav={NAV}
+      nav={nav}
       spaceVariant="admin"
       footerLabel="Quitter le pilotage"
       onFooterClick={() => void handleLeave()}

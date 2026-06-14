@@ -16,6 +16,10 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 10. `migrations/010_replacement_teacher_responses.sql` (legacy)
 11. `migrations/011_registration_path.sql`
 12. `migrations/012_cancel_awaiting_replacement.sql` (normalise cours `awaiting_replacement` → `cancelled`)
+13. `migrations/013_stripe_payments.sql` (paiement carte + `payment_pending`)
+14. `migrations/014_payment_notifications.sql` (notification paiement élève)
+
+Guide détaillé Stripe : [`docs/STRIPE_SETUP.md`](../docs/STRIPE_SETUP.md)
 
 Indisponibilité prof/élève : annulation simple + créneau libéré ; l'élève rebook via la marketplace.
 

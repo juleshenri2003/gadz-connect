@@ -12,7 +12,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { UserRole } from "@gadz-connect/types";
-import { Mail, MapPin, Sparkles, UserCheck } from "lucide-react";
+import { Mail, MapPin, Sparkles, UserCheck, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -36,6 +36,7 @@ const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
+  password: z.string().min(1, "Mot de passe requis"),
   campusId: z.string().uuid("Choisissez votre campus / ville"),
 });
 
@@ -114,6 +115,15 @@ export function LoginPage() {
   const { data: rhAdmin, isSuccess: hasRhAccess, isLoading: rhLoading } =
     useRhAccess();
 
+  const { data: demoAccounts } = useQuery({
+    queryKey: ["demo-accounts"],
+    queryFn: () =>
+      apiFetch<{
+        data: Array<{ email: string; password: string; label: string }>;
+      }>("/api/auth/demo-accounts"),
+    enabled: USE_EMAIL_LOGIN,
+  });
+
   const { data: campuses, isLoading: campusesLoading } = useQuery({
     queryKey: ["campus"],
     queryFn: () =>
@@ -134,6 +144,7 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: import.meta.env.DEV ? "prof.enattente@ensam.eu" : "",
+      password: "",
       campusId: getStoredCampusId(),
     },
   });
@@ -170,12 +181,13 @@ export function LoginPage() {
     return <Navigate to="/app" replace />;
   }
 
-  async function onEmailLogin({ email, campusId }: LoginForm) {
+  async function onEmailLogin({ email, password, campusId }: LoginForm) {
     setServerError(null);
     persistCampus(campusId);
     setLoading(true);
     const { error, accessToken, profileSetupComplete } = await emailLogin(
       email,
+      password,
       campusId,
     );
     setLoading(false);
@@ -289,7 +301,7 @@ export function LoginPage() {
             </h2>
             <p className="mt-1 text-sm text-ink-600">
               {USE_EMAIL_LOGIN
-                ? "Campus puis e-mail @ensam.eu — élève, prof ou RH."
+                ? "Campus, e-mail @ensam.eu et mot de passe personnel."
                 : "Campus et e-mail — connexion par lien magique."}
             </p>
           </div>
@@ -353,7 +365,7 @@ export function LoginPage() {
                   id="email"
                   type="email"
                   placeholder="prenom.nom@etu.ensam.eu"
-                  autoComplete="email"
+                  autoComplete="username"
                   aria-invalid={Boolean(errors.email)}
                   {...register("email")}
                 />
@@ -361,6 +373,28 @@ export function LoginPage() {
                   <p className="text-sm text-danger">{errors.email.message}</p>
                 ) : null}
               </div>
+
+              {USE_EMAIL_LOGIN ? (
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5 text-ink-400" />
+                    Mot de passe
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Votre mot de passe"
+                    autoComplete="current-password"
+                    aria-invalid={Boolean(errors.password)}
+                    {...register("password")}
+                  />
+                  {errors.password ? (
+                    <p className="text-sm text-danger">
+                      {errors.password.message}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </fieldset>
 
             {serverError ? (
@@ -383,19 +417,23 @@ export function LoginPage() {
           </form>
         </div>
 
-        {USE_EMAIL_LOGIN ? (
-          <div className="mt-6 space-y-3 lg:hidden">
-            <HelpCard
-              icon={UserCheck}
-              title="Compte existant"
-              description="Accès direct à votre espace sur le campus choisi."
-            />
-            <HelpCard
-              icon={Sparkles}
-              title="Première connexion"
-              description="Inscription guidée — parcours élève ou prof."
-            />
-          </div>
+        {USE_EMAIL_LOGIN && demoAccounts?.data?.length ? (
+          <details className="mt-6 rounded-lg border border-line bg-surface/80 p-4 text-sm">
+            <summary className="cursor-pointer font-medium text-ink-900">
+              Comptes démo (mots de passe)
+            </summary>
+            <ul className="mt-3 space-y-2 text-ink-600">
+              {demoAccounts.data.map((account) => (
+                <li key={account.email} className="rounded-md bg-paper px-3 py-2">
+                  <p className="font-medium text-ink-900">{account.email}</p>
+                  <p className="font-mono text-xs text-brand-700">
+                    {account.password}
+                  </p>
+                  <p className="text-xs text-ink-400">{account.label}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
         ) : null}
       </div>
     </AuthShell>

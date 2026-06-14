@@ -182,6 +182,35 @@ export async function getSiteAdministratorIds(
   return uniqueRecipientIds([...ids], excludeUserId);
 }
 
+/** Notification au professeur lorsqu'un élève a payé une réservation. */
+export async function notifyPaymentReceived(params: {
+  providerId: string;
+  clientId: string;
+  campusId: string;
+  courseId: string;
+  subject: string;
+  scheduledAt: string | null;
+  amountGross: number;
+  studentName: string;
+}): Promise<void> {
+  const dateLabel = params.scheduledAt
+    ? new Date(params.scheduledAt).toLocaleString("fr-FR", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "date à confirmer";
+
+  await notifyUsers([params.providerId], {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "payment_received",
+    title: `Paiement reçu — ${params.subject}`,
+    message: `${params.studentName} a payé ${params.amountGross.toFixed(2).replace(".", ",")} € pour la séance du ${dateLabel}.`,
+    scheduledAt: params.scheduledAt,
+    declaredBy: params.clientId,
+  });
+}
+
 /** Notification personnelle lors de l'activation automatique du compte prestataire. */
 export async function notifyAccountActivated(
   userId: string,

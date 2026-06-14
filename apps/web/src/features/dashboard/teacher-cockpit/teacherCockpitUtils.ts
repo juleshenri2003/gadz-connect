@@ -8,7 +8,7 @@ import {
   startOfWeek,
 } from "@/features/scheduling/calendar-utils";
 
-const COMMISSION_SASU = 5;
+const COMMISSION_SASU = 3;
 const URSSAF_RATE_FULL = 0.211;
 const URSSAF_RATE_ACRE = 0.106;
 const LIBERATOIRE_RATE = 0.022;

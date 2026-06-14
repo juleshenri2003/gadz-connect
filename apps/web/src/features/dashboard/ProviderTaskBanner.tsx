@@ -32,7 +32,7 @@ export function ProviderTaskBanner() {
         scope="student-actions"
         tasks={studentTasks.tasks}
         title="À faire — espace élève"
-        subtitle="Remplacements, réservations et alertes campus"
+        subtitle="Remplacements, réservations et alertes"
         sequential
       />
     );
@@ -46,7 +46,7 @@ export function ProviderTaskBanner() {
       scope="teacher-actions"
       tasks={teacherTasks.tasks}
       title="À faire — espace prestataire"
-      subtitle="Remplacements, URSSAF, paiements et alertes campus"
+      subtitle="Remplacements, URSSAF, paiements et alertes"
       sequential
     />
   );

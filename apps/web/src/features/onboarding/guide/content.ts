@@ -1,10 +1,19 @@
-/** Contenu issu du guide « TUYSS FINALE — Devenir Auto-entrepreneur Pour Méthodo » */
+/** Guide INPI — aligné sur la doc officielle INPI (vérifié juin 2026). */
 
 export const INPI_URL = "https://procedures.inpi.fr/";
+export const INPI_OFFICIAL_GUIDE_URL =
+  "https://www.inpi.fr/realiser-demarches/formalites-dentreprises/creer-en-tant-que-micro-entrepreneur";
 export const URSSAF_ACRE_URL =
   "https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/toutes-les-fiches-pratiques/demander-lacre.html";
 export const URSSAF_PORTAL_URL =
   "https://www.autoentrepreneur.urssaf.fr/portail/accueil.html";
+
+export const INPI_GUIDE_META = {
+  lastVerifiedAt: "2026-06-14",
+  officialSource: INPI_OFFICIAL_GUIDE_URL,
+  disclaimer:
+    "Guide indicatif Gadz'Connect — le Guichet Unique INPI fait foi. En cas de doute, consultez procedures.inpi.fr ou contactez le responsable campus.",
+} as const;
 
 export const PLATFORM_CONTACTS = {
   responsable: {
@@ -56,90 +65,119 @@ export const REASSURANCE_POINTS = [
 export const SCAM_WARNINGS = [
   "Courriers postaux demandant de payer une CFE, un affichage publicitaire ou une « amende ».",
   "E-mails ou sites imitant l'URSSAF, l'INPI ou les impôts avec un lien de paiement.",
-  "Toute démarche payante pour « finaliser » votre immatriculation — tout est gratuit.",
+  "Toute démarche payante pour « finaliser » votre immatriculation — la création est gratuite ou à tarif réglementé très faible.",
 ] as const;
 
 export const INPI_STEPS = [
   {
-    id: "access",
-    title: "Accéder au Guichet Unique INPI",
-    summary: "Ouvrir le site officiel et lancer une création de micro-entreprise.",
+    id: "connect",
+    title: "Se connecter au Guichet Unique",
+    summary: "Ouvrir procedures.inpi.fr et créer ou utiliser votre compte.",
     details: [
-      "Rendez-vous sur le Guichet Unique INPI (lien officiel ci-dessous).",
-      "Lancez une demande de **création d'une micro-entreprise**.",
-      "Choisissez la **démarche encadrée** (cadre rouge sur le site).",
-      "Acceptez les conditions, puis sélectionnez **« Création d'entreprise »**.",
+      "Rendez-vous sur le portail e-procédures INPI (lien officiel ci-dessous).",
+      "Créez un compte ou connectez-vous (FranceConnect possible).",
+      "À la question **« Devenir compte administrateur de mon entreprise »**, répondez **NON** — sauf besoin très spécifique.",
+      "Le « nom de dossier » est un libellé interne : il n'a aucun impact une fois l'inscription terminée.",
     ],
     link: INPI_URL,
     linkLabel: "Ouvrir procedures.inpi.fr",
   },
   {
-    id: "franceconnect",
-    title: "Connexion FranceConnect",
-    summary: "Reconnectez-vous avec FranceConnect si demandé.",
+    id: "begin",
+    title: "Débuter la formalité de création",
+    summary: "Lancer une création de micro-entreprise (entrepreneur individuel).",
     details: [
-      "Utilisez **FranceConnect** si le site vous y invite (compte existant ou création).",
-      "À la question **« Devenir compte administrateur de mon entreprise »**, répondez **NON**.",
-      "Le « nom de dossier » est un libellé interne : il n'a aucun impact une fois l'inscription terminée.",
-      "En cas de doute sur une case, contactez le responsable Gadz'Connect.",
+      "Cliquez sur **« Créer, modifier ou cesser une entreprise »** (rubrique Entreprises).",
+      "Dans **« Création d'entreprise »**, cliquez sur **« Créer une entreprise »**.",
+      "Lisez **« Préparez votre démarche »**, puis **« Continuer »**.",
+      "À **« Quelle forme d'entreprise ? »** : choisissez **Entrepreneur individuel**.",
+      "Cochez **Oui** à **« Souhaitez-vous opter pour le statut micro-entrepreneur ? »**.",
+      "Donnez un nom à votre brouillon — vous pourrez le retrouver pendant 1 an via **« Accéder à mes brouillons »**.",
     ],
-    alert:
-      "Réponse obligatoire : NON à « compte administrateur » — sauf besoin spécifique que personne n'a ici.",
+    tip: "Si vous avez déjà une EI et ajoutez une activité, c'est une modification, pas une création.",
+  },
+  {
+    id: "identity",
+    title: "Renseigner identité et établissement",
+    summary: "Compléter toutes les rubriques obligatoires (astérisque *).",
+    details: [
+      "**Identité de l'entreprise** : vos informations personnelles, date de début d'activité, numéro de sécurité sociale.",
+      "**Composition** et **Insaisissabilité** : en général rien à remplir pour un tutorat en solo — passez si facultatif.",
+      "**Établissements** : adresse (souvent votre domicile), caractéristiques de l'établissement.",
+      "Remplissez **tous les champs obligatoires** pour passer à l'étape suivante.",
+      "En cas de doute sur une case, contactez le responsable Gadz'Connect avant de valider.",
+    ],
   },
   {
     id: "activity",
-    title: "Catégoriser votre activité (soutien scolaire)",
+    title: "Catégoriser l'activité (soutien scolaire)",
     summary: "Chemin exact dans l'arbre INPI pour donner des cours.",
     details: [
-      "Dans la catégorisation de l'activité, suivez exactement ce chemin :",
+      "Dans **Établissements → Activité(s)**, suivez exactement ce chemin :",
     ],
     copyText: ACTIVITY_PATH_COPY,
     copyLabels: ACTIVITY_PATH_LABELS,
   },
   {
-    id: "urssaf",
-    title: "Périodicité URSSAF & ACRE",
-    summary: "Déclarations trimestrielles recommandées ; ACRE en parallèle si besoin.",
+    id: "fiscal",
+    title: "Options fiscales URSSAF & ACRE",
+    summary: "Périodicité, versement libératoire ; ACRE souvent en NON sur l'INPI.",
     details: [
-      "Pour la **périodicité des déclarations**, choisissez **Trimestrielle** (recommandé plutôt que mensuelle).",
-      "Un oubli de déclaration peut entraîner une amende URSSAF — pensez à l'app « AutoEntrepreneur URSSAF ».",
-      "Si les démarches URSSAF ne sont pas encore faites au moment de la création, cochez **NON** au dépôt d'ACRE sur l'INPI.",
+      "Rubrique **« Options fiscales »** : choisissez la **périodicité** (trimestrielle recommandée pour Gadz'Connect).",
+      "Pour le **versement libératoire** : cochez selon votre choix au questionnaire Gadz'Connect.",
+      "Si les démarches URSSAF ne sont pas encore faites, cochez **NON** au dépôt d'ACRE sur l'INPI.",
       "Vous pourrez demander l'ACRE ensuite sur le portail URSSAF (lien ci-dessous).",
     ],
     link: URSSAF_ACRE_URL,
     linkLabel: "Demander l'ACRE (URSSAF)",
-    tip: "Conseil guide Méthodo : trimestrielle, pas mensuelle.",
+    tip: "Un oubli de déclaration URSSAF peut entraîner une amende — activez l'app « AutoEntrepreneur URSSAF ».",
   },
   {
-    id: "identity",
-    title: "Pièce d'identité — étape critique",
-    summary: "Scanner une CNI ou passeport avec mention manuscrite obligatoire.",
+    id: "documents",
+    title: "Pièces jointes obligatoires",
+    summary: "CNI, domicile, non-condamnation — format PDF, 10 Mo max.",
     details: [
-      "Préparez une photocopie ou scan de votre pièce d'identité (CNI ou passeport).",
-      "**Avant de scanner**, écrivez à la main sur le papier :",
-      "1. La mention de conformité (texte ci-dessous à recopier).",
-      "2. La date du jour.",
-      "3. Votre signature.",
-      "Seulement ensuite, scannez ou photographiez le document et téléversez-le.",
+      "Téléversez les documents demandés au **format PDF** (10 Mo max par fichier).",
+      "**Pièce d'identité** (CNI ou passeport) — voir encadré obligatoire ci-dessous.",
+      "**Justificatif de domicile** : facture, quittance de loyer ou attestation hébergeur récente.",
+      "**Déclaration sur l'honneur de non-condamnation** : formulaire à télécharger et signer.",
+      "L'INPI ne valide pas la conformité des pièces — les autorités compétentes le font après envoi.",
     ],
     copyText: ID_CONFORMITY_MENTION,
     alert:
-      "Sans mention manuscrite + date + signature sur le papier, votre dossier peut être refusé.",
+      "Sur la CNI : écrivez À LA MAIN sur le papier la mention de conformité, la date du jour et votre signature AVANT de scanner.",
     critical: true,
+    tip: "Depuis août 2025, vous pouvez gérer l'anonymisation de vos données sur le Guichet Unique.",
   },
   {
-    id: "submit",
-    title: "Envoi du dossier & attente SIRET",
-    summary: "Valider, envoyer, puis récupérer votre numéro SIRET sous 1 à 4 semaines.",
+    id: "validate",
+    title: "Vérifier, signer et payer",
+    summary: "Valider le dossier, signer, puis régler (souvent 0 € pour tutorat).",
     details: [
-      "Vérifiez le récapitulatif, puis **envoyez le dossier**.",
-      "Créez votre compte URSSAF si ce n'est pas déjà fait.",
-      "Téléchargez le document ACRE si vous ne l'avez pas demandé à la création.",
-      "Vous recevrez votre **numéro SIRET** après validation INSEE — revenez sur Gadz'Connect pour le saisir.",
-      "Pour récupérer la synthèse de création sur l'INPI : préférez **Mozilla Firefox** (Safari sur Mac pose souvent problème).",
+      "Rubrique **« Récapitulatif »** : vérifiez chaque section, puis **« Valider le dossier »**.",
+      "Complétez **Correspondance** et **Observations** si demandé.",
+      "Téléchargez la synthèse et vérifiez une dernière fois.",
+      "Cochez **« Je confirme que les informations sont exactes »**, puis **« Signer la demande »**.",
+      "**Attention** : après signature, plus de modification possible.",
+      "Effectuez le **paiement** (carte bancaire) — les tarifs varient selon l'activité ; le soutien scolaire est souvent gratuit ou très faible.",
+      "Conservez le reçu dans **Suivi des formalités → État d'avancement**.",
+    ],
+    alert:
+      "« Valider le dossier » ne termine pas la démarche — signature et paiement sont obligatoires.",
+  },
+  {
+    id: "followup",
+    title: "Suivi INSEE et saisie SIRET",
+    summary: "Attendre le SIRET (1 à 4 semaines), puis revenir sur Gadz'Connect.",
+    details: [
+      "Suivez votre dossier via **Suivi des formalités → État d'avancement des formalités**.",
+      "En cas de dossier incomplet : régularisation sur le Guichet Unique (notification par e-mail).",
+      "Une fois immatriculé : vous recevez votre **numéro SIRET** (14 chiffres).",
+      "Revenez sur Gadz'Connect → **Micro-entreprise** pour déclarer votre SIRET.",
+      "Pour télécharger la synthèse : préférez **Mozilla Firefox** (Safari pose parfois problème).",
     ],
     link: INPI_URL,
-    linkLabel: "Retour sur l'espace INPI",
+    linkLabel: "Suivi des formalités INPI",
   },
 ] as const;
 

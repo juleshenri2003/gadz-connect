@@ -96,7 +96,7 @@ export function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-ink-900">Alertes campus</h2>
+          <h2 className="text-2xl font-bold text-ink-900">Alertes</h2>
           <p className="mt-1 text-sm text-ink-600">
             {getPageSubtitle(profile)}
           </p>
@@ -282,7 +282,7 @@ function NotificationRow({
   const declarantRole =
     n.declarant?.role === "teacher"
       ? "Professeur"
-      : n.declarant?.role === "student"
+      : n.declarant?.role === "student" || n.declarant?.role === "student_provider"
         ? "Élève"
         : null;
 

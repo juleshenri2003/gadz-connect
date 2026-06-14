@@ -9,6 +9,7 @@ const PROF_EMAIL = "prof.martin@ensam.eu";
 const FAKE_SIRET = "12345678901234";
 
 import { getDemoCampusId } from "./lib/demo-campus.js";
+import { ensureDemoUserPassword } from "./lib/demo-auth.js";
 
 const admin = createClient(
   process.env.SUPABASE_URL!,
@@ -22,26 +23,13 @@ async function main() {
     process.exit(1);
   }
 
-  const { data: existingUsers } = await admin.auth.admin.listUsers();
-  let userId = existingUsers.users.find(
-    (u) => u.email?.toLowerCase() === PROF_EMAIL,
-  )?.id;
-
-  if (!userId) {
-    const { data: created, error } = await admin.auth.admin.createUser({
-      email: PROF_EMAIL,
-      email_confirm: true,
-      user_metadata: { first_name: "Marie", last_name: "Martin" },
-    });
-    if (error || !created.user) {
-      console.error("createUser:", error?.message);
-      process.exit(1);
-    }
-    userId = created.user.id;
-    console.log("Utilisateur auth créé:", PROF_EMAIL);
-  } else {
-    console.log("Utilisateur auth existant:", PROF_EMAIL);
+  const auth = await ensureDemoUserPassword(admin, PROF_EMAIL);
+  if (!auth.ok) {
+    console.error("auth:", auth.message);
+    process.exit(1);
   }
+  const userId = auth.userId;
+  console.log("Utilisateur auth prêt:", PROF_EMAIL);
 
   const { data: existingProfile } = await admin
     .from("profiles")
@@ -56,6 +44,8 @@ async function main() {
     role: "teacher" as const,
     campus_id: campusId,
     siret: FAKE_SIRET,
+    is_autoentrepreneur_verified: true,
+    micro_enterprise_address: "12 rue de l'Industrie, 75015 Paris",
     account_status: "active" as const,
     micro_enterprise_activity: "enseignement" as const,
     urssaf_periodicity: "monthly" as const,

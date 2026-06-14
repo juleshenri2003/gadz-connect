@@ -5,6 +5,7 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { getDemoCampusId } from "./lib/demo-campus.js";
+import { ensureDemoUserPassword } from "./lib/demo-auth.js";
 
 const admin = createClient(
   process.env.SUPABASE_URL!,
@@ -46,21 +47,9 @@ const PERSONAS = [
 ] as const;
 
 async function ensureUser(email: string, firstName: string, lastName: string) {
-  const { data: existingUsers } = await admin.auth.admin.listUsers();
-  let userId = existingUsers.users.find(
-    (u) => u.email?.toLowerCase() === email,
-  )?.id;
-
-  if (!userId) {
-    const { data: created, error } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: { first_name: firstName, last_name: lastName },
-    });
-    if (error || !created.user) throw new Error(error?.message ?? "createUser");
-    userId = created.user.id;
-  }
-  return userId;
+  const auth = await ensureDemoUserPassword(admin, email);
+  if (!auth.ok) throw new Error(auth.message);
+  return auth.userId;
 }
 
 async function main() {
@@ -101,6 +90,7 @@ async function main() {
   }
 
   console.log("\nComptes seed prêts pour QA manuelle.");
+  console.log("Mots de passe : pnpm --filter @gadz-connect/api seed-demo-passwords");
 }
 
 main().catch((err) => {

@@ -41,12 +41,15 @@ export function useTeacherActionTasks() {
 
   const isPendingRh =
     profile?.role === "teacher" && profile.account_status === "pending_siret";
+  const isActiveTeacher =
+    profile?.role === "teacher" && profile.account_status === "active";
 
   return {
     progress,
     tasks: progress.tasks,
     isLoading,
     isPendingRh,
-    showBanner: Boolean(profile && !isPendingRh && profile.role === "teacher"),
+    isActiveTeacher,
+    showBanner: Boolean(isActiveTeacher),
   };
 }

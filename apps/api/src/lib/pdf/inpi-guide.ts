@@ -129,7 +129,7 @@ function writeReassuranceSection(doc: PdfDoc): void {
 function writePlatformSection(doc: PdfDoc): void {
   writeSectionTitle(
     doc,
-    "Tuyss inscription cours particuliers en tant qu'auto-entrepreneur",
+    "Gadz'Connect — donner des cours en micro-entreprise",
   );
   writeBody(
     doc,
@@ -149,19 +149,23 @@ function writePlatformSection(doc: PdfDoc): void {
 }
 
 function writeInpiWalkthrough(doc: PdfDoc, input: InpiGuideInput): void {
-  writeSectionTitle(doc, "Devenir auto-entrepreneur — étapes INPI");
-  writeBody(doc, "Sommaire des étapes à réaliser sur le Guichet Unique :");
+  writeSectionTitle(doc, "Créer sa micro-entreprise — étapes INPI (2026)");
+  writeBody(
+    doc,
+    "Procédure officielle sur procedures.inpi.fr — guide indicatif Gadz'Connect.",
+  );
   doc.moveDown(0.3);
 
   writeNumberedList(doc, [
-    "Se rendre sur procedures.inpi.fr et créer une micro-entreprise.",
-    "Répondre NON à « Devenir compte administrateur de mon entreprise » (FranceConnect si demandé).",
-    "Choisir la démarche encadrée, accepter les conditions, sélectionner « Création d'entreprise ».",
-    "Catégoriser l'activité : Activités de services → Enseignement → Autres enseignements → Soutien scolaire.",
-    `Choisir la périodicité URSSAF : ${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}. Un oubli peut entraîner une amende URSSAF.`,
+    "Se connecter sur procedures.inpi.fr (FranceConnect possible). Répondre NON à « compte administrateur ».",
+    "Créer, modifier ou cesser → Créer une entreprise → Entrepreneur individuel → cocher micro-entrepreneur.",
+    "Renseigner identité, établissement (domicile), date de début d'activité et n° de sécurité sociale.",
+    `Catégoriser l'activité : Activités de services → Enseignement → Autres enseignements → Soutien scolaire.`,
+    `Options fiscales : périodicité ${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}. Versement libératoire : ${input.versementLiberatoire ? "OUI" : "NON"}.`,
     "Si les démarches URSSAF ne sont pas faites : cocher NON au dépôt d'ACRE sur l'INPI.",
-    "Téléverser une pièce d'identité (voir encadré ci-dessous).",
-    "Envoyer le dossier et attendre le numéro SIRET (1 à 4 semaines).",
+    "Pièces jointes PDF : CNI (avec mention manuscrite), justificatif de domicile, déclaration de non-condamnation.",
+    "Récapitulatif → Valider le dossier → signer → payer (tarif réglementé, souvent faible ou nul).",
+    "Suivre l'avancement via Suivi des formalités. Saisir le SIRET reçu sur Gadz'Connect.",
   ]);
   doc.moveDown(0.4);
 
@@ -176,18 +180,19 @@ function writeInpiWalkthrough(doc: PdfDoc, input: InpiGuideInput): void {
     "Sans ces trois éléments manuscrits, le dossier peut être refusé.",
   ]);
 
-  writeSubsectionTitle(doc, "Nom de dossier");
-  writeBody(
-    doc,
-    "Le « nom de dossier » est un libellé interne sans impact une fois l'inscription terminée. En cas de doute sur une case, contactez le responsable avant de valider.",
-  );
-  doc.moveDown(0.4);
+  writeSubsectionTitle(doc, "Pièces jointes courantes");
+  writeBulletList(doc, [
+    "Justificatif de domicile récent (facture, quittance, attestation hébergeur).",
+    "Déclaration sur l'honneur de non-condamnation (formulaire à signer).",
+    "Format PDF, 10 Mo maximum par fichier.",
+  ]);
 
-  writeSubsectionTitle(doc, "Après l'envoi");
+  writeSubsectionTitle(doc, "Après signature et paiement");
   writeBulletList(doc, [
     "Créez votre compte URSSAF si ce n'est pas déjà fait.",
     "Demandez l'ACRE sur le portail URSSAF si vous ne l'avez pas cochée à la création.",
-    "Revenez sur Gadz'Connect pour saisir votre SIRET dès réception.",
+    "En cas de dossier incomplet : régularisation sur le Guichet Unique (e-mail de notification).",
+    "Revenez sur Gadz'Connect pour saisir votre SIRET dès réception (14 chiffres).",
   ]);
   writeLinkLine(doc, "Demander l'ACRE", URSSAF_ACRE_URL);
   doc.moveDown(0.3);
@@ -294,7 +299,7 @@ export function buildInpiGuidePdf(input: InpiGuideInput): Promise<Buffer> {
       .fontSize(9)
       .fillColor("#94A3B8")
       .text(
-        "Document généré par Gadz'Connect — guide indicatif basé sur la tuyss Méthodo. Gadz'Connect ne crée pas l'entreprise à votre place. Vous restez responsable de votre déclaration sur procedures.inpi.fr.",
+        "Document généré par Gadz'Connect — guide indicatif aligné sur la doc officielle INPI (juin 2026). Gadz'Connect ne crée pas l'entreprise à votre place. Vous restez responsable de votre déclaration sur procedures.inpi.fr.",
         { align: "center" },
       );
 

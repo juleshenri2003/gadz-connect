@@ -8,6 +8,7 @@ import {
   StripeStatusBadge,
   UrssafStatusBadge,
 } from "./AdminBudgetStatusBadges";
+import { TransactionInvoicesPanel } from "@/features/billing/TransactionInvoicesPanel";
 import { formatPersonName, formatTransactionDate } from "./adminBudgetLabels";
 
 interface AdminBudgetTransactionDrawerProps {
@@ -120,6 +121,11 @@ export function AdminBudgetTransactionDrawer({
             />
             <DetailRow label="Net versé" value={formatEuro(transaction.net_payout)} />
           </dl>
+
+          <TransactionInvoicesPanel
+            transactionId={transaction.id}
+            stripeStatus={transaction.status_stripe}
+          />
 
           <div className="flex flex-col gap-2">
             <Button size="sm" variant="outline" asChild>

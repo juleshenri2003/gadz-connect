@@ -1,7 +1,7 @@
 import type { FiscalCalculateInput, FiscalCalculateResult } from "@gadz-connect/types";
 
 /** Commission fixe SASU (€) */
-export const COMMISSION_SASU = 5;
+export const COMMISSION_SASU = 3;
 
 /** Taux URSSAF micro-entreprise BNC — taux plein */
 export const URSSAF_RATE_FULL = 0.211;

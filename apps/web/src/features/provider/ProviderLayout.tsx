@@ -1,6 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { ROLE_LABELS } from "@/features/admin/format";
+import {
+  applyNavBadges,
+  computeNavBadgeCounts,
+} from "@/features/dashboard/navBadgeCounts";
+import { useStudentActionTasks } from "@/features/dashboard/useStudentActionTasks";
+import { useTeacherActionTasks } from "@/features/dashboard/useTeacherActionTasks";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
 import { GuideModal } from "@/features/onboarding/guide/GuideModal";
 import { OnboardingGuideProvider } from "@/features/onboarding/guide/OnboardingGuideContext";
@@ -12,6 +18,8 @@ export function ProviderLayout() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { profile, progress, isStudentRole } = useProviderProgress();
+  const studentTasks = useStudentActionTasks();
+  const teacherTasks = useTeacherActionTasks();
 
   async function handleSignOut() {
     await signOut();
@@ -28,12 +36,29 @@ export function ProviderLayout() {
       : progress
         ? `${progress.completedCount}/${progress.totalCount}`
         : undefined;
-    nav = buildStudentNav(studentLabel);
-  } else if (profile && progress) {
-    const progressLabel = progress.isComplete
-      ? undefined
-      : `${progress.completedCount}/${progress.totalCount}`;
-    nav = buildTutorNav(progressLabel);
+    const baseNav = buildStudentNav(studentLabel);
+    const badgeCounts = computeNavBadgeCounts(
+      studentTasks.tasks,
+      baseNav.map((item) => item.to),
+    );
+    nav = applyNavBadges(baseNav, badgeCounts);
+  } else if (profile) {
+    const isPendingRh = profile.account_status === "pending_siret";
+    const progressLabel =
+      isPendingRh && progress && !progress.isComplete
+        ? `${progress.completedCount}/${progress.totalCount}`
+        : undefined;
+    const baseNav = buildTutorNav(progressLabel);
+
+    if (isPendingRh) {
+      nav = baseNav;
+    } else {
+      const badgeCounts = computeNavBadgeCounts(
+        teacherTasks.tasks,
+        baseNav.map((item) => item.to),
+      );
+      nav = applyNavBadges(baseNav, badgeCounts);
+    }
   } else {
     nav = buildTutorNav();
   }

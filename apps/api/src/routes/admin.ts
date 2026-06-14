@@ -20,6 +20,14 @@ import {
   parseAdminBudgetQuery,
   parseAdminTransactionsQuery,
 } from "../lib/admin-budget.js";
+import {
+  createAdminInvoiceSignedUrl,
+  fetchAdminTransactionInvoices,
+} from "../lib/billing/admin-invoices.js";
+import {
+  buildDemoParentInvoicePdf,
+  buildDemoStudentInvoicePdf,
+} from "../lib/billing/demo-invoice-data.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import {
   fetchAdminProfileDetail,
@@ -657,6 +665,92 @@ adminRouter.get("/transactions", async (req: AdminRequest, res) => {
   } catch (err) {
     console.error("[admin] transactions:", (err as Error).message);
     res.status(500).json({ error: "Impossible de charger les transactions" });
+  }
+});
+
+/**
+ * GET /api/admin/invoices/preview/:type
+ * Aperçu PDF de démonstration (parent | student) pour le pilotage RH.
+ */
+adminRouter.get(
+  "/invoices/preview/:type",
+  async (req: AdminRequest, res) => {
+    const type = req.params.type;
+    if (type !== "parent" && type !== "student") {
+      res.status(400).json({ error: "Type invalide — parent ou student" });
+      return;
+    }
+
+    try {
+      const pdf =
+        type === "parent"
+          ? await buildDemoParentInvoicePdf()
+          : await buildDemoStudentInvoicePdf();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="facture-${type}-demo.pdf"`,
+      );
+      res.send(pdf);
+    } catch (err) {
+      console.error("[admin] invoice preview:", (err as Error).message);
+      res.status(500).json({ error: "Impossible de générer l'aperçu PDF" });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/transactions/:id/invoices
+ * Factures liées à une transaction (pilotage budgets).
+ */
+adminRouter.get(
+  "/transactions/:id/invoices",
+  async (req: AdminRequest, res) => {
+    const transactionId = String(req.params.id ?? "");
+    if (!transactionId) {
+      res.status(400).json({ error: "Identifiant transaction manquant" });
+      return;
+    }
+
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const scopeCampusId = campusFilter?.campusId;
+
+    try {
+      const invoices = await fetchAdminTransactionInvoices(
+        transactionId,
+        scopeCampusId,
+      );
+      res.json({ data: invoices });
+    } catch (err) {
+      const message = (err as Error).message;
+      const status = message.includes("introuvable") ? 404 : 403;
+      res.status(status).json({ error: message });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/invoices/:id/url
+ * URL signée pour consulter une facture.
+ */
+adminRouter.get("/invoices/:id/url", async (req: AdminRequest, res) => {
+  const invoiceId = String(req.params.id ?? "");
+  if (!invoiceId) {
+    res.status(400).json({ error: "Identifiant facture manquant" });
+    return;
+  }
+
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+
+  try {
+    const url = await createAdminInvoiceSignedUrl(invoiceId, scopeCampusId);
+    res.json({ data: { url } });
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = message.includes("introuvable") ? 404 : 403;
+    res.status(status).json({ error: message });
   }
 });
 

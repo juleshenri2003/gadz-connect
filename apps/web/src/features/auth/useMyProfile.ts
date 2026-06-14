@@ -51,6 +51,10 @@ export function useMyProfile() {
       return res.data;
     },
     enabled: Boolean(user && getAccessToken()),
+    refetchInterval: (query) =>
+      query.state.data?.account_status === "pending_siret" ? 30_000 : false,
+    refetchOnWindowFocus: (query) =>
+      query.state.data?.account_status === "pending_siret",
   });
 }
 

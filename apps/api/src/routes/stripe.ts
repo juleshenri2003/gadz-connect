@@ -9,12 +9,27 @@ import {
 import { ensureProfileForUser } from "../lib/profiles.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import {
-  stripe,
+  isStripeConfigured,
   STRIPE_CONNECT_REFRESH_URL,
   STRIPE_CONNECT_RETURN_URL,
+  STRIPE_PUBLISHABLE_KEY,
+  stripe,
 } from "../lib/stripe.js";
 
 export const stripeRouter = Router();
+
+/**
+ * GET /api/stripe/config
+ * Clé publique Stripe pour Elements côté élève (pas d'auth requise).
+ */
+stripeRouter.get("/config", (_req, res) => {
+  res.json({
+    data: {
+      configured: isStripeConfigured && Boolean(STRIPE_PUBLISHABLE_KEY),
+      publishableKey: STRIPE_PUBLISHABLE_KEY ?? null,
+    },
+  });
+});
 
 stripeRouter.use(requireAuth);
 
@@ -262,8 +277,21 @@ stripeRouter.post(
       return;
     }
 
-    const loginLink = await stripe.accounts.createLoginLink(accountId);
-
-    res.json({ data: { url: loginLink.url } });
+    try {
+      const loginLink = await stripe.accounts.createLoginLink(accountId);
+      res.json({ data: { url: loginLink.url } });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Impossible d'ouvrir le dashboard Stripe";
+      console.error("[stripe] dashboard-link:", message);
+      if (message.includes("not completed onboarding")) {
+        res.status(400).json({
+          error:
+            "Onboarding Stripe incomplet — reprenez la configuration depuis Paiements.",
+        });
+        return;
+      }
+      res.status(502).json({ error: message });
+    }
   },
 );

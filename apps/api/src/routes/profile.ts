@@ -231,6 +231,8 @@ profileRouter.patch(
       siret: alreadyRegistered ? normalizedSiret : null,
       account_status: accountStatus,
       siret_verification_failed: siretVerificationFailed,
+      is_autoentrepreneur_verified:
+        accountStatus === "active" && Boolean(normalizedSiret),
     })
     .eq("id", user.id)
     .select(
@@ -346,6 +348,7 @@ profileRouter.patch(
       siret: parsed.data.siret,
       account_status: accountStatus,
       siret_verification_failed: siretVerificationFailed,
+      is_autoentrepreneur_verified: accountStatus === "active",
     })
     .eq("id", user.id)
     .select(
@@ -374,15 +377,17 @@ const setupSchema = z
     role: z.enum(["student_provider", "teacher"]),
     registrationPath: z.enum(["existing_siret", "new_micro"]).optional(),
     cv: z.string().max(5000).optional(),
+    pdfBase64: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === "teacher") {
       const trimmed = data.cv?.trim() ?? "";
-      if (trimmed.length < 50) {
+      const hasPdf = Boolean(data.pdfBase64?.trim());
+      if (!hasPdf && trimmed.length < 50) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message:
-            "CV requis pour les professeurs (minimum 50 caractères — parcours, expériences, compétences)",
+            "Déposez un CV PDF ou décrivez votre parcours (minimum 50 caractères)",
           path: ["cv"],
         });
       }
@@ -444,6 +449,7 @@ profileRouter.patch(
   }
 
   const isStudent = parsed.data.role === "student_provider";
+  const cvText = parsed.data.cv?.trim() ?? "";
 
   const { data: updated, error } = await supabaseAdmin
     .from("profiles")
@@ -462,7 +468,7 @@ profileRouter.patch(
             registration_path: null,
           }
         : {
-            cv: parsed.data.cv?.trim() ?? null,
+            cv: cvText.length >= 50 ? cvText : null,
             registration_path: parsed.data.registrationPath ?? "new_micro",
           }),
     })
@@ -475,6 +481,20 @@ profileRouter.patch(
   if (error || !updated) {
     res.status(500).json({ error: error?.message ?? "Mise à jour impossible" });
     return;
+  }
+
+  if (!isStudent && parsed.data.pdfBase64?.trim()) {
+    try {
+      const buffer = decodePdfBase64(parsed.data.pdfBase64);
+      const { path } = await uploadCvPdf(user.id, buffer);
+      await supabaseAdmin
+        .from("profiles")
+        .update({ cv_pdf_path: path })
+        .eq("id", user.id);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
   }
 
   res.json({ data: updated });

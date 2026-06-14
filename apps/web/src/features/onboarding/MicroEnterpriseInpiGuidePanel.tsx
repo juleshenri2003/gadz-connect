@@ -5,6 +5,7 @@ import { GuideManualConfirm } from "@/features/onboarding/guide/GuideManualConfi
 import { GuideExternalButton } from "@/features/onboarding/guide/GuideExternalButton";
 import {
   CFE_GUIDE,
+  INPI_GUIDE_META,
   INPI_STEPS,
   INPI_URL,
   PLATFORM_CONTACTS,
@@ -18,7 +19,7 @@ import { formatFrenchDate } from "./microEnterprisePageUtils";
 export const INPI_GUIDE_SECTION_ID = "inpi-guide";
 
 const FIRST_STEP_ID =
-  INPI_STEPS.find((step) => step.id === "access")?.id ?? INPI_STEPS[0]?.id ?? "";
+  INPI_STEPS.find((step) => step.id === "connect")?.id ?? INPI_STEPS[0]?.id ?? "";
 
 interface MicroEnterpriseInpiGuidePanelProps {
   profile?: MyProfile;
@@ -153,6 +154,7 @@ export function MicroEnterpriseInpiGuidePanel({
               Suivez les étapes ci-dessous pour créer votre micro-entreprise.
             </p>
           )}
+          <p className="text-xs text-ink-400">{INPI_GUIDE_META.disclaimer}</p>
         </div>
         <div className="mt-4">
           <InpiGuideProgressHead currentIndex={currentIndex} />

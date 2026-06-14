@@ -7,6 +7,8 @@ const PROFILE_SELECT_BASE = `
   role,
   campus_id,
   siret,
+  is_autoentrepreneur_verified,
+  micro_enterprise_address,
   account_status,
   status_acre,
   versement_liberatoire,

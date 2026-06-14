@@ -1,8 +1,18 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
+import {
+  cancelPendingBooking,
+  finalizeBookingSlot,
+} from "../../lib/booking.js";
+import { generatePaymentInvoices } from "../../lib/billing/generate-payment-invoices.js";
+import { notifyPaymentReceived } from "../../lib/notification-helpers.js";
 import { supabaseAdmin } from "../../lib/supabase.js";
-import { stripe, STRIPE_WEBHOOK_SECRET } from "../../lib/stripe.js";
+import {
+  isStripeWebhookConfigured,
+  stripe,
+  STRIPE_WEBHOOK_SECRET,
+} from "../../lib/stripe.js";
 
 export const stripeWebhookRouter = Router();
 
@@ -27,9 +37,21 @@ async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
 ) {
   const courseId = paymentIntent.metadata?.course_id;
-  if (!courseId || !paymentIntent.amount_received) return;
+  const slotId = paymentIntent.metadata?.slot_id;
+  const clientId = paymentIntent.metadata?.client_id;
+  if (!courseId) return;
 
-  const amountGross = paymentIntent.amount_received / 100;
+  const { data: course } = await supabaseAdmin
+    .from("courses")
+    .select(
+      "id, status, slot_id, client_id, provider_id, campus_id, subject, title, scheduled_at",
+    )
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (!course) return;
+
+  const wasPending = course.status === "payment_pending";
 
   const { data: existing } = await supabaseAdmin
     .from("transactions")
@@ -37,24 +59,101 @@ async function handlePaymentIntentSucceeded(
     .eq("course_id", courseId)
     .maybeSingle();
 
+  let transactionId: string | null = existing?.id ?? null;
+
   if (existing) {
     await supabaseAdmin
       .from("transactions")
-      .update({ status_stripe: "succeeded" })
+      .update({
+        status_stripe: "succeeded",
+        stripe_payment_intent_id: paymentIntent.id,
+      })
       .eq("id", existing.id);
-    return;
   }
 
-  // Les montants détaillés sont calculés côté API fiscal lors de la création
-  await supabaseAdmin.from("transactions").insert({
-    course_id: courseId,
-    amount_gross: amountGross,
-    commission_sasu: 5,
-    taxes_urssaf: 0,
-    net_payout: 0,
-    status_stripe: "succeeded",
-    status_urssaf: "pending",
+  const resolvedSlotId = slotId ?? course.slot_id;
+  const resolvedClientId = clientId ?? course.client_id;
+
+  if (course.status !== "scheduled") {
+    if (resolvedSlotId && resolvedClientId) {
+      const slotResult = await finalizeBookingSlot(
+        resolvedSlotId as string,
+        resolvedClientId as string,
+      );
+      if (!slotResult.ok) {
+        console.error(
+          "[stripe webhook] créneau indisponible après paiement:",
+          slotResult.error,
+        );
+      }
+    }
+
+    await supabaseAdmin
+      .from("courses")
+      .update({ status: "scheduled" })
+      .eq("id", courseId);
+  }
+
+  if (transactionId) {
+    try {
+      await generatePaymentInvoices({
+        transactionId,
+        courseId: course.id as string,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (err) {
+      console.error(
+        "[stripe webhook] génération factures:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  if (!wasPending) return;
+
+  const amountGross = paymentIntent.amount_received / 100;
+  const { data: client } = await supabaseAdmin
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", resolvedClientId as string)
+    .maybeSingle();
+
+  const studentName = client
+    ? `${client.first_name} ${client.last_name}`.trim()
+    : "Un élève";
+
+  await notifyPaymentReceived({
+    providerId: course.provider_id as string,
+    clientId: resolvedClientId as string,
+    campusId: course.campus_id as string,
+    courseId: course.id as string,
+    subject: (course.subject as string) ?? (course.title as string),
+    scheduledAt: (course.scheduled_at as string) ?? null,
+    amountGross,
+    studentName,
   });
+}
+
+async function handlePaymentIntentFailed(
+  paymentIntent: Stripe.PaymentIntent,
+) {
+  const courseId = paymentIntent.metadata?.course_id;
+  if (!courseId) return;
+
+  const { data: course } = await supabaseAdmin
+    .from("courses")
+    .select("id, status")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (!course || course.status !== "payment_pending") return;
+
+  await supabaseAdmin
+    .from("transactions")
+    .update({ status_stripe: "failed" })
+    .eq("course_id", courseId);
+
+  await cancelPendingBooking(courseId);
 }
 
 /**
@@ -62,7 +161,7 @@ async function handlePaymentIntentSucceeded(
  * Corps brut requis pour la vérification de signature Stripe.
  */
 stripeWebhookRouter.post("/", async (req: Request, res: Response) => {
-  if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+  if (!stripe || !isStripeWebhookConfigured()) {
     res.status(503).send("Stripe webhook non configuré");
     return;
   }
@@ -95,6 +194,11 @@ stripeWebhookRouter.post("/", async (req: Request, res: Response) => {
         break;
       case "payment_intent.succeeded":
         await handlePaymentIntentSucceeded(
+          event.data.object as Stripe.PaymentIntent,
+        );
+        break;
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(
           event.data.object as Stripe.PaymentIntent,
         );
         break;

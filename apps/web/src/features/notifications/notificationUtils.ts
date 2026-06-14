@@ -7,6 +7,7 @@ export const KIND_LABELS: Record<string, string> = {
   prof_unavailable: "Séance annulée (prof)",
   student_unavailable: "Séance annulée (élève)",
   account_activated: "Compte activé",
+  payment_received: "Paiement reçu",
 };
 
 export type NotificationFilter = "all" | "student_unavailable";
@@ -63,6 +64,8 @@ export function getKindBadgeClasses(kind: string): string {
       return "bg-orange-100 text-orange-900";
     case "account_activated":
       return "bg-success-bg text-success";
+    case "payment_received":
+      return "bg-brand-50 text-brand-700";
     default:
       return "bg-paper text-ink-600";
   }
@@ -131,23 +134,23 @@ export function getPageSubtitle(profile: MyProfile | undefined): string {
     return "Séances annulées par vos professeurs — réservez un autre tuteur si besoin";
   }
   if (profile.role === "teacher") {
-    return "Annulations de séances sur votre campus";
+    return "Paiements, annulations et informations sur votre activité";
   }
   if (profile.role === "admin_general" || profile.role === "admin_campus") {
-    return "Supervision des annulations de séances campus";
+    return "Supervision des annulations et alertes";
   }
-  return "Annulations de séances et informations campus";
+  return "Annulations de séances et informations";
 }
 
 export function getEmptyStateMessage(profile: MyProfile | undefined): string {
   if (profile?.role === "teacher") {
-    return "Aucune alerte — les annulations déclarées depuis votre emploi du temps apparaîtront ici.";
+    return "Aucune alerte — paiements et annulations apparaîtront ici.";
   }
   if (profile?.role && isStudent(profile.role)) {
     return "Aucune alerte pour le moment — vous serez notifié en cas d'annulation de séance.";
   }
   if (profile?.role === "admin_general" || profile?.role === "admin_campus") {
-    return "Aucune alerte campus sur votre périmètre pour le moment.";
+    return "Aucune alerte sur votre périmètre pour le moment.";
   }
   return "Aucune alerte pour le moment.";
 }

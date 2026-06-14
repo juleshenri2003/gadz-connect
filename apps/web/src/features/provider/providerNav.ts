@@ -21,7 +21,7 @@ export function buildStudentNav(progressLabel?: string): AppNavItem[] {
       icon: LayoutDashboard,
     },
     { to: "/app/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
-    { to: "/app/alertes", label: "Alertes campus", shortLabel: "Alertes", icon: Bell },
+    { to: "/app/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
     { to: "/app/repertoire", label: "Mon répertoire", shortLabel: "Répertoire", icon: FolderOpen },
     { to: "/app/cours", label: "Trouver mon tuteur", shortLabel: "Tuteurs", icon: BookOpen },
     { to: "/app/profil", label: "Mon profil", shortLabel: "Profil", icon: User },
@@ -39,7 +39,7 @@ export function buildTutorNav(progressLabel?: string): AppNavItem[] {
       icon: LayoutDashboard,
     },
     { to: "/app/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
-    { to: "/app/alertes", label: "Alertes campus", shortLabel: "Alertes", icon: Bell },
+    { to: "/app/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
     { to: "/app/cours", label: "Mes cours", shortLabel: "Cours", icon: BookOpen },
     {
       to: "/app/micro-entreprise",
