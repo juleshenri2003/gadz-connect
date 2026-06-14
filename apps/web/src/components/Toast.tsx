@@ -19,7 +19,8 @@ export function Toast({
   return createPortal(
     <div
       className={cn(
-        "fixed bottom-6 right-6 z-[60] max-w-sm rounded-md border px-4 py-3 text-sm shadow-raised",
+        "fixed bottom-6 right-6 z-[60] max-w-sm rounded-md border px-4 py-3 text-sm shadow-raised md:bottom-6",
+        "max-md:bottom-safe-toast max-md:left-4 max-md:right-4 max-md:max-w-none",
         variant === "success"
           ? "border-success/20 bg-success-bg text-success"
           : "border-danger/20 bg-danger-bg text-danger",

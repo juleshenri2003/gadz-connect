@@ -3,14 +3,18 @@ import {
   AvatarFallback,
   Button,
   cn,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@gadz-connect/ui";
-import { ChevronLeft, ChevronRight, LogOut, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { ChevronLeft, ChevronRight, LogOut, MoreHorizontal, type LucideIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   SidebarCollapseProvider,
   useSidebarCollapsed,
@@ -18,11 +22,186 @@ import {
 } from "./sidebarCollapse";
 import { AppLogo } from "./AppLogo";
 
+const MOBILE_PRIMARY_COUNT = 4;
+
+function navShortLabel(item: AppNavItem) {
+  return item.shortLabel ?? item.label.split(" ")[0] ?? item.label;
+}
+
+function MobileBottomNav({
+  nav,
+  footerLabel,
+  footerTo,
+  onFooterClick,
+}: {
+  nav: readonly AppNavItem[];
+  footerLabel: string;
+  footerTo: string;
+  onFooterClick?: () => void;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const primary = nav.filter((item) => !item.disabled).slice(0, MOBILE_PRIMARY_COUNT);
+  const secondary = nav.filter((item) => !item.disabled).slice(MOBILE_PRIMARY_COUNT);
+
+  const logoutItem = onFooterClick ? (
+    <button
+      type="button"
+      className="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-ink-600 transition-colors active:bg-paper"
+      onClick={() => {
+        setMoreOpen(false);
+        onFooterClick();
+      }}
+    >
+      <LogOut className="h-5 w-5 shrink-0 text-ink-400" />
+      {footerLabel}
+    </button>
+  ) : (
+    <Link
+      to={footerTo}
+      className="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-ink-600 transition-colors active:bg-paper"
+      onClick={() => setMoreOpen(false)}
+    >
+      <LogOut className="h-5 w-5 shrink-0 text-ink-400" />
+      {footerLabel}
+    </Link>
+  );
+
+  return (
+    <>
+      <nav
+        aria-label="Navigation principale"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-safe md:hidden"
+      >
+        <div className="grid grid-cols-5 gap-0.5 px-1 pt-1">
+          {primary.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    "relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] font-medium transition-colors active:bg-paper",
+                    isActive ? "text-brand-700" : "text-ink-500",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span className="relative">
+                      {Icon ? (
+                        <Icon
+                          className={cn(
+                            "h-5 w-5",
+                            isActive ? "text-brand-700" : "text-ink-400",
+                          )}
+                        />
+                      ) : null}
+                      {item.badge ? (
+                        <span className="absolute -right-2 -top-1 rounded-full bg-accent-600 px-1 text-[9px] font-semibold leading-tight text-white">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="max-w-full truncate">{navShortLabel(item)}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+
+          {secondary.length > 0 ? (
+            <button
+              type="button"
+              className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] font-medium text-ink-500 transition-colors active:bg-paper"
+              onClick={() => setMoreOpen(true)}
+              aria-label="Plus de navigation"
+            >
+              <MoreHorizontal className="h-5 w-5 text-ink-400" />
+              <span>Plus</span>
+            </button>
+          ) : (
+            <div className="flex min-h-12 flex-col items-center justify-center">
+              {onFooterClick ? (
+                <button
+                  type="button"
+                  className="flex flex-col items-center gap-0.5 px-1 py-1.5 text-[10px] font-medium text-ink-500 active:bg-paper"
+                  onClick={onFooterClick}
+                  aria-label={footerLabel}
+                >
+                  <LogOut className="h-5 w-5 text-ink-400" />
+                  <span className="max-w-full truncate">Quitter</span>
+                </button>
+              ) : (
+                <Link
+                  to={footerTo}
+                  className="flex flex-col items-center gap-0.5 px-1 py-1.5 text-[10px] font-medium text-ink-500 active:bg-paper"
+                  aria-label={footerLabel}
+                >
+                  <LogOut className="h-5 w-5 text-ink-400" />
+                  <span className="max-w-full truncate">Quitter</span>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {secondary.length > 0 ? (
+        <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+          <DialogContent className="fixed inset-x-0 bottom-0 top-auto max-h-[70vh] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-b-none rounded-t-xl border-b-0 pb-safe">
+            <DialogHeader>
+              <DialogTitle>Navigation</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1">
+              {secondary.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex min-h-12 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors active:bg-paper",
+                        isActive
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-ink-600",
+                      )
+                    }
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    {Icon ? (
+                      <Icon className="h-5 w-5 shrink-0 text-ink-400" />
+                    ) : null}
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge ? (
+                      <span className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-600">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </NavLink>
+                );
+              })}
+              <div className="border-t border-line pt-2">{logoutItem}</div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
 export type AppSpaceVariant = "student" | "teacher" | "admin";
 
 export interface AppNavItem {
   to: string;
   label: string;
+  /** Libellé court pour la bottom nav mobile */
+  shortLabel?: string;
+  /** Badge optionnel (ex. progression 2/6) */
+  badge?: string;
   end?: boolean;
   disabled?: boolean;
   icon?: LucideIcon;
@@ -173,7 +352,9 @@ function AppShellInner({
 }: AppShellProps) {
   const collapsed = useSidebarCollapsed();
   const toggleSidebar = useSidebarCollapseToggle();
+  const location = useLocation();
   const space = spaceVariant ? SPACE_STYLES[spaceVariant] : null;
+  const hideMobileNav = location.pathname === "/app/setup";
 
   const logoutButton = onFooterClick ? (
     <Button
@@ -333,7 +514,8 @@ function AppShellInner({
 
       <div
         className={cn(
-          "flex min-h-screen min-w-0 flex-col pb-16 transition-[padding] duration-200 ease-in-out md:pb-0",
+          "flex min-h-screen min-w-0 flex-col transition-[padding] duration-200 ease-in-out",
+          hideMobileNav ? "pb-0" : "pb-safe-nav md:pb-0",
           collapsed ? "md:pl-16" : "md:pl-64",
         )}
       >
@@ -347,57 +529,14 @@ function AppShellInner({
           <Outlet />
         </main>
 
-        <nav
-          aria-label="Navigation principale"
-          className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-1 overflow-x-auto border-t border-line bg-surface p-2 md:hidden"
-        >
-          {nav.map((item) =>
-            item.disabled ? (
-              <span
-                key={item.to}
-                className="whitespace-nowrap rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-ink-400/50"
-                aria-disabled
-              >
-                {item.label}
-              </span>
-            ) : (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                    isActive
-                      ? "bg-brand-600 text-white"
-                      : "bg-paper text-ink-600",
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
-            ),
-          )}
-          {onFooterClick ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto shrink-0"
-              onClick={onFooterClick}
-            >
-              {footerLabel}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto shrink-0"
-              asChild
-            >
-              <Link to={footerTo}>{footerLabel}</Link>
-            </Button>
-          )}
-        </nav>
+        {!hideMobileNav ? (
+          <MobileBottomNav
+            nav={nav}
+            footerLabel={footerLabel}
+            footerTo={footerTo}
+            onFooterClick={onFooterClick}
+          />
+        ) : null}
       </div>
     </div>
   );

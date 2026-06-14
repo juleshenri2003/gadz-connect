@@ -37,22 +37,41 @@ interface WeekCalendarProps {
 
 function WeekCalendarSkeleton() {
   return (
-    <div className="overflow-x-auto rounded-md border border-line bg-surface">
-      <div className="grid min-w-[720px] grid-cols-7 divide-x divide-line">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="min-h-[280px] animate-pulse">
-            <div className="border-b bg-paper px-2 py-3">
-              <div className="mx-auto h-3 w-8 rounded bg-line" />
-              <div className="mx-auto mt-2 h-6 w-6 rounded bg-line" />
+    <>
+      <div className="space-y-2 md:hidden">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="overflow-hidden rounded-md border border-line bg-surface animate-pulse"
+          >
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <div className="h-4 w-24 rounded bg-line" />
+              <div className="h-4 w-4 rounded bg-line" />
             </div>
-            <div className="space-y-2 p-2">
-              <div className="h-16 rounded-lg bg-paper" />
-              <div className="h-12 rounded-lg bg-paper" />
+            <div className="space-y-2 p-3">
+              <div className="h-14 rounded-lg bg-paper" />
+              <div className="h-10 rounded-lg bg-paper" />
             </div>
           </div>
         ))}
       </div>
-    </div>
+      <div className="hidden overflow-x-auto rounded-md border border-line bg-surface md:block">
+        <div className="grid min-w-[720px] grid-cols-7 divide-x divide-line">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="min-h-[280px] animate-pulse">
+              <div className="border-b bg-paper px-2 py-3">
+                <div className="mx-auto h-3 w-8 rounded bg-line" />
+                <div className="mx-auto mt-2 h-6 w-6 rounded bg-line" />
+              </div>
+              <div className="space-y-2 p-2">
+                <div className="h-16 rounded-lg bg-paper" />
+                <div className="h-12 rounded-lg bg-paper" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 

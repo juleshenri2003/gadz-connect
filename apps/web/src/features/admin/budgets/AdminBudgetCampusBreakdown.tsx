@@ -22,7 +22,40 @@ export function AdminBudgetCampusBreakdown({
         </p>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <ul className="mt-4 divide-y divide-line md:hidden">
+        {rows.map((row) => (
+          <li key={row.campusId} className="py-4 first:pt-0">
+            <p className="font-medium text-ink-900">
+              <AdminBudgetCampusLink
+                campusId={row.campusId}
+                campusName={row.name}
+              />
+            </p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-ink-400">Encaissé net</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatEuro(row.encaisseNet)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">En attente</dt>
+                <dd className="tabular-nums">{formatEuro(row.enAttenteBrut)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">Commissions</dt>
+                <dd className="tabular-nums">{formatEuro(row.commission)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">Transactions</dt>
+                <dd className="tabular-nums">{row.transactionCount}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[40rem] text-left text-sm">
           <thead className="border-b bg-paper text-ink-600">
             <tr>

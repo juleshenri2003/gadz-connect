@@ -84,7 +84,7 @@ const ACCOUNT_OPTIONS = [
     title: "Professeur — en cours d'immatriculation",
     description:
       "Je crée ma micro-entreprise (auto-entrepreneur) et j'attends mon SIRET.",
-    duration: "Parcours complet · ~2 semaines",
+    duration: "Parcours complet",
   },
 ];
 
@@ -220,12 +220,12 @@ export function ProfileSetupPage() {
                   {ACCOUNT_OPTIONS.map((opt) => (
                     <label
                       key={opt.value}
-                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50"
+                      className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-line p-4 active:bg-paper has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50"
                     >
                       <input
                         type="radio"
                         value={opt.value}
-                        className="mt-1"
+                        className="mt-1 size-4 shrink-0"
                         {...register("accountType")}
                       />
                       <span className="text-sm">
@@ -240,10 +240,10 @@ export function ProfileSetupPage() {
                     </label>
                   ))}
                   {isTeacher ? (
-                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3">
+                    <label className="mt-3 flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-line p-4 active:bg-paper">
                       <input
                         type="checkbox"
-                        className="mt-1"
+                        className="mt-1 size-4 shrink-0"
                         {...register("microEnterpriseConfirmed")}
                       />
                       <span className="text-sm text-ink-600">
@@ -306,7 +306,7 @@ export function ProfileSetupPage() {
                   <Label htmlFor="campusId">Campus / ville</Label>
                   <select
                     id="campusId"
-                    className="flex h-10 w-full rounded-md border border-line bg-surface px-3 text-sm"
+                    className="flex h-12 w-full rounded-md border border-line bg-surface px-3 text-base"
                     {...register("campusId")}
                     disabled={isLoading}
                   >

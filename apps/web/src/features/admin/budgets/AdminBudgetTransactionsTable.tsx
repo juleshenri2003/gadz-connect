@@ -43,8 +43,57 @@ export function AdminBudgetTransactionsTable({
           apparaissent ici dès qu&apos;un élève réserve un créneau.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[56rem] text-left text-sm">
+        <>
+          <ul className="mt-4 divide-y divide-line lg:hidden">
+            {transactions.map((transaction) => {
+              const courseLabel =
+                transaction.course.subject ||
+                transaction.course.title ||
+                "Cours de tutorat";
+
+              return (
+                <li key={transaction.id}>
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-2 p-4 text-left active:bg-paper"
+                    onClick={() => onOpenTransaction(transaction)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink-900">{courseLabel}</p>
+                        <p className="text-sm text-ink-600">
+                          {formatTransactionDate(transaction.created_at)}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
+                        {formatEuro(transaction.net_payout)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-x-2 text-xs text-ink-600">
+                      <span>
+                        {formatPersonName(transaction.course.provider, "—")}
+                      </span>
+                      <span aria-hidden>→</span>
+                      <span>
+                        {formatPersonName(transaction.course.client, "—")}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StripeStatusBadge status={transaction.status_stripe} />
+                      {transaction.status_stripe === "succeeded" ? (
+                        <UrssafStatusBadge status={transaction.status_urssaf} />
+                      ) : null}
+                      <span className="text-xs text-ink-400">
+                        Brut {formatEuro(transaction.amount_gross)}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-4 hidden overflow-x-auto lg:block">
+            <table className="w-full min-w-[56rem] text-left text-sm">
             <thead className="border-b bg-paper text-ink-600">
               <tr>
                 <th className="px-3 py-2 font-medium">Date</th>
@@ -107,7 +156,8 @@ export function AdminBudgetTransactionsTable({
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </section>
   );

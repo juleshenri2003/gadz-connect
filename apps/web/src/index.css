@@ -45,6 +45,7 @@
 @layer base {
   body {
     @apply min-h-screen bg-paper font-sans text-ink-900 antialiased;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   h1,
@@ -69,6 +70,32 @@
 
   .shadow-raised {
     box-shadow: var(--shadow-raised);
+  }
+
+  .pb-safe {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .pb-safe-nav {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .bottom-safe {
+    bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-safe-toast {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .bottom-safe-toast {
+      bottom: 1.5rem;
+    }
+  }
+
+  .-webkit-overflow-scrolling-touch {
+    -webkit-overflow-scrolling: touch;
   }
 }
 

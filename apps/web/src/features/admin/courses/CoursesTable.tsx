@@ -62,8 +62,68 @@ export function CoursesTable({
             ) : null}
           </div>
         ) : courses.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
+          <>
+            <ul className="divide-y divide-line lg:hidden">
+              {courses.map((course) => (
+                <li key={course.id} className="border-b border-line last:border-0">
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-2 p-4 text-left active:bg-paper"
+                    onClick={() => onOpenCourse(course.id)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink-900">
+                          {courseDisplayTitle(course)}
+                        </p>
+                        <p className="text-sm text-ink-600">
+                          {formatCourseSessionWhen(course.starts_at, course.ends_at)}
+                        </p>
+                      </div>
+                      <CourseStatusBadge
+                        status={course.status}
+                        startsAt={course.starts_at}
+                        endsAt={course.ends_at}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-ink-600">
+                      <span>Prof : {course.provider_name ?? "—"}</span>
+                      <span aria-hidden>·</span>
+                      <span>Élève : {course.client_name ?? "—"}</span>
+                      {showCampus && course.campus?.name ? (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{course.campus.name}</span>
+                        </>
+                      ) : null}
+                    </div>
+                    {(course.missing_summary ||
+                      course.status === "awaiting_replacement" ||
+                      course.replacement_proposal_count > 0) && (
+                      <div className="flex flex-wrap gap-1">
+                        {course.missing_summary ? (
+                          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                            CR manquant
+                          </span>
+                        ) : null}
+                        {course.status === "awaiting_replacement" ? (
+                          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                            Remplacement
+                          </span>
+                        ) : null}
+                        {course.replacement_proposal_count > 0 ? (
+                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                            {course.replacement_proposal_count} prop.
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="border-b bg-paper text-ink-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">Session</th>
@@ -136,7 +196,8 @@ export function CoursesTable({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         ) : (
           <p className="p-4 text-sm text-ink-400">
             {getEmptyStateMessage(filters)}

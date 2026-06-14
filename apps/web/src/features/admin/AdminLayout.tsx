@@ -14,12 +14,12 @@ import { useAdminMe } from "./useAdmin";
 import { ROLE_LABELS } from "./format";
 
 const NAV = [
-  { to: "/admin", label: "Tableau de bord", end: true, icon: LayoutDashboard },
-  { to: "/admin/planning", label: "Emploi du temps", icon: Calendar },
-  { to: "/admin/alertes", label: "Alertes campus", icon: Bell },
-  { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
-  { to: "/admin/budgets", label: "Budgets", icon: Wallet },
-  { to: "/admin/cours", label: "Cours", icon: BookOpen },
+  { to: "/admin", label: "Tableau de bord", shortLabel: "Accueil", end: true, icon: LayoutDashboard },
+  { to: "/admin/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
+  { to: "/admin/alertes", label: "Alertes campus", shortLabel: "Alertes", icon: Bell },
+  { to: "/admin/utilisateurs", label: "Utilisateurs", shortLabel: "Users", icon: Users },
+  { to: "/admin/budgets", label: "Budgets", shortLabel: "Budgets", icon: Wallet },
+  { to: "/admin/cours", label: "Cours", shortLabel: "Cours", icon: BookOpen },
 ] as const;
 
 export function AdminLayout() {

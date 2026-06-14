@@ -41,6 +41,19 @@ function readStoredView(): AdminScheduleViewMode {
     : "week";
 }
 
+function getInitialView(
+  urlView: AdminScheduleViewMode | undefined,
+): AdminScheduleViewMode {
+  if (urlView) return urlView;
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 767px)").matches
+  ) {
+    return "list";
+  }
+  return readStoredView();
+}
+
 export function AdminSchedulePage() {
   const { getAccessToken } = useAuth();
   const { data: me } = useAdminMe();
@@ -51,8 +64,8 @@ export function AdminSchedulePage() {
     [searchParams],
   );
 
-  const [view, setViewState] = useState<AdminScheduleViewMode>(
-    () => urlState.view ?? readStoredView(),
+  const [view, setViewState] = useState<AdminScheduleViewMode>(() =>
+    getInitialView(urlState.view),
   );
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [exporting, setExporting] = useState(false);

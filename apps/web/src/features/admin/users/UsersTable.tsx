@@ -7,6 +7,7 @@ import {
 } from "@gadz-connect/ui";
 import type { AdminProfileRow } from "@/features/admin/types";
 import { UserTableRow } from "./UserTableRow";
+import { UserMobileCard } from "./UserMobileCard";
 import { UsersTableSkeleton } from "./UsersTableSkeleton";
 import { getEmptyStateMessage, type UserFiltersState } from "./userFilters";
 
@@ -51,8 +52,23 @@ export function UsersTable({
         ) : isError ? (
           <p className="p-4 text-sm text-danger">{errorMessage}</p>
         ) : profiles.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
+          <>
+            <ul className="divide-y divide-line lg:hidden">
+              {profiles.map((profile) => (
+                <UserMobileCard
+                  key={profile.id}
+                  profile={profile}
+                  showCampus={showCampus}
+                  isMutating={mutatingProfileId === profile.id}
+                  onOpen={() => onOpenProfile(profile.id)}
+                  onValidate={() => onValidate(profile.id)}
+                  onSuspend={() => onSuspend(profile)}
+                  onReactivate={() => onReactivate(profile.id)}
+                />
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="border-b bg-paper text-ink-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">Utilisateur</th>
@@ -85,7 +101,8 @@ export function UsersTable({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         ) : (
           <p className="p-4 text-sm text-ink-400">
             {getEmptyStateMessage(filters)}

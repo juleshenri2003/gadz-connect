@@ -18,7 +18,38 @@ export function AdminCampusBreakdown({ rows }: AdminCampusBreakdownProps) {
         </p>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <ul className="mt-4 divide-y divide-line md:hidden">
+        {rows.map((row) => (
+          <li key={row.campusId} className="py-4 first:pt-0">
+            <Link
+              to={buildAdminPlanningHref({ campusId: row.campusId })}
+              className="font-medium text-brand-700 hover:underline"
+            >
+              {row.name}
+            </Link>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-ink-400">Profs actifs</dt>
+                <dd className="tabular-nums">{row.teachersActive}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">Élèves actifs</dt>
+                <dd className="tabular-nums">{row.studentsActive}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">Cours planifiés</dt>
+                <dd className="tabular-nums">{row.coursesScheduled}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-400">SIRET en attente</dt>
+                <dd className="tabular-nums">{row.pendingSiret}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[32rem] text-left text-sm">
           <thead className="border-b bg-paper text-ink-600">
             <tr>
