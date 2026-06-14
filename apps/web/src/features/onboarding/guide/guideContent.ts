@@ -173,7 +173,7 @@ export function getGuideDescription(
   if (registrationPath === "existing_siret") {
     return "Parcours express (~15 min) — activez votre compte avec votre SIRET existant.";
   }
-  return "Parcours complet (~2 semaines) — créez votre micro-entreprise et proposez des cours.";
+  return "Parcours complet — créez votre micro-entreprise et proposez des cours.";
 }
 
 export function getJourneySubtitle(

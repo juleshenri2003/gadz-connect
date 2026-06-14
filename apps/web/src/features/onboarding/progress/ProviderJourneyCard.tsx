@@ -215,7 +215,7 @@ export function ProviderJourneyCard({
       className={cn(
         "rounded-md border p-4 shadow-surface sm:p-5",
         variant === "pending"
-          ? "border-warning/20 bg-gradient-to-r from-warning-bg via-surface to-paper"
+          ? "border-warning/20 bg-warning-bg/30"
           : "border-brand-100 bg-surface-alt border border-line",
       )}
       aria-label="Parcours prestataire"

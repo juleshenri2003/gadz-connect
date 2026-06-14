@@ -139,7 +139,7 @@ export function MicroEnterpriseInpiGuidePanel({
         className,
       )}
     >
-      <div className="border-b border-brand-100 bg-gradient-to-br from-brand-50/80 to-white px-5 py-5 sm:px-6">
+      <div className="border-b border-brand-100 bg-paper px-5 py-5 sm:px-6">
         <div className="space-y-1">
           <h3 className="text-lg font-semibold text-ink-900">
             Guichet Unique INPI

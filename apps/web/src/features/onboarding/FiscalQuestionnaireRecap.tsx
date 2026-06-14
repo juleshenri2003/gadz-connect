@@ -184,7 +184,7 @@ export function FiscalQuestionnaireRecap({
       </div>
 
       <div className="space-y-4 px-5 py-5 sm:px-6">
-        <div className="rounded-md border border-brand-100 bg-gradient-to-br from-brand-50/90 to-white px-4 py-4">
+        <div className="rounded-md border border-brand-100 bg-paper px-4 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
             Votre situation
           </p>

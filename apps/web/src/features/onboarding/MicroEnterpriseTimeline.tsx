@@ -21,7 +21,7 @@ export function MicroEnterpriseTimeline({
 
   return (
     <section
-      className="rounded-md border border-brand-100 bg-gradient-to-r from-brand-50/80 via-surface to-paper p-5 sm:p-6"
+      className="rounded-md border border-brand-100 bg-surface-alt p-5 sm:p-6"
       aria-label="Étapes micro-entreprise"
     >
       <div

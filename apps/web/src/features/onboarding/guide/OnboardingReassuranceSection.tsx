@@ -12,7 +12,7 @@ export function OnboardingReassuranceSection({
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   return (
-    <Card className="border-success/20 bg-gradient-to-br from-success-bg/80 to-white">
+    <Card className="border-success/20 bg-success-bg/30">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -30,7 +30,7 @@ Document de référence produit. Voir le dépôt pour l'état d'implémentation 
 2. Questionnaire fiscal + saisie SIRET existant → `active` immédiat
 3. Stripe Connect + publication de créneaux
 
-### Parcours complet (`new_micro`) — ~2 semaines
+### Parcours complet (`new_micro`)
 
 1. Setup profil + CV
 2. Questionnaire fiscal → `pending_siret`
