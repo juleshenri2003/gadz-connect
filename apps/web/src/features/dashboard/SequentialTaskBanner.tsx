@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button, cn } from "@gadz-connect/ui";
 import { useMarkInpiSent } from "@/features/onboarding/progress/useMarkInpiSent";
@@ -72,11 +73,19 @@ export function SequentialTaskBanner({
 }: SequentialTaskBannerProps) {
   const markInpiSent = useMarkInpiSent();
   const queue = useSequentialTaskQueue(scope, tasks);
-  const { currentTask, todoTasks, isComplete } = queue;
+  const { currentTask, todoTasks, isComplete, showCompleteBanner, acknowledgeComplete } =
+    queue;
+
+  useEffect(() => {
+    if (!showCompleteBanner) return;
+    const timer = window.setTimeout(acknowledgeComplete, 3500);
+    return () => window.clearTimeout(timer);
+  }, [showCompleteBanner, acknowledgeComplete]);
 
   if (tasks.length === 0) return null;
+  if (isComplete && !showCompleteBanner) return null;
 
-  if (isComplete) {
+  if (showCompleteBanner) {
     return (
       <section className="rounded-md border border-success/20 bg-success-bg px-4 py-3 sm:px-5">
         <p className="text-sm font-medium text-success">

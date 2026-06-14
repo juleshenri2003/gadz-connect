@@ -27,7 +27,12 @@ export function AdminBudgetTransactionsTable({
       <div>
         <h3 className="font-semibold text-ink-900">Transactions</h3>
         <p className="mt-1 text-xs text-ink-400">
-          Détail opérationnel — cliquez sur une ligne pour ouvrir le dossier
+          <span className="hidden lg:inline">
+            Détail opérationnel — cliquez sur une ligne pour ouvrir le dossier
+          </span>
+          <span className="lg:hidden">
+            Touchez une carte pour ouvrir le dossier
+          </span>
         </p>
       </div>
 

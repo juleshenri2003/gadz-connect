@@ -83,7 +83,9 @@ function MobileBottomNav({
                 className={({ isActive }) =>
                   cn(
                     "relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] font-medium transition-colors active:bg-paper",
-                    isActive ? "text-brand-700" : "text-ink-500",
+                    isActive
+                      ? "bg-brand-50 text-brand-700"
+                      : "text-ink-500",
                   )
                 }
               >
@@ -99,7 +101,7 @@ function MobileBottomNav({
                         />
                       ) : null}
                       {item.badge ? (
-                        <span className="absolute -right-2 -top-1 rounded-full bg-accent-600 px-1 text-[9px] font-semibold leading-tight text-white">
+                        <span className="absolute -right-2 -top-1 rounded-full bg-brand-600 px-1 text-[9px] font-semibold leading-tight text-white">
                           {item.badge}
                         </span>
                       ) : null}
@@ -150,11 +152,14 @@ function MobileBottomNav({
 
       {secondary.length > 0 ? (
         <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
-          <DialogContent className="fixed inset-x-0 bottom-0 top-auto max-h-[70vh] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-b-none rounded-t-xl border-b-0 pb-safe">
-            <DialogHeader>
+          <DialogContent className="fixed inset-x-0 bottom-0 left-0 top-auto max-h-[75vh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-b-none rounded-t-xl border-b-0 p-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom">
+            <div className="flex justify-center pt-3 pb-1" aria-hidden>
+              <span className="h-1 w-10 rounded-full bg-line" />
+            </div>
+            <DialogHeader className="px-5 pb-2">
               <DialogTitle>Navigation</DialogTitle>
             </DialogHeader>
-            <div className="space-y-1">
+            <div className="max-h-[55vh] space-y-1 overflow-y-auto px-3 pb-safe -webkit-overflow-scrolling-touch">
               {secondary.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -177,14 +182,16 @@ function MobileBottomNav({
                     ) : null}
                     <span className="flex-1">{item.label}</span>
                     {item.badge ? (
-                      <span className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-600">
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">
                         {item.badge}
                       </span>
                     ) : null}
                   </NavLink>
                 );
               })}
-              <div className="border-t border-line pt-2">{logoutItem}</div>
+              <div className="border-t border-line px-2 pt-2 pb-2">
+                {logoutItem}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -519,13 +526,13 @@ function AppShellInner({
           collapsed ? "md:pl-16" : "md:pl-64",
         )}
       >
-        {headerExtra ? (
+        {headerExtra && !hideMobileNav ? (
           <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-4 py-2 md:hidden">
             {headerExtra}
           </div>
         ) : null}
 
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 max-md:pb-6 md:p-8">
           <Outlet />
         </main>
 

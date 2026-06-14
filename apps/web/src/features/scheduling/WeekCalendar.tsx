@@ -1,4 +1,5 @@
 import { Button, cn } from "@gadz-connect/ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
@@ -367,30 +368,37 @@ export function WeekCalendar({
             />
           ) : null}
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-1 sm:w-auto sm:gap-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="min-h-11 flex-1 px-2 sm:flex-none sm:px-3"
+            aria-label="Semaine précédente"
             onClick={() => updateAnchor(addDays(anchor, -7))}
           >
-            ← Semaine préc.
+            <ChevronLeft className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Semaine préc.</span>
           </Button>
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="min-h-11 shrink-0 px-3"
             onClick={() => updateAnchor(new Date())}
           >
-            Aujourd&apos;hui
+            Auj.
           </Button>
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="min-h-11 flex-1 px-2 sm:flex-none sm:px-3"
+            aria-label="Semaine suivante"
             onClick={() => updateAnchor(addDays(anchor, 7))}
           >
-            Semaine suiv. →
+            <span className="hidden sm:inline">Semaine suiv.</span>
+            <ChevronRight className="h-4 w-4 sm:ml-1" />
           </Button>
         </div>
       </div>

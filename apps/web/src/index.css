@@ -45,7 +45,6 @@
 @layer base {
   body {
     @apply min-h-screen bg-paper font-sans text-ink-900 antialiased;
-    padding-bottom: env(safe-area-inset-bottom);
   }
 
   h1,
@@ -77,7 +76,7 @@
   }
 
   .pb-safe-nav {
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
   }
 
   .bottom-safe {

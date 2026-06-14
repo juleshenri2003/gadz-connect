@@ -18,18 +18,36 @@ interface MonthCalendarProps {
 
 function MonthCalendarSkeleton() {
   return (
-    <div className="grid grid-cols-7 gap-1">
-      {Array.from({ length: 42 }).map((_, i) => (
-        <div
-          key={i}
-          className="min-h-[72px] animate-pulse rounded-lg bg-paper"
-        />
-      ))}
-    </div>
+    <>
+      <div className="space-y-2 md:hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-12 animate-pulse rounded-lg border border-line bg-surface"
+          />
+        ))}
+      </div>
+      <div className="hidden grid-cols-7 gap-1 md:grid">
+        {Array.from({ length: 42 }).map((_, i) => (
+          <div
+            key={i}
+            className="min-h-[72px] animate-pulse rounded-lg bg-paper"
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
 const WEEKDAY_HEADERS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+function formatMobileDayLabel(day: Date): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(day);
+}
 
 export function MonthCalendar({
   events,
@@ -82,7 +100,12 @@ export function MonthCalendar({
             {formatMonthLabel(anchor)}
           </p>
           <p className="text-xs text-ink-400">
-            Cliquez sur un jour pour ouvrir la vue semaine
+            <span className="hidden md:inline">
+              Cliquez sur un jour pour ouvrir la vue semaine
+            </span>
+            <span className="md:hidden">
+              Touchez un jour pour ouvrir la vue semaine
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -108,6 +131,42 @@ export function MonthCalendar({
         </div>
       </div>
 
+      <ul className="space-y-2 md:hidden">
+        {monthDays
+          .filter((day) => day.getMonth() === anchor.getMonth())
+          .map((day) => {
+            const summary = summarizeDayEvents(events, day);
+            const isToday = isSameDay(day, today);
+
+            return (
+              <li key={day.toISOString()}>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors active:bg-paper",
+                    isToday
+                      ? "border-brand-100 bg-brand-50"
+                      : "border-line bg-surface",
+                  )}
+                  onClick={() => onDayClick?.(day)}
+                >
+                  <p className="min-w-0 text-sm font-medium capitalize text-ink-900">
+                    {formatMobileDayLabel(day)}
+                  </p>
+                  {summary.total > 0 ? (
+                    <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                      {summary.total} év.
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-ink-400">—</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+      </ul>
+
+      <div className="hidden md:block">
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-ink-400">
         {WEEKDAY_HEADERS.map((label) => (
           <div key={label} className="py-2">
@@ -148,7 +207,7 @@ export function MonthCalendar({
                   <span className="inline-flex rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">
                     {summary.total}
                   </span>
-                  {summary.replacements > 0 ? (
+                  {summary.cancelled > 0 ? (
                     <span className="block h-1.5 w-1.5 rounded-full bg-warning-bg" />
                   ) : null}
                 </div>
@@ -156,6 +215,7 @@ export function MonthCalendar({
             </button>
           );
         })}
+      </div>
       </div>
     </div>
   );

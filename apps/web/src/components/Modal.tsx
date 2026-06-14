@@ -87,7 +87,7 @@ export function Modal({
             type="button"
             variant="ghost"
             size="icon"
-            className="shrink-0 text-ink-400 hover:text-ink-900"
+            className="size-11 shrink-0 text-ink-400 hover:text-ink-900 active:bg-paper"
             aria-label="Fermer"
             onClick={onClose}
           >
@@ -100,7 +100,7 @@ export function Modal({
         </div>
 
         {footer ? (
-          <footer className="shrink-0 border-t border-line px-5 py-4 sm:px-6">
+          <footer className="shrink-0 border-t border-line px-5 py-4 pb-safe sm:px-6 sm:pb-4">
             {footer}
           </footer>
         ) : null}

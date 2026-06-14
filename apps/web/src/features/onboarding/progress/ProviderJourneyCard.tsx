@@ -68,15 +68,16 @@ function StepChip({
       aria-current={isCurrent ? "step" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
+        "flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600",
+        "active:opacity-90",
         isDone
-          ? "border-success/20 bg-success-bg text-success hover:bg-success-bg"
+          ? "border-success/20 bg-success-bg text-success hover:bg-success-bg active:bg-success-bg"
           : isWaiting
-            ? "border-warning/20 bg-warning-bg text-warning hover:bg-warning-bg"
+            ? "border-warning/20 bg-warning-bg text-warning hover:bg-warning-bg active:bg-warning-bg"
             : isCurrent
-              ? "border-brand-100 bg-brand-50 text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
-              : "border-line bg-surface text-ink-600 hover:border-brand-100 hover:bg-brand-50/40",
+              ? "border-brand-100 bg-brand-50 text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100 active:bg-brand-100"
+              : "border-line bg-surface text-ink-600 hover:border-brand-100 hover:bg-brand-50/40 active:bg-brand-50/60",
       )}
     >
       <span

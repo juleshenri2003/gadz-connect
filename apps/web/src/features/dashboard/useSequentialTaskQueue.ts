@@ -20,11 +20,22 @@ function readCursor(scope: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function readCompleteAcknowledged(scope: string): boolean {
+  try {
+    return localStorage.getItem(storageKey(scope, "complete-ack")) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function useSequentialTaskQueue(scope: string, tasks: DashboardTask[]) {
   const [dismissed, setDismissed] = useState<string[]>(() =>
     readDismissed(scope),
   );
   const [cursor, setCursor] = useState(() => readCursor(scope));
+  const [completeAcknowledged, setCompleteAcknowledged] = useState(() =>
+    readCompleteAcknowledged(scope),
+  );
 
   const todoTasks = useMemo(
     () =>
@@ -57,6 +68,18 @@ export function useSequentialTaskQueue(scope: string, tasks: DashboardTask[]) {
       localStorage.setItem(storageKey(scope, "cursor"), String(next));
     }
   }, [cursor, todoTasks.length, scope]);
+
+  useEffect(() => {
+    if (todoTasks.length > 0 && completeAcknowledged) {
+      setCompleteAcknowledged(false);
+      localStorage.removeItem(storageKey(scope, "complete-ack"));
+    }
+  }, [todoTasks.length, completeAcknowledged, scope]);
+
+  const acknowledgeComplete = useCallback(() => {
+    setCompleteAcknowledged(true);
+    localStorage.setItem(storageKey(scope, "complete-ack"), "1");
+  }, [scope]);
 
   const currentIndex =
     todoTasks.length === 0 ? 0 : Math.min(cursor, todoTasks.length - 1);
@@ -102,6 +125,8 @@ export function useSequentialTaskQueue(scope: string, tasks: DashboardTask[]) {
     completedCount,
     percent,
     isComplete: todoTasks.length === 0,
+    showCompleteBanner: todoTasks.length === 0 && !completeAcknowledged,
+    acknowledgeComplete,
     completeCurrent,
     skipToNext,
   };

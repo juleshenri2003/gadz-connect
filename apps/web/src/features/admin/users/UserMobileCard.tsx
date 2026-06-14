@@ -36,7 +36,7 @@ export function UserMobileCard({
   const stripeStatus = getStripeStatus(profile);
 
   return (
-    <li className="border-b border-line last:border-0">
+    <li>
       <button
         type="button"
         className="flex w-full flex-col gap-2 p-4 text-left active:bg-paper"

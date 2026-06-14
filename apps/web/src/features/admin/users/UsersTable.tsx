@@ -42,8 +42,11 @@ export function UsersTable({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Liste des utilisateurs</CardTitle>
-        <CardDescription>
+        <CardDescription className="hidden lg:block">
           Cliquez sur une ligne pour ouvrir la fiche détail
+        </CardDescription>
+        <CardDescription className="lg:hidden">
+          Touchez une carte pour ouvrir la fiche détail
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
