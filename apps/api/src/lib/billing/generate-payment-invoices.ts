@@ -42,7 +42,8 @@ async function nextInvoiceSequence(
   return (count ?? 0) + 1;
 }
 
-async function getClientEmail(clientId: string): Promise<string | null> {
+async function getClientEmail(clientId: string | null | undefined): Promise<string | null> {
+  if (!clientId) return null;
   const { data, error } = await supabaseAdmin.auth.admin.getUserById(clientId);
   if (error || !data.user?.email) return null;
   return data.user.email;
@@ -108,15 +109,17 @@ export async function generatePaymentInvoices(
     endsAt = (slot?.ends_at as string) ?? null;
   }
 
-  const clientId = course.client_id as string;
+  const clientId = (course.client_id as string | null) ?? null;
   const providerId = course.provider_id as string;
 
   const [{ data: client }, { data: provider }] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("first_name, last_name")
-      .eq("id", clientId)
-      .maybeSingle(),
+    clientId
+      ? supabaseAdmin
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", clientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabaseAdmin
       .from("profiles")
       .select(

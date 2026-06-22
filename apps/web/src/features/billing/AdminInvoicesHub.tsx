@@ -39,9 +39,9 @@ interface PersonInvoiceGroup {
 
 function personKeyFromInvoice(invoice: AdminInvoiceRow, tab: HubTab): string {
   if (tab === "prof") {
-    return invoice.provider_profile_id ?? invoice.prof_name;
+    return invoice.prof_name;
   }
-  return invoice.client_profile_id ?? invoice.parent_name;
+  return invoice.parent_name;
 }
 
 function personKeyFromTransaction(
@@ -87,8 +87,16 @@ function mergeTransactionPlaceholders(
   transactions: AdminTransactionRow[],
   tab: HubTab,
 ): PersonInvoiceGroup[] {
+  const invoicedTransactionIds = new Set<string>();
+  for (const group of map.values()) {
+    for (const invoice of group.invoices) {
+      invoicedTransactionIds.add(invoice.transaction_id);
+    }
+  }
+
   for (const tx of transactions) {
     if (tx.status_stripe !== "succeeded") continue;
+    if (invoicedTransactionIds.has(tx.id)) continue;
 
     const key = personKeyFromTransaction(tx, tab);
     const personName =
@@ -358,7 +366,8 @@ function PendingLineItem({
         {tab === "prof" ? " HT" : " TTC"} attendu
       </p>
       <p className="mt-1 text-xs text-warning">
-        Facture non générée — vérifiez migration 015 et webhook Stripe.
+        Facture non générée — lancez le webhook Stripe ou{" "}
+        <code className="text-xs">pnpm backfill-invoices</code>.
       </p>
     </li>
   );

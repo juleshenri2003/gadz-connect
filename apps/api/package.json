@@ -27,7 +27,8 @@
     "repair-demo": "tsx scripts/repair-orphan-slots.ts",
     "stripe-check": "tsx scripts/stripe-check.ts",
     "stripe-listen": "bash scripts/stripe-listen.sh",
-    "test-invoice-pdf": "tsx scripts/test-invoice-pdf.ts"
+    "test-invoice-pdf": "tsx scripts/test-invoice-pdf.ts",
+    "backfill-invoices": "tsx scripts/backfill-invoices.ts"
   },
   "dependencies": {
     "@gadz-connect/types": "workspace:*",
