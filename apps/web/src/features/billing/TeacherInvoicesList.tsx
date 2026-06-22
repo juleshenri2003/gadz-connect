@@ -35,14 +35,15 @@ export function TeacherInvoicesList() {
         <ul className="mt-4 space-y-3">
           {invoices.map((invoice) => {
             const courseLabel =
-              invoice.course?.subject ||
-              invoice.course?.title ||
+              invoice.course_subject ||
+              invoice.course_title ||
               "Cours de tutorat";
-            const date = invoice.course?.scheduled_at
-              ? new Date(invoice.course.scheduled_at).toLocaleDateString(
-                  "fr-FR",
-                  { day: "numeric", month: "short", year: "numeric" },
-                )
+            const date = invoice.scheduled_at
+              ? new Date(invoice.scheduled_at).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
               : new Date(invoice.created_at).toLocaleDateString("fr-FR", {
                   day: "numeric",
                   month: "short",

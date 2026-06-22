@@ -9,7 +9,6 @@ import { AdminInvoicePreviewPanel } from "./AdminInvoicePreviewPanel";
 import {
   useAdminInvoicePdfEmbed,
   useAdminInvoices,
-  useOpenAdminInvoicePdf,
   useResendParentInvoice,
   type AdminInvoiceRow,
 } from "./useInvoices";
