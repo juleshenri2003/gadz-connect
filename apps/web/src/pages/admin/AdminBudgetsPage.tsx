@@ -146,7 +146,7 @@ export function AdminBudgetsPage() {
 
       <AdminBudgetKpiStrip budget={budget} />
 
-      <AdminInvoicesHub filters={filters} />
+      <AdminInvoicesHub filters={filters} transactions={transactions} />
 
       <AdminBudgetFilters
         filters={filters}

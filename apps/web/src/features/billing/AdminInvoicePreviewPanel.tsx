@@ -8,12 +8,18 @@ import {
 
 interface AdminInvoicePreviewPanelProps {
   embedded?: boolean;
+  /** Limite l'aperçu à un seul type (rubrique prof ou parents). */
+  variant?: InvoiceType;
 }
 
 export function AdminInvoicePreviewPanel({
   embedded = false,
+  variant,
 }: AdminInvoicePreviewPanelProps) {
   const preview = useAdminInvoicePreview();
+
+  const showParent = !variant || variant === "parent";
+  const showStudent = !variant || variant === "student";
 
   const content = (
     <>
@@ -29,23 +35,31 @@ export function AdminInvoicePreviewPanel({
         </div>
       ) : (
         <p className="text-sm text-ink-600">
-          Modèles de démonstration (montants fictifs).
+          Modèle de démonstration (montants fictifs).
         </p>
       )}
 
-      <div className={embedded ? "mt-3 flex flex-wrap gap-2" : "mt-4 flex flex-wrap gap-2"}>
-        <PreviewButton
-          type="parent"
-          label="Facture parent (36 €)"
-          loading={preview.isPending && preview.variables === "parent"}
-          onClick={() => preview.mutate("parent")}
-        />
-        <PreviewButton
-          type="student"
-          label="Facture étudiant (33 €)"
-          loading={preview.isPending && preview.variables === "student"}
-          onClick={() => preview.mutate("student")}
-        />
+      <div
+        className={
+          embedded ? "mt-3 flex flex-wrap gap-2" : "mt-4 flex flex-wrap gap-2"
+        }
+      >
+        {showParent ? (
+          <PreviewButton
+            type="parent"
+            label="Facture parent (36 € TTC)"
+            loading={preview.isPending && preview.variables === "parent"}
+            onClick={() => preview.mutate("parent")}
+          />
+        ) : null}
+        {showStudent ? (
+          <PreviewButton
+            type="student"
+            label="Facture prof URSSAF (33 € HT)"
+            loading={preview.isPending && preview.variables === "student"}
+            onClick={() => preview.mutate("student")}
+          />
+        ) : null}
       </div>
 
       {preview.isError ? (
