@@ -36,6 +36,7 @@ import {
   MicroEnterpriseInpiGuidePanel,
 } from "@/features/onboarding/MicroEnterpriseInpiGuidePanel";
 import { SiretSubmissionForm } from "@/features/onboarding/SiretSubmissionForm";
+import { MicroEnterpriseAddressForm } from "@/features/onboarding/MicroEnterpriseAddressForm";
 import { MicroEnterpriseValidatedPanel } from "@/features/onboarding/MicroEnterpriseValidatedPanel";
 import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
 import { saveOnboardingToProfile } from "./api";
@@ -86,9 +87,6 @@ function RecapPanel({
 
   return (
     <div className="space-y-6">
-      {showInpiGuide ? (
-        <MicroEnterpriseInpiGuidePanel profile={profile} />
-      ) : null}
       <div
         className={
           hasActionAside
@@ -124,6 +122,13 @@ function RecapPanel({
           </div>
         ) : null}
       </div>
+      {showInpiGuide ? (
+        <MicroEnterpriseInpiGuidePanel profile={profile} />
+      ) : profile.micro_enterprise_activity ? (
+        <MicroEnterpriseAddressForm
+          existingAddress={profile.micro_enterprise_address}
+        />
+      ) : null}
     </div>
   );
 }
@@ -325,6 +330,15 @@ export function OnboardingMicroEnterpriseForm() {
               </Button>
             </div>
           )}
+          {profile &&
+          profile.micro_enterprise_activity &&
+          (hasValidSiret(profile.siret) ||
+            profile.account_status === "active" ||
+            Boolean(profile.siret?.trim())) ? (
+            <MicroEnterpriseAddressForm
+              existingAddress={profile.micro_enterprise_address}
+            />
+          ) : null}
         </CardContent>
       </Card>,
     );

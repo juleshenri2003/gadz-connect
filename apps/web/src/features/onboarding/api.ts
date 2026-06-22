@@ -34,3 +34,17 @@ export async function saveOnboardingToProfile(
     return { error: (err as Error).message };
   }
 }
+
+export async function saveMicroEnterpriseAddress(
+  microEnterpriseAddress: string,
+  token: string,
+): Promise<{ micro_enterprise_address: string }> {
+  const res = await apiFetch<{
+    data: { micro_enterprise_address: string };
+  }>("/api/profile/billing", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ microEnterpriseAddress }),
+  });
+  return res.data;
+}

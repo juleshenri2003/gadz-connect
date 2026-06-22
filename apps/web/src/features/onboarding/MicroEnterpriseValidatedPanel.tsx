@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
 import { formatSiretDisplay } from "@/features/onboarding/microEnterprisePageUtils";
+import { MicroEnterpriseAddressForm } from "@/features/onboarding/MicroEnterpriseAddressForm";
 import { useStripeConnectStatus } from "@/features/stripe/useStripeConnect";
 
 interface MicroEnterpriseValidatedPanelProps {
@@ -33,6 +34,20 @@ export function MicroEnterpriseValidatedPanel({
           </>
         ) : null}
       </div>
+
+      {!profile.micro_enterprise_address?.trim() ? (
+        <div
+          className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning"
+          role="status"
+        >
+          Renseignez votre adresse d&apos;auto-entreprise pour des factures
+          conformes (obligatoire avant votre premier cours payé).
+        </div>
+      ) : null}
+
+      <MicroEnterpriseAddressForm
+        existingAddress={profile.micro_enterprise_address}
+      />
 
       {nextTask ? (
         <div

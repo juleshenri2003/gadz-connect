@@ -14,12 +14,15 @@ interface OnboardingInpiStepGuideProps {
   hideProgressHeader?: boolean;
   openId?: string;
   onOpenIdChange?: (id: string) => void;
+  /** Contenu additionnel sous certaines étapes (ex. formulaire adresse à l'étape identité). */
+  renderAfterStep?: (stepId: string) => React.ReactNode;
 }
 
 export function OnboardingInpiStepGuide({
   hideProgressHeader = false,
   openId: controlledOpenId,
   onOpenIdChange,
+  renderAfterStep,
 }: OnboardingInpiStepGuideProps = {}) {
   const firstStepId =
     INPI_STEPS.find((step) => step.id === "connect")?.id ?? INPI_STEPS[0]?.id ?? "";
@@ -90,6 +93,8 @@ export function OnboardingInpiStepGuide({
             </a>
           </Button>
         ) : null}
+
+        {renderAfterStep?.(step.id)}
 
         <div className="flex flex-wrap gap-2 border-t border-line pt-3">
           <Button

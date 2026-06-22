@@ -369,6 +369,70 @@ profileRouter.patch(
   },
 );
 
+const billingSchema = z.object({
+  microEnterpriseAddress: z
+    .string()
+    .trim()
+    .min(10, "Adresse trop courte")
+    .max(500, "Adresse trop longue"),
+});
+
+/**
+ * PATCH /api/profile/billing
+ * Adresse postale de l'auto-entreprise (facturation URSSAF).
+ */
+profileRouter.patch(
+  "/billing",
+  loadAccountStatus,
+  rejectSuspended,
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = billingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.flatten().formErrors[0] ?? "Validation failed",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    const user = req.user!;
+
+    const { data: profile, error: fetchError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    if (profile.role !== "teacher") {
+      res.status(403).json({
+        error: "Réservé aux enseignants — adresse auto-entreprise",
+      });
+      return;
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        micro_enterprise_address: parsed.data.microEnterpriseAddress,
+      })
+      .eq("id", user.id)
+      .select("id, micro_enterprise_address")
+      .maybeSingle();
+
+    if (error || !updated) {
+      res.status(500).json({ error: error?.message ?? "Mise à jour impossible" });
+      return;
+    }
+
+    res.json({ data: updated });
+  },
+);
+
 const setupSchema = z
   .object({
     firstName: z.string().min(1).max(80),

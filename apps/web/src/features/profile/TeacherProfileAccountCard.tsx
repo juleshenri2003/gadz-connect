@@ -98,6 +98,16 @@ export function TeacherProfileAccountCard({
             <dl className="grid gap-4 sm:grid-cols-2">
               <FieldRow label="SIRET" value={siretDisplay} />
               <FieldRow
+                label="Adresse auto-entreprise"
+                value={
+                  profile.micro_enterprise_address?.trim() ? (
+                    profile.micro_enterprise_address
+                  ) : (
+                    <span className="text-warning">Non renseignée</span>
+                  )
+                }
+              />
+              <FieldRow
                 label="Activité"
                 value={getActivityLabel(profile.micro_enterprise_activity)}
               />

@@ -13,6 +13,7 @@ import {
   SCAM_WARNINGS,
 } from "@/features/onboarding/guide/content";
 import { OnboardingInpiStepGuide } from "@/features/onboarding/guide/OnboardingInpiStepGuide";
+import { MicroEnterpriseAddressForm } from "@/features/onboarding/MicroEnterpriseAddressForm";
 import { GuideRichList, GuideRichText } from "@/features/onboarding/guide/GuideRichText";
 import { formatFrenchDate } from "./microEnterprisePageUtils";
 
@@ -166,6 +167,32 @@ export function MicroEnterpriseInpiGuidePanel({
           hideProgressHeader
           openId={openStepId}
           onOpenIdChange={setOpenStepId}
+          renderAfterStep={(stepId) => {
+            if (!profile?.micro_enterprise_activity) return null;
+            if (stepId === "identity") {
+              return (
+                <div className="rounded-lg border border-brand-100 bg-brand-50/40 p-1">
+                  <MicroEnterpriseAddressForm
+                    id="micro-enterprise-address"
+                    existingAddress={profile.micro_enterprise_address}
+                  />
+                </div>
+              );
+            }
+            if (
+              stepId === "followup" &&
+              !profile.micro_enterprise_address?.trim()
+            ) {
+              return (
+                <p className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-sm text-warning">
+                  Adresse non renseignée — ouvrez l&apos;étape 3 (« Identité et
+                  établissement ») pour l&apos;enregistrer avant votre premier
+                  cours payé.
+                </p>
+              );
+            }
+            return null;
+          }}
         />
 
         {!inpiConfirmed ? (
@@ -178,6 +205,17 @@ export function MicroEnterpriseInpiGuidePanel({
             <div className="mt-3">
               <GuideManualConfirm confirmed={inpiConfirmed} />
             </div>
+            <p className="mt-3 text-sm text-ink-600">
+              Pensez aussi à{" "}
+              <a
+                href="#inpi-step-identity"
+                className="font-medium text-brand-700 underline underline-offset-2"
+                onClick={() => setOpenStepId("identity")}
+              >
+                enregistrer votre adresse
+              </a>{" "}
+              (étape 3 du guide) pour la facturation URSSAF.
+            </p>
           </div>
         ) : (
           <GuideManualConfirm confirmed={inpiConfirmed} />

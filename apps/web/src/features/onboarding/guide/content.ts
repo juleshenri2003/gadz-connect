@@ -104,6 +104,7 @@ export const INPI_STEPS = [
       "**Identité de l'entreprise** : vos informations personnelles, date de début d'activité, numéro de sécurité sociale.",
       "**Composition** et **Insaisissabilité** : en général rien à remplir pour un tutorat en solo — passez si facultatif.",
       "**Établissements** : adresse (souvent votre domicile), caractéristiques de l'établissement.",
+      "Recopiez la **même adresse** dans le formulaire Gadz'Connect ci-dessous (factures URSSAF).",
       "Remplissez **tous les champs obligatoires** pour passer à l'étape suivante.",
       "En cas de doute sur une case, contactez le responsable Gadz'Connect avant de valider.",
     ],

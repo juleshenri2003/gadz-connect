@@ -18,6 +18,7 @@ export interface MyProfile {
   siret_verification_failed: boolean;
   status_acre: boolean;
   micro_enterprise_activity: string | null;
+  micro_enterprise_address: string | null;
   urssaf_periodicity: string | null;
   versement_liberatoire: boolean;
   profile_setup_complete: boolean;
