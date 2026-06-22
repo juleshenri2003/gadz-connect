@@ -1,17 +1,18 @@
 import { Button, cn } from "@gadz-connect/ui";
 import { ChevronRight, FileText, Mail, MailCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatEuro } from "@/features/admin/format";
 import type { BudgetFiltersState } from "@/features/admin/budgets/budgetFilters";
 import { formatPersonName } from "@/features/admin/budgets/adminBudgetLabels";
 import type { AdminTransactionRow } from "@/features/admin/types";
+import { AdminInvoicePreviewPanel } from "./AdminInvoicePreviewPanel";
 import {
+  useAdminInvoicePdfEmbed,
   useAdminInvoices,
   useOpenAdminInvoicePdf,
   useResendParentInvoice,
   type AdminInvoiceRow,
 } from "./useInvoices";
-import { AdminInvoicePreviewPanel } from "./AdminInvoicePreviewPanel";
 
 interface AdminInvoicesHubProps {
   filters: BudgetFiltersState;
@@ -164,19 +165,110 @@ function formatCourseDate(iso: string | null, fallback?: string): string {
   });
 }
 
+function InvoicePdfEmbed({ invoiceId }: { invoiceId: string }) {
+  const { data: pdfUrl, isLoading, isError } = useAdminInvoicePdfEmbed(invoiceId);
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
+
+  if (isLoading) {
+    return (
+      <p className="py-8 text-center text-sm text-ink-400">
+        Chargement de l&apos;aperçu PDF…
+      </p>
+    );
+  }
+
+  if (isError || !pdfUrl) {
+    return (
+      <p className="py-4 text-center text-sm text-danger">
+        Impossible d&apos;afficher l&apos;aperçu PDF.
+      </p>
+    );
+  }
+
+  return (
+    <iframe
+      title="Aperçu facture PDF"
+      src={pdfUrl}
+      className="h-[min(70vh,520px)] w-full rounded-md border border-line bg-white"
+    />
+  );
+}
+
+function PersonInvoicePreview({
+  group,
+  tab,
+  selectedInvoiceId,
+  onSelectInvoice,
+}: {
+  group: PersonInvoiceGroup;
+  tab: HubTab;
+  selectedInvoiceId: string | null;
+  onSelectInvoice: (id: string) => void;
+}) {
+  const hasRealInvoices = group.invoices.length > 0;
+
+  if (!hasRealInvoices) {
+    return (
+      <div className="rounded-lg border border-line bg-paper/60 p-4">
+        <p className="text-sm font-medium text-ink-900">Aperçu facture</p>
+        <p className="mt-1 text-xs text-ink-600">
+          Facture réelle non encore générée — modèle de démonstration ci-dessous.
+        </p>
+        <div className="mt-3">
+          <AdminInvoicePreviewPanel
+            embedded
+            variant={tab === "prof" ? "student" : "parent"}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const activeId = selectedInvoiceId ?? group.invoices[0]?.id ?? null;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-line bg-paper/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-ink-900">Aperçu facture</p>
+        {group.invoices.length > 1 ? (
+          <div className="flex flex-wrap gap-1">
+            {group.invoices.map((invoice, index) => (
+              <Button
+                key={invoice.id}
+                type="button"
+                size="sm"
+                variant={activeId === invoice.id ? "default" : "outline"}
+                onClick={() => onSelectInvoice(invoice.id)}
+              >
+                Cours {index + 1}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {activeId ? <InvoicePdfEmbed invoiceId={activeId} /> : null}
+    </div>
+  );
+}
+
 function InvoiceLineItem({
   invoice,
   tab,
-  onOpen,
+  isSelected,
+  onSelect,
   onResend,
-  opening,
   resendingId,
 }: {
   invoice: AdminInvoiceRow;
   tab: HubTab;
-  onOpen: (id: string) => void;
+  isSelected: boolean;
+  onSelect: () => void;
   onResend: (id: string) => void;
-  opening: boolean;
   resendingId: string | null;
 }) {
   const counterparty =
@@ -185,8 +277,19 @@ function InvoiceLineItem({
       : `Prof : ${invoice.prof_name}`;
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2.5">
-      <div className="min-w-0 flex-1">
+    <li
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
+        isSelected
+          ? "border-brand-200 bg-brand-50/50"
+          : "border-line bg-surface",
+      )}
+    >
+      <button
+        type="button"
+        className="min-w-0 flex-1 text-left"
+        onClick={onSelect}
+      >
         <p className="text-sm font-medium text-ink-900">
           {invoice.course_subject}
         </p>
@@ -201,23 +304,7 @@ function InvoiceLineItem({
             {tab === "prof" ? " HT" : " TTC"}
           </span>
         </p>
-        {tab === "parents" ? (
-          <p className="mt-1 text-xs">
-            {invoice.parent_email_sent_at ? (
-              <span className="inline-flex items-center gap-1 text-success">
-                <MailCheck className="h-3.5 w-3.5" aria-hidden />
-                E-mail envoyé le{" "}
-                {new Date(invoice.parent_email_sent_at).toLocaleString("fr-FR")}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-warning">
-                <Mail className="h-3.5 w-3.5" aria-hidden />
-                E-mail non envoyé
-              </span>
-            )}
-          </p>
-        ) : null}
-      </div>
+      </button>
       <div className="flex shrink-0 flex-wrap gap-2">
         {tab === "parents" ? (
           <Button
@@ -231,15 +318,20 @@ function InvoiceLineItem({
             {resendingId === invoice.id ? "Envoi…" : "Renvoyer"}
           </Button>
         ) : null}
+        {tab === "parents" && invoice.parent_email_sent_at ? (
+          <span className="inline-flex items-center gap-1 self-center text-xs text-success">
+            <MailCheck className="h-3.5 w-3.5" aria-hidden />
+            Envoyé
+          </span>
+        ) : null}
         <Button
           type="button"
           size="sm"
-          variant="outline"
-          disabled={opening}
-          onClick={() => onOpen(invoice.id)}
+          variant={isSelected ? "default" : "outline"}
+          onClick={onSelect}
         >
           <FileText className="mr-1.5 h-4 w-4" aria-hidden />
-          PDF
+          Aperçu
         </Button>
       </div>
     </li>
@@ -277,20 +369,26 @@ function PersonInvoiceSection({
   tab,
   isOpen,
   onToggle,
-  onOpen,
   onResend,
-  opening,
   resendingId,
 }: {
   group: PersonInvoiceGroup;
   tab: HubTab;
   isOpen: boolean;
   onToggle: () => void;
-  onOpen: (id: string) => void;
   onResend: (id: string) => void;
-  opening: boolean;
   resendingId: string | null;
 }) {
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
+    group.invoices[0]?.id ?? null,
+  );
+
+  useEffect(() => {
+    if (isOpen && group.invoices[0]) {
+      setSelectedInvoiceId(group.invoices[0].id);
+    }
+  }, [isOpen, group.invoices]);
+
   const itemCount = group.invoices.length + group.pending.length;
   const amountLabel =
     group.invoices.length > 0
@@ -316,6 +414,11 @@ function PersonInvoiceSection({
               ? ` · ${group.pending.length} en attente`
               : ""}
           </p>
+          {!isOpen ? (
+            <p className="mt-0.5 text-xs text-brand-700">
+              Cliquer pour voir l&apos;aperçu des factures
+            </p>
+          ) : null}
         </div>
         <ChevronRight
           className={cn(
@@ -327,22 +430,38 @@ function PersonInvoiceSection({
       </button>
 
       {isOpen ? (
-        <ul className="space-y-2 border-t border-line bg-surface/50 px-4 pb-4 pt-3">
-          {group.invoices.map((invoice) => (
-            <InvoiceLineItem
-              key={invoice.id}
-              invoice={invoice}
-              tab={tab}
-              onOpen={onOpen}
-              onResend={onResend}
-              opening={opening}
-              resendingId={resendingId}
-            />
-          ))}
-          {group.pending.map((line) => (
-            <PendingLineItem key={line.id} line={line} tab={tab} />
-          ))}
-        </ul>
+        <div className="space-y-3 border-t border-line bg-surface/50 px-4 pb-4 pt-3">
+          <PersonInvoicePreview
+            group={group}
+            tab={tab}
+            selectedInvoiceId={selectedInvoiceId}
+            onSelectInvoice={setSelectedInvoiceId}
+          />
+
+          {group.invoices.length > 0 ? (
+            <ul className="space-y-2">
+              {group.invoices.map((invoice) => (
+                <InvoiceLineItem
+                  key={invoice.id}
+                  invoice={invoice}
+                  tab={tab}
+                  isSelected={selectedInvoiceId === invoice.id}
+                  onSelect={() => setSelectedInvoiceId(invoice.id)}
+                  onResend={onResend}
+                  resendingId={resendingId}
+                />
+              ))}
+            </ul>
+          ) : null}
+
+          {group.pending.length > 0 ? (
+            <ul className="space-y-2">
+              {group.pending.map((line) => (
+                <PendingLineItem key={line.id} line={line} tab={tab} />
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -372,7 +491,6 @@ export function AdminInvoicesHub({
       tab === "parents" && emailStatus !== "all" ? emailStatus : undefined,
   });
 
-  const openPdf = useOpenAdminInvoicePdf();
   const resendParent = useResendParentInvoice();
 
   const profGroups = useMemo(() => {
@@ -412,8 +530,7 @@ export function AdminInvoicesHub({
       <div>
         <h3 className="font-semibold text-ink-900">Centre de facturation</h3>
         <p className="mt-1 text-sm text-ink-600">
-          Cliquez sur un nom pour voir toutes ses factures. Montants calculés
-          automatiquement selon le tarif horaire et la durée du cours.
+          Cliquez sur un nom pour afficher l&apos;aperçu PDF de ses factures.
         </p>
       </div>
 
@@ -507,9 +624,7 @@ export function AdminInvoicesHub({
                   prev === group.key ? null : group.key,
                 )
               }
-              onOpen={(id) => openPdf.mutate(id)}
               onResend={handleResend}
-              opening={openPdf.isPending}
               resendingId={resendingId}
             />
           ))}
@@ -524,18 +639,6 @@ export function AdminInvoicesHub({
       {resendParent.isSuccess ? (
         <p className="text-sm text-success">Facture parent renvoyée par e-mail.</p>
       ) : null}
-
-      <details className="rounded-lg border border-line bg-paper/50">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink-900">
-          Aperçu modèle PDF (démo)
-        </summary>
-        <div className="border-t border-line px-4 pb-4 pt-3">
-          <AdminInvoicePreviewPanel
-            embedded
-            variant={tab === "prof" ? "student" : "parent"}
-          />
-        </div>
-      </details>
     </section>
   );
 }

@@ -142,6 +142,74 @@ export function useOpenAdminInvoicePdf() {
   });
 }
 
+export function useAdminInvoicePdfEmbed(invoiceId: string | null) {
+  const { getAccessToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["admin-invoice-pdf-embed", invoiceId],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token || !invoiceId) throw new Error("Non authentifié");
+      const res = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Erreur HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+    enabled: Boolean(invoiceId && getAccessToken()),
+    staleTime: 60_000,
+  });
+}
+
+/** URL blob pour afficher le PDF inline (aperçu dans la page). */
+export function useAdminInvoicePdfBlob(invoiceId: string | null) {
+  const { getAccessToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["admin-invoice-pdf-blob", invoiceId],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token || !invoiceId) throw new Error("Non authentifié");
+      const res = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Erreur HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+    enabled: Boolean(invoiceId && getAccessToken()),
+    staleTime: 60_000,
+  });
+}
+
+/** Aperçu démo inline (quand la facture réelle n'existe pas encore). */
+export function useAdminDemoInvoicePdfBlob(type: InvoiceType | null) {
+  const { getAccessToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["admin-invoice-demo-pdf-blob", type],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token || !type) throw new Error("Non authentifié");
+      const res = await fetch(`${API_URL}/api/admin/invoices/preview/${type}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Impossible de charger l'aperçu démo");
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+    enabled: Boolean(type && getAccessToken()),
+    staleTime: 60_000,
+  });
+}
+
 /** @deprecated use useOpenAdminInvoicePdf */
 export const useOpenAdminInvoiceUrl = useOpenAdminInvoicePdf;
 
