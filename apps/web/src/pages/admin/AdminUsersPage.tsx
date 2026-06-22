@@ -109,6 +109,7 @@ export function AdminUsersPage() {
     try {
       await updateStatus.mutateAsync({ profileId, account_status });
       setToast({ message: successMessage, variant: "success" });
+      setSelectedProfileId(profileId);
     } catch (mutationError) {
       setToast({
         message:
@@ -183,7 +184,7 @@ export function AdminUsersPage() {
           void runStatusUpdate(
             profileId,
             "active",
-            "Compte activé manuellement.",
+            "Compte activé — vérification auto-entrepreneur, Stripe et notification envoyés.",
           )
         }
         onSuspend={setSuspendTarget}
@@ -235,7 +236,7 @@ export function AdminUsersPage() {
           void runStatusUpdate(
             profileId,
             "active",
-            "Compte activé manuellement.",
+            "Compte activé — vérification auto-entrepreneur, Stripe et notification envoyés.",
           )
         }
         onSuspend={setSuspendTarget}

@@ -225,3 +225,18 @@ export async function notifyAccountActivated(
     declaredBy: userId,
   });
 }
+
+/** Notification après validation manuelle par l'équipe RH. */
+export async function notifyTeacherValidatedByAdmin(
+  userId: string,
+  campusId: string,
+): Promise<void> {
+  await notifyUsers([userId], {
+    campusId,
+    kind: "account_activated",
+    title: "Compte validé par l'équipe RH",
+    message:
+      "Votre profil a été activé. Finalisez l'onboarding Stripe et publiez vos créneaux pour apparaître dans la marketplace.",
+    declaredBy: userId,
+  });
+}

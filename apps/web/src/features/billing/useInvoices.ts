@@ -94,7 +94,7 @@ export function useAdminInvoices(params: AdminInvoicesQueryParams) {
         data: AdminInvoiceRow[];
         meta: AdminInvoicesMeta;
       }>(`/api/admin/invoices${qs ? `?${qs}` : ""}`, { token });
-      return res;
+      return { invoices: res.data, meta: res.meta };
     },
     enabled: Boolean(getAccessToken()),
   });

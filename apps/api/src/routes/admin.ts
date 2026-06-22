@@ -39,6 +39,10 @@ import {
   type AdminProfileFilter,
 } from "../lib/admin-profiles-query.js";
 import {
+  buildTeacherStatusUpdate,
+  completeTeacherActivation,
+} from "../lib/admin-activate-teacher.js";
+import {
   fetchAdminCourseDetail,
   fetchAdminCoursesSummary,
   listAdminCourses,
@@ -231,12 +235,18 @@ adminRouter.patch(
       return;
     }
 
-    const profileId = req.params.id;
+    const profileId = String(req.params.id ?? "");
+    if (!profileId) {
+      res.status(400).json({ error: "Identifiant profil manquant" });
+      return;
+    }
     const campusFilter = adminCampusFilter(req.adminProfile!);
 
     let targetQuery = supabaseAdmin
       .from("profiles")
-      .select("id, campus_id, account_status, siret")
+      .select(
+        "id, campus_id, account_status, siret, role, first_name, last_name",
+      )
       .eq("id", profileId);
 
     if (campusFilter) {
@@ -264,22 +274,58 @@ adminRouter.patch(
       return;
     }
 
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from("profiles")
-      .update({ account_status })
-      .eq("id", profileId)
-      .select(
-        "id, first_name, last_name, role, account_status, siret, campus_id, campus:campus_id ( name )",
-      )
-      .single();
+    const isTeacherActivation =
+      target.role === "teacher" &&
+      account_status === "active" &&
+      target.account_status !== "active";
 
-    if (updateError || !updated) {
-      console.error("[admin] update status:", updateError?.message);
+    const updatePayload = buildTeacherStatusUpdate(
+      {
+        id: target.id as string,
+        role: target.role as string,
+        campus_id: (target.campus_id as string | null) ?? null,
+        siret: (target.siret as string | null) ?? null,
+        account_status: target.account_status as AccountStatus,
+        first_name: (target.first_name as string) ?? "",
+        last_name: (target.last_name as string) ?? "",
+      },
+      account_status,
+    );
+
+    const { error: updateError } = await supabaseAdmin
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", profileId);
+
+    if (updateError) {
+      console.error("[admin] update status:", updateError.message);
       res.status(500).json({ error: "Impossible de mettre à jour le statut" });
       return;
     }
 
-    res.json({ data: updated });
+    if (isTeacherActivation) {
+      await completeTeacherActivation({
+        id: target.id as string,
+        role: target.role as string,
+        campus_id: (target.campus_id as string | null) ?? null,
+        siret: (target.siret as string | null) ?? null,
+        account_status: account_status,
+        first_name: (target.first_name as string) ?? "",
+        last_name: (target.last_name as string) ?? "",
+      });
+    }
+
+    const detail = await fetchAdminProfileDetail(
+      profileId,
+      campusFilter?.campusId,
+    );
+
+    if (!detail) {
+      res.status(500).json({ error: "Profil introuvable après mise à jour" });
+      return;
+    }
+
+    res.json({ data: detail });
   },
 );
 

@@ -180,7 +180,7 @@ export function useUpdateProfileStatus() {
       profileId: string;
       account_status: AccountStatus;
     }) => {
-      const res = await apiFetch<{ data: AdminProfileRow }>(
+      const res = await apiFetch<{ data: AdminProfileDetail }>(
         `/api/admin/profiles/${profileId}/status`,
         {
           method: "PATCH",
@@ -190,10 +190,29 @@ export function useUpdateProfileStatus() {
       );
       return res.data;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-profile"] });
+    onSuccess: (updated, { profileId }) => {
+      queryClient.setQueriesData(
+        { queryKey: ["admin-profiles"] },
+        (
+          old:
+            | { profiles: AdminProfileRow[]; meta: AdminProfilesMeta }
+            | undefined,
+        ) => {
+          if (!old?.profiles) return old;
+          return {
+            ...old,
+            profiles: old.profiles.map((profile) =>
+              profile.id === profileId ? { ...profile, ...updated } : profile,
+            ),
+          };
+        },
+      );
+      queryClient.setQueryData(["admin-profile", profileId], updated);
       void queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-profile", profileId],
+      });
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
     },
   });

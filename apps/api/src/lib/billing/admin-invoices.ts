@@ -333,9 +333,7 @@ async function loadInvoiceForScope(
 ): Promise<AdminInvoiceRow & { storage_path: string; client_profile_id: string | null }> {
   const { data: invoice, error } = await supabaseAdmin
     .from("payment_invoices")
-    .select(
-      `${INVOICE_SELECT}, client_profile_id, transaction:transaction_id ( status_stripe )`,
-    )
+    .select(INVOICE_SELECT)
     .eq("id", invoiceId)
     .maybeSingle();
 
