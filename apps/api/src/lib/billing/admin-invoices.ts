@@ -22,6 +22,8 @@ export interface AdminInvoiceRow {
   course_id: string;
   parent_name: string;
   prof_name: string;
+  provider_profile_id: string | null;
+  client_profile_id: string | null;
   course_subject: string;
   course_title: string;
   scheduled_at: string | null;
@@ -111,6 +113,8 @@ function mapInvoiceRow(row: Record<string, unknown>): AdminInvoiceRow | null {
     course_id: (row.course_id as string) ?? course.id,
     parent_name: formatPersonName(client),
     prof_name: formatPersonName(provider),
+    provider_profile_id: (row.provider_profile_id as string | null) ?? null,
+    client_profile_id: (row.client_profile_id as string | null) ?? null,
     course_subject: courseSubject,
     course_title: course.title,
     scheduled_at: course.scheduled_at,
@@ -136,6 +140,8 @@ const INVOICE_SELECT = `
   created_at,
   parent_email_sent_at,
   storage_path,
+  provider_profile_id,
+  client_profile_id,
   transaction:transaction_id (
     id,
     status_stripe,
@@ -203,7 +209,9 @@ export async function fetchAdminInvoices(
   let mapped = (data ?? [])
     .map((row) => mapInvoiceRow(row as Record<string, unknown>))
     .filter((row): row is AdminInvoiceRow => row !== null)
-    .filter((row) => isInPeriod(row.created_at, start, end));
+    .filter((row) =>
+      isInPeriod(row.scheduled_at ?? row.created_at, start, end),
+    );
 
   if (effectiveCampusId) {
     mapped = mapped.filter((row) => row.campus_id === effectiveCampusId);

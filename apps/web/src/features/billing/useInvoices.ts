@@ -16,6 +16,8 @@ export interface AdminInvoiceRow {
   course_id: string;
   parent_name: string;
   prof_name: string;
+  provider_profile_id: string | null;
+  client_profile_id: string | null;
   course_subject: string;
   course_title: string;
   scheduled_at: string | null;
