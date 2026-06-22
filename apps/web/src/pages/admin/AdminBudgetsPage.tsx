@@ -8,7 +8,7 @@ import {
   useAdminMe,
   useAdminTransactions,
 } from "@/features/admin/useAdmin";
-import { AdminInvoicePreviewPanel } from "@/features/billing/AdminInvoicePreviewPanel";
+import { AdminInvoicesHub } from "@/features/billing/AdminInvoicesHub";
 import { AdminBudgetCampusBreakdown } from "@/features/admin/budgets/AdminBudgetCampusBreakdown";
 import { AdminBudgetFilters } from "@/features/admin/budgets/AdminBudgetFilters";
 import { AdminBudgetHeader } from "@/features/admin/budgets/AdminBudgetHeader";
@@ -146,7 +146,7 @@ export function AdminBudgetsPage() {
 
       <AdminBudgetKpiStrip budget={budget} />
 
-      <AdminInvoicePreviewPanel />
+      <AdminInvoicesHub filters={filters} />
 
       <AdminBudgetFilters
         filters={filters}

@@ -6,22 +6,34 @@ import {
   type InvoiceType,
 } from "./useInvoices";
 
-export function AdminInvoicePreviewPanel() {
+interface AdminInvoicePreviewPanelProps {
+  embedded?: boolean;
+}
+
+export function AdminInvoicePreviewPanel({
+  embedded = false,
+}: AdminInvoicePreviewPanelProps) {
   const preview = useAdminInvoicePreview();
 
-  return (
-    <section className="rounded-md border border-line bg-surface p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-ink-900">Aperçu des factures</h3>
-          <p className="mt-1 text-sm text-ink-600">
-            Visualisez le modèle PDF avec le n° SAP configuré — sans paiement
-            réel.
-          </p>
+  const content = (
+    <>
+      {!embedded ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-ink-900">Aperçu des factures</h3>
+            <p className="mt-1 text-sm text-ink-600">
+              Visualisez le modèle PDF avec le n° SAP configuré — sans paiement
+              réel.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <p className="text-sm text-ink-600">
+          Modèles de démonstration (montants fictifs).
+        </p>
+      )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className={embedded ? "mt-3 flex flex-wrap gap-2" : "mt-4 flex flex-wrap gap-2"}>
         <PreviewButton
           type="parent"
           label="Facture parent (36 €)"
@@ -41,6 +53,16 @@ export function AdminInvoicePreviewPanel() {
           {(preview.error as Error).message}
         </p>
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <section className="rounded-md border border-line bg-surface p-5">
+      {content}
     </section>
   );
 }

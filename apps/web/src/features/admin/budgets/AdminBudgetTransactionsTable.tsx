@@ -6,6 +6,7 @@ import {
   UrssafStatusBadge,
 } from "./AdminBudgetStatusBadges";
 import { formatPersonName, formatTransactionDate } from "./adminBudgetLabels";
+import { TransactionInvoiceBadges } from "@/features/billing/AdminInvoicesHub";
 
 interface AdminBudgetTransactionsTableProps {
   transactions: AdminTransactionRow[];
@@ -88,6 +89,10 @@ export function AdminBudgetTransactionsTable({
                       {transaction.status_stripe === "succeeded" ? (
                         <UrssafStatusBadge status={transaction.status_urssaf} />
                       ) : null}
+                      <TransactionInvoiceBadges
+                        statusStripe={transaction.status_stripe}
+                        invoiceSummary={transaction.invoice_summary}
+                      />
                       <span className="text-xs text-ink-400">
                         Brut {formatEuro(transaction.amount_gross)}
                       </span>
@@ -110,6 +115,7 @@ export function AdminBudgetTransactionsTable({
                 <th className="px-3 py-2 font-medium text-right">Net</th>
                 <th className="px-3 py-2 font-medium">Stripe</th>
                 <th className="px-3 py-2 font-medium">URSSAF</th>
+                <th className="px-3 py-2 font-medium">Factures</th>
               </tr>
             </thead>
             <tbody>
@@ -155,6 +161,12 @@ export function AdminBudgetTransactionsTable({
                       ) : (
                         <span className="text-xs text-ink-400">—</span>
                       )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <TransactionInvoiceBadges
+                        statusStripe={transaction.status_stripe}
+                        invoiceSummary={transaction.invoice_summary}
+                      />
                     </td>
                   </tr>
                 );

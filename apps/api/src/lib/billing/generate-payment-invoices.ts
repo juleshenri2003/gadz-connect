@@ -11,6 +11,7 @@ import {
 import { sendParentInvoiceEmail } from "../email/send-parent-invoice.js";
 import { buildParentInvoicePdf } from "../pdf/parent-invoice.js";
 import { buildStudentInvoicePdf } from "../pdf/student-invoice.js";
+import { buildInvoiceDownloadFilename } from "./invoice-filename.js";
 import { supabaseAdmin } from "../supabase.js";
 
 export interface GeneratePaymentInvoicesInput {
@@ -217,6 +218,8 @@ export async function generatePaymentInvoices(
 
     const clientEmail = await getClientEmail(clientId);
     if (clientEmail) {
+      const parentLastName = (client?.last_name as string | undefined)?.trim();
+      const profLastName = (provider?.last_name as string | undefined)?.trim();
       const emailResult = await sendParentInvoiceEmail({
         to: clientEmail,
         parentName,
@@ -224,6 +227,13 @@ export async function generatePaymentInvoices(
         amountGross,
         subject,
         pdfBuffer: parentPdf,
+        downloadFilename: buildInvoiceDownloadFilename({
+          invoiceNumber: parentInvoiceNumber,
+          invoiceType: "parent",
+          parentLastName,
+          profLastName,
+          subject,
+        }),
       });
 
       if (emailResult.sent) {

@@ -280,6 +280,10 @@ export interface AdminTransactionRow {
   status_urssaf: TransactionUrssafStatus;
   created_at: string;
   course: AdminTransactionCourse;
+  invoice_summary?: {
+    invoice_count: number;
+    parent_email_sent: boolean;
+  };
 }
 
 export interface AdminTransactionsMeta {

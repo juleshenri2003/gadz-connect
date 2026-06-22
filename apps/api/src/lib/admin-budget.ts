@@ -86,6 +86,10 @@ export interface AdminTransactionRow {
   status_urssaf: TransactionUrssafStatus;
   created_at: string;
   course: AdminTransactionCourse;
+  invoice_summary?: {
+    invoice_count: number;
+    parent_email_sent: boolean;
+  };
 }
 
 export interface AdminTransactionsMeta {
@@ -615,7 +619,19 @@ export async function fetchAdminTransactions(
 
   const total = mapped.length;
   const offset = (page - 1) * limit;
-  const transactions = mapped.slice(offset, offset + limit);
+  let transactions = mapped.slice(offset, offset + limit);
+
+  const { fetchInvoiceSummariesForTransactions } = await import(
+    "./billing/admin-invoices.js"
+  );
+  const summaries = await fetchInvoiceSummariesForTransactions(
+    transactions.map((tx) => tx.id),
+  );
+  transactions = transactions.map((tx) => {
+    const summary = summaries.get(tx.id);
+    if (!summary || summary.invoice_count === 0) return tx;
+    return { ...tx, invoice_summary: summary };
+  });
 
   return {
     transactions,

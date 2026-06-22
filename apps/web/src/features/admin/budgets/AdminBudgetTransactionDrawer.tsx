@@ -125,6 +125,8 @@ export function AdminBudgetTransactionDrawer({
           <TransactionInvoicesPanel
             transactionId={transaction.id}
             stripeStatus={transaction.status_stripe}
+            parentName={formatPersonName(transaction.course.client)}
+            profName={formatPersonName(transaction.course.provider)}
           />
 
           <div className="flex flex-col gap-2">

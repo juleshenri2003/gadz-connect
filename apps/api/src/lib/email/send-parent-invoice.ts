@@ -5,6 +5,7 @@ export interface SendParentInvoiceEmailInput {
   amountGross: number;
   subject: string;
   pdfBuffer: Buffer;
+  downloadFilename?: string;
 }
 
 export interface SendParentInvoiceEmailResult {
@@ -39,6 +40,9 @@ export async function sendParentInvoiceEmail(
   }
 
   const subject = `Facture Gadz'Connect n° ${input.invoiceNumber}`;
+  const attachmentName =
+    input.downloadFilename?.trim() ||
+    `facture-${input.invoiceNumber.replace(/\s+/g, "-")}.pdf`;
   const html = `
     <p>Bonjour ${input.parentName},</p>
     <p>Votre paiement de <strong>${formatEuro(input.amountGross)}</strong> pour le cours « ${input.subject} » a bien été reçu.</p>
@@ -59,7 +63,7 @@ export async function sendParentInvoiceEmail(
       html,
       attachments: [
         {
-          filename: `facture-${input.invoiceNumber}.pdf`,
+          filename: attachmentName,
           content: input.pdfBuffer.toString("base64"),
         },
       ],

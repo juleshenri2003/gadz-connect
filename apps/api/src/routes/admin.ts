@@ -22,7 +22,11 @@ import {
 } from "../lib/admin-budget.js";
 import {
   createAdminInvoiceSignedUrl,
+  downloadAdminInvoicePdf,
+  fetchAdminInvoices,
   fetchAdminTransactionInvoices,
+  parseAdminInvoicesQuery,
+  resendParentInvoiceEmail,
 } from "../lib/billing/admin-invoices.js";
 import {
   buildDemoParentInvoicePdf,
@@ -669,6 +673,24 @@ adminRouter.get("/transactions", async (req: AdminRequest, res) => {
 });
 
 /**
+ * GET /api/admin/invoices
+ * Liste des factures avec contexte cours / parent / prof.
+ */
+adminRouter.get("/invoices", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const params = parseAdminInvoicesQuery(req.query as Record<string, unknown>);
+
+  try {
+    const { invoices, meta } = await fetchAdminInvoices(scopeCampusId, params);
+    res.json({ data: invoices, meta });
+  } catch (err) {
+    console.error("[admin] invoices:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de charger les factures" });
+  }
+});
+
+/**
  * GET /api/admin/invoices/preview/:type
  * Aperçu PDF de démonstration (parent | student) pour le pilotage RH.
  */
@@ -725,6 +747,68 @@ adminRouter.get(
     } catch (err) {
       const message = (err as Error).message;
       const status = message.includes("introuvable") ? 404 : 403;
+      res.status(status).json({ error: message });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/invoices/:id/pdf
+ * Télécharge le PDF avec un nom de fichier lisible.
+ */
+adminRouter.get("/invoices/:id/pdf", async (req: AdminRequest, res) => {
+  const invoiceId = String(req.params.id ?? "");
+  if (!invoiceId) {
+    res.status(400).json({ error: "Identifiant facture manquant" });
+    return;
+  }
+
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+
+  try {
+    const { buffer, filename } = await downloadAdminInvoicePdf(
+      invoiceId,
+      scopeCampusId,
+    );
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${filename.replace(/"/g, "")}"`,
+    );
+    res.send(buffer);
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = message.includes("introuvable") ? 404 : 403;
+    res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/admin/invoices/:id/resend-parent
+ * Renvoie la facture parent par e-mail (Resend).
+ */
+adminRouter.post(
+  "/invoices/:id/resend-parent",
+  async (req: AdminRequest, res) => {
+    const invoiceId = String(req.params.id ?? "");
+    if (!invoiceId) {
+      res.status(400).json({ error: "Identifiant facture manquant" });
+      return;
+    }
+
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const scopeCampusId = campusFilter?.campusId;
+
+    try {
+      const result = await resendParentInvoiceEmail(invoiceId, scopeCampusId);
+      res.json({ data: result });
+    } catch (err) {
+      const message = (err as Error).message;
+      const status =
+        message.includes("introuvable") || message.includes("impossible")
+          ? 400
+          : 500;
       res.status(status).json({ error: message });
     }
   },
