@@ -84,6 +84,7 @@ export interface AdminTransactionRow {
   net_payout: number;
   status_stripe: TransactionStripeStatus;
   status_urssaf: TransactionUrssafStatus;
+  invoice_status?: "pending_invoice" | "invoiced";
   created_at: string;
   course: AdminTransactionCourse;
   invoice_summary?: {
@@ -106,6 +107,7 @@ interface RawTransactionRow {
   net_payout: unknown;
   status_stripe: string;
   status_urssaf: string;
+  invoice_status?: string;
   created_at: string;
   course_id: string;
   course: unknown;
@@ -373,6 +375,8 @@ function mapRawTransaction(row: RawTransactionRow): AdminTransactionRow | null {
     net_payout: parseAmount(row.net_payout),
     status_stripe: row.status_stripe as TransactionStripeStatus,
     status_urssaf: row.status_urssaf as TransactionUrssafStatus,
+    invoice_status:
+      row.invoice_status === "invoiced" ? "invoiced" : "pending_invoice",
     created_at: row.created_at,
     course: {
       id: courseRaw.id,
@@ -388,7 +392,7 @@ function mapRawTransaction(row: RawTransactionRow): AdminTransactionRow | null {
 
 const TRANSACTION_SELECT = `
   id, amount_gross, commission_sasu, taxes_urssaf, net_payout,
-  status_stripe, status_urssaf, created_at, course_id,
+  status_stripe, status_urssaf, invoice_status, created_at, course_id,
   course:course_id (
     id, title, subject, scheduled_at, campus_id,
     campus:campus_id ( id, name ),

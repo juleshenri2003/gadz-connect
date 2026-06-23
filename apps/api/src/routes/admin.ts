@@ -28,6 +28,11 @@ import {
   parseAdminInvoicesQuery,
   resendParentInvoiceEmail,
 } from "../lib/billing/admin-invoices.js";
+import { streamAdminInvoicesZip } from "../lib/billing/export-admin-invoices-zip.js";
+import { runMonthlyBilling } from "../lib/billing/run-monthly-billing.js";
+import {
+  regeneratePaymentInvoices,
+} from "../lib/billing/regenerate-payment-invoices.js";
 import {
   buildDemoParentInvoicePdf,
   buildDemoStudentInvoicePdf,
@@ -737,6 +742,45 @@ adminRouter.get("/invoices", async (req: AdminRequest, res) => {
 });
 
 /**
+ * POST /api/admin/invoices/backfill
+ * Lance la facturation mensuelle pour le mois précédent (ou ?period=YYYY-MM).
+ */
+adminRouter.post("/invoices/backfill", async (req: AdminRequest, res) => {
+  try {
+    const period =
+      typeof req.query.period === "string" ? req.query.period : undefined;
+    const result = await runMonthlyBilling({ period });
+    res.json({ data: result });
+  } catch (err) {
+    console.error("[admin] backfill invoices:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de lancer la facturation mensuelle" });
+  }
+});
+
+/**
+ * GET /api/admin/invoices/export
+ * Export ZIP des factures de la période (query: period=month|week|30d|all).
+ */
+adminRouter.get("/invoices/export", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const params = parseAdminInvoicesQuery(req.query as Record<string, unknown>);
+
+  try {
+    await streamAdminInvoicesZip(
+      res,
+      campusFilter?.campusId,
+      params.period ?? "month",
+    );
+  } catch (err) {
+    const message = (err as Error).message;
+    console.error("[admin] export invoices:", message);
+    if (!res.headersSent) {
+      res.status(message.includes("Aucune") ? 404 : 500).json({ error: message });
+    }
+  }
+});
+
+/**
  * GET /api/admin/invoices/preview/:type
  * Aperçu PDF de démonstration (parent | student) pour le pilotage RH.
  */
@@ -794,6 +838,72 @@ adminRouter.get(
       const message = (err as Error).message;
       const status = message.includes("introuvable") ? 404 : 403;
       res.status(status).json({ error: message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/transactions/:id/regenerate-invoices
+ * Régénère les PDF factures d'une transaction (données prof à jour).
+ */
+adminRouter.post(
+  "/transactions/:id/regenerate-invoices",
+  async (req: AdminRequest, res) => {
+    const transactionId = String(req.params.id ?? "");
+    if (!transactionId) {
+      res.status(400).json({ error: "Identifiant transaction manquant" });
+      return;
+    }
+
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const scopeCampusId = campusFilter?.campusId;
+
+    try {
+      const { data: transaction, error } = await supabaseAdmin
+        .from("transactions")
+        .select("id, course_id, stripe_payment_intent_id, status_stripe, course:courses!inner ( campus_id )")
+        .eq("id", transactionId)
+        .maybeSingle();
+
+      if (error || !transaction) {
+        res.status(404).json({ error: "Transaction introuvable" });
+        return;
+      }
+
+      const course = Array.isArray(transaction.course)
+        ? transaction.course[0]
+        : transaction.course;
+      const campusId = (course as { campus_id?: string })?.campus_id;
+
+      if (scopeCampusId && campusId !== scopeCampusId) {
+        res.status(403).json({ error: "Transaction hors périmètre" });
+        return;
+      }
+
+      if (transaction.status_stripe !== "succeeded") {
+        res.status(400).json({ error: "Paiement non confirmé" });
+        return;
+      }
+
+      const paymentIntentId =
+        (transaction.stripe_payment_intent_id as string | null) ??
+        `regen-${transactionId}`;
+
+      const result = await regeneratePaymentInvoices({
+        transactionId,
+        courseId: transaction.course_id as string,
+        paymentIntentId,
+      });
+
+      const invoices = await fetchAdminTransactionInvoices(
+        transactionId,
+        scopeCampusId,
+      );
+
+      res.json({ data: { ...result, invoices } });
+    } catch (err) {
+      console.error("[admin] regenerate invoices:", (err as Error).message);
+      res.status(500).json({ error: (err as Error).message });
     }
   },
 );

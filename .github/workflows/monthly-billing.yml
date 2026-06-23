@@ -1,0 +1,47 @@
+name: Monthly billing
+
+on:
+  schedule:
+    # 1er de chaque mois à 06:00 UTC (08:00 Paris hiver)
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Période YYYY-MM (vide = mois précédent)"
+        required: false
+        type: string
+
+jobs:
+  monthly-billing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run monthly billing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GADZ_PLATFORM_LEGAL_NAME: ${{ vars.GADZ_PLATFORM_LEGAL_NAME }}
+          GADZ_SAP_NUMBER: ${{ vars.GADZ_SAP_NUMBER }}
+          GADZ_PLATFORM_ADDRESS: ${{ vars.GADZ_PLATFORM_ADDRESS }}
+          GADZ_PLATFORM_SIRET: ${{ vars.GADZ_PLATFORM_SIRET }}
+          GADZ_BILLING_EMAIL_FROM: ${{ vars.GADZ_BILLING_EMAIL_FROM }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.period }}" ]; then
+            ARGS="--period=${{ github.event.inputs.period }}"
+          fi
+          pnpm --filter @gadz-connect/api monthly-billing -- $ARGS

@@ -1,7 +1,7 @@
 import type { FiscalCalculateInput, FiscalCalculateResult } from "@gadz-connect/types";
+import { calculateCommissionSasu } from "@gadz-connect/types";
 
-/** Commission fixe SASU (€) */
-export const COMMISSION_SASU = 3;
+export { COMMISSION_SASU_EUR, calculateCommissionSasu } from "@gadz-connect/types";
 
 /** Taux URSSAF micro-entreprise BNC — taux plein */
 export const URSSAF_RATE_FULL = 0.211;
@@ -14,14 +14,16 @@ export const LIBERATOIRE_RATE = 0.022;
 
 /**
  * Calcule le découpage financier d'un cours.
- * Base URSSAF et libératoire = montant brut − commission SASU.
+ * 1. Commission Gadz'Connect (3 € fixes)
+ * 2. URSSAF + versement libératoire sur le reste (base après commission)
+ * 3. Net versé au prof = brut − commission − cotisations
  */
 export function calculateFiscalBreakdown(
   input: FiscalCalculateInput,
 ): FiscalCalculateResult {
   const { amountGross, statusAcre, versementLiberatoire } = input;
 
-  const commissionSasu = COMMISSION_SASU;
+  const commissionSasu = calculateCommissionSasu(amountGross);
   const baseAfterCommission = round2(amountGross - commissionSasu);
 
   const urssafRate = statusAcre ? URSSAF_RATE_ACRE : URSSAF_RATE_FULL;

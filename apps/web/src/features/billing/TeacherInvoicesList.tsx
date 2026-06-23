@@ -17,7 +17,8 @@ export function TeacherInvoicesList() {
     >
       <h3 className="font-semibold text-ink-900">Mes factures URSSAF</h3>
       <p className="mt-1 text-sm text-ink-600">
-        Factures émises par votre auto-entreprise après chaque cours encaissé.
+        Notes de débours mensuelles émises par votre auto-entreprise (1er de chaque
+        mois).
       </p>
 
       {isLoading ? (
@@ -28,8 +29,8 @@ export function TeacherInvoicesList() {
         </p>
       ) : !invoices?.length ? (
         <p className="mt-4 text-sm text-ink-600">
-          Aucune facture pour l&apos;instant. Elles apparaissent ici dès qu&apos;un
-          paiement parent est confirmé.
+          Aucune facture pour l&apos;instant. Elles sont générées le 1er de chaque
+          mois pour les cours du mois précédent.
         </p>
       ) : (
         <ul className="mt-4 space-y-3">

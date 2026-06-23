@@ -9,6 +9,9 @@ import { AdminInvoicePreviewPanel } from "./AdminInvoicePreviewPanel";
 import {
   useAdminInvoicePdfEmbed,
   useAdminInvoices,
+  useAdminBackfillInvoices,
+  useAdminExportInvoicesZip,
+  useRegenerateTransactionInvoices,
   useResendParentInvoice,
   type AdminInvoiceRow,
 } from "./useInvoices";
@@ -95,6 +98,7 @@ function mergeTransactionPlaceholders(
 
   for (const tx of transactions) {
     if (tx.status_stripe !== "succeeded") continue;
+    if (tx.invoice_status === "invoiced") continue;
     if (invoicedTransactionIds.has(tx.id)) continue;
 
     const key = personKeyFromTransaction(tx, tab);
@@ -348,9 +352,13 @@ function InvoiceLineItem({
 function PendingLineItem({
   line,
   tab,
+  onGenerate,
+  generating,
 }: {
   line: PendingCourseLine;
   tab: HubTab;
+  onGenerate: (transactionId: string) => void;
+  generating: boolean;
 }) {
   return (
     <li className="rounded-lg border border-dashed border-warning/30 bg-warning-bg/30 px-3 py-2.5 text-sm">
@@ -364,10 +372,20 @@ function PendingLineItem({
         {formatEuro(line.amount)}
         {tab === "prof" ? " HT" : " TTC"} attendu
       </p>
-      <p className="mt-1 text-xs text-warning">
-        Facture non générée — lancez le webhook Stripe ou{" "}
-        <code className="text-xs">pnpm backfill-invoices</code>.
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-warning">
+          Facture non générée — webhook Stripe absent ou paiement antérieur.
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={generating}
+          onClick={() => onGenerate(line.id)}
+        >
+          {generating ? "Génération…" : "Générer"}
+        </Button>
+      </div>
     </li>
   );
 }
@@ -379,6 +397,8 @@ function PersonInvoiceSection({
   onToggle,
   onResend,
   resendingId,
+  onGeneratePending,
+  generatingTxId,
 }: {
   group: PersonInvoiceGroup;
   tab: HubTab;
@@ -386,6 +406,8 @@ function PersonInvoiceSection({
   onToggle: () => void;
   onResend: (id: string) => void;
   resendingId: string | null;
+  onGeneratePending: (transactionId: string) => void;
+  generatingTxId: string | null;
 }) {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     group.invoices[0]?.id ?? null,
@@ -465,7 +487,13 @@ function PersonInvoiceSection({
           {group.pending.length > 0 ? (
             <ul className="space-y-2">
               {group.pending.map((line) => (
-                <PendingLineItem key={line.id} line={line} tab={tab} />
+                <PendingLineItem
+                  key={line.id}
+                  line={line}
+                  tab={tab}
+                  generating={generatingTxId === line.id}
+                  onGenerate={onGeneratePending}
+                />
               ))}
             </ul>
           ) : null}
@@ -485,6 +513,8 @@ export function AdminInvoicesHub({
     "all",
   );
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [generatingTxId, setGeneratingTxId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const succeededTransactions = useMemo(
     () => transactions.filter((tx) => tx.status_stripe === "succeeded"),
@@ -500,6 +530,9 @@ export function AdminInvoicesHub({
   });
 
   const resendParent = useResendParentInvoice();
+  const backfillInvoices = useAdminBackfillInvoices();
+  const exportZip = useAdminExportInvoicesZip();
+  const regenerateTx = useRegenerateTransactionInvoices();
 
   const profGroups = useMemo(() => {
     const studentOnly = (data?.invoices ?? []).filter(
@@ -525,6 +558,22 @@ export function AdminInvoicesHub({
       await resendParent.mutateAsync(invoiceId);
     } finally {
       setResendingId(null);
+    }
+  }
+
+  async function handleGeneratePending(transactionId: string) {
+    setGeneratingTxId(transactionId);
+    setActionMessage(null);
+    try {
+      await regenerateTx.mutateAsync(transactionId);
+      setActionMessage("Factures générées.");
+      await refetch();
+    } catch (err) {
+      setActionMessage(
+        err instanceof Error ? err.message : "Génération impossible",
+      );
+    } finally {
+      setGeneratingTxId(null);
     }
   }
 
@@ -596,6 +645,39 @@ export function AdminInvoicesHub({
         >
           Actualiser
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={backfillInvoices.isPending}
+          onClick={() => {
+            void backfillInvoices.mutateAsync().then((result) => {
+              setActionMessage(
+                result.ok > 0
+                  ? `${result.ok} dossier(s) facturé(s).`
+                  : "Aucune facture manquante.",
+              );
+              void refetch();
+            });
+          }}
+        >
+          {backfillInvoices.isPending ? "Génération…" : "Factures manquantes"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={exportZip.isPending}
+          onClick={() => {
+            void exportZip.mutateAsync({
+              period: filters.period,
+              campusId:
+                filters.campusId !== "all" ? filters.campusId : undefined,
+            });
+          }}
+        >
+          {exportZip.isPending ? "Export…" : "Export ZIP"}
+        </Button>
       </div>
 
       {tab === "prof" ? (
@@ -634,11 +716,16 @@ export function AdminInvoicesHub({
               }
               onResend={handleResend}
               resendingId={resendingId}
+              onGeneratePending={(txId) => void handleGeneratePending(txId)}
+              generatingTxId={generatingTxId}
             />
           ))}
         </div>
       )}
 
+      {actionMessage ? (
+        <p className="text-sm text-ink-600">{actionMessage}</p>
+      ) : null}
       {resendParent.isError ? (
         <p className="text-sm text-danger">
           {(resendParent.error as Error).message}

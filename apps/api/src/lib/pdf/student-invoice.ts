@@ -70,7 +70,11 @@ export function buildStudentInvoicePdf(
       `N° SAP : ${input.platform.sapNumber}`,
     ]);
 
-    writeSectionTitle(doc, "Prestation de cours");
+    writeSectionTitle(doc, "Prestation de service");
+    writeBody(
+      doc,
+      "Soutien scolaire / cours particulier réalisé pour le compte de la plateforme Gadz'Connect.",
+    );
     writeBody(doc, `Objet : ${input.subject}`);
     writeBody(
       doc,

@@ -5,7 +5,6 @@ import {
   cancelPendingBooking,
   finalizeBookingSlot,
 } from "../../lib/booking.js";
-import { generatePaymentInvoices } from "../../lib/billing/generate-payment-invoices.js";
 import { notifyPaymentReceived } from "../../lib/notification-helpers.js";
 import { supabaseAdmin } from "../../lib/supabase.js";
 import {
@@ -59,14 +58,13 @@ async function handlePaymentIntentSucceeded(
     .eq("course_id", courseId)
     .maybeSingle();
 
-  const transactionId: string | null = existing?.id ?? null;
-
   if (existing) {
     await supabaseAdmin
       .from("transactions")
       .update({
         status_stripe: "succeeded",
         stripe_payment_intent_id: paymentIntent.id,
+        invoice_status: "pending_invoice",
       })
       .eq("id", existing.id);
   }
@@ -92,21 +90,6 @@ async function handlePaymentIntentSucceeded(
       .from("courses")
       .update({ status: "scheduled" })
       .eq("id", courseId);
-  }
-
-  if (transactionId) {
-    try {
-      await generatePaymentInvoices({
-        transactionId,
-        courseId: course.id as string,
-        paymentIntentId: paymentIntent.id,
-      });
-    } catch (err) {
-      console.error(
-        "[stripe webhook] génération factures:",
-        err instanceof Error ? err.message : err,
-      );
-    }
   }
 
   if (!wasPending) return;

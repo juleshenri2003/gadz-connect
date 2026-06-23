@@ -9,6 +9,14 @@ export function invoiceStoragePath(
   return `${invoiceType}/${transactionId}.pdf`;
 }
 
+export function monthlyInvoiceStoragePath(
+  invoiceType: "parent" | "student",
+  periodCompact: string,
+  invoiceId: string,
+): string {
+  return `monthly/${invoiceType}/${periodCompact}/${invoiceId}.pdf`;
+}
+
 export async function uploadInvoicePdf(
   storagePath: string,
   buffer: Buffer,

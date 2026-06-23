@@ -79,6 +79,14 @@ export interface FiscalCalculateInput {
   versementLiberatoire: boolean;
 }
 
+/** Commission fixe Gadz'Connect (€) — prélevée sur chaque cours avant cotisations. */
+export const COMMISSION_SASU_EUR = 3;
+
+export function calculateCommissionSasu(amountGross: number): number {
+  const gross = Math.max(0, amountGross);
+  return Math.min(COMMISSION_SASU_EUR, Math.round(gross * 100) / 100);
+}
+
 export interface FiscalCalculateResult {
   amountGross: number;
   commissionSasu: number;

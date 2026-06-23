@@ -10,6 +10,10 @@ import {
 import { createCvPdfSignedUrl } from "../lib/cv-pdf.js";
 import { createInvoiceSignedUrl } from "../lib/billing/invoice-storage.js";
 import {
+  buildTransactionRevenueFromBooking,
+  toTransactionInsertRow,
+} from "../lib/billing/revenue-split.js";
+import {
   finalizeBookingSlot,
   prepareBooking,
   shouldUseStripePayment,
@@ -570,20 +574,42 @@ tutorsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
   }
 
   const { data: invoices, error } = await supabaseAdmin
-    .from("payment_invoices")
+    .from("monthly_invoices")
     .select(
-      "id, invoice_number, invoice_type, amount, created_at, course_id, parent_email_sent_at, course:course_id ( subject, title, scheduled_at )",
+      "id, invoice_number, invoice_type, amount, line_count, billing_period, created_at, email_sent_at",
     )
-    .eq("provider_profile_id", userId)
+    .eq("profile_id", userId)
     .eq("invoice_type", "student")
-    .order("created_at", { ascending: false });
+    .order("billing_period", { ascending: false });
 
   if (error) {
     res.status(500).json({ error: error.message });
     return;
   }
 
-  res.json({ data: invoices ?? [] });
+  const mapped = (invoices ?? []).map((row) => {
+    const billingPeriod = row.billing_period as string;
+    const lineCount = Number(row.line_count ?? 0);
+    const periodLabel = new Date(`${billingPeriod}T00:00:00.000Z`).toLocaleDateString(
+      "fr-FR",
+      { month: "long", year: "numeric", timeZone: "UTC" },
+    );
+    const label = `Note de débours — ${periodLabel} (${lineCount} cours)`;
+    return {
+      id: row.id,
+      invoice_number: row.invoice_number,
+      invoice_type: row.invoice_type,
+      amount: row.amount,
+      created_at: row.created_at,
+      line_count: lineCount,
+      billing_period: billingPeriod,
+      course_subject: label,
+      course_title: label,
+      scheduled_at: `${billingPeriod}T12:00:00.000Z`,
+    };
+  });
+
+  res.json({ data: mapped });
 });
 
 /**
@@ -597,8 +623,8 @@ tutorsRouter.get(
     const invoiceId = req.params.id;
 
     const { data: invoice, error } = await supabaseAdmin
-      .from("payment_invoices")
-      .select("id, storage_path, provider_profile_id, invoice_type")
+      .from("monthly_invoices")
+      .select("id, storage_path, profile_id, invoice_type")
       .eq("id", invoiceId)
       .maybeSingle();
 
@@ -607,7 +633,7 @@ tutorsRouter.get(
       return;
     }
 
-    if (!invoice || invoice.provider_profile_id !== userId) {
+    if (!invoice || invoice.profile_id !== userId) {
       res.status(404).json({ error: "Facture introuvable" });
       return;
     }
@@ -798,16 +824,15 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
         automatic_payment_methods: { enabled: true },
       });
 
-      const { error: txError } = await supabaseAdmin.from("transactions").insert({
-        course_id: course.id,
-        amount_gross: fiscal.amountGross,
-        commission_sasu: fiscal.commissionSasu,
-        taxes_urssaf: fiscal.taxesUrssaf,
-        net_payout: fiscal.netPayout,
-        status_stripe: "pending",
-        status_urssaf: "pending",
-        stripe_payment_intent_id: paymentIntent.id,
-      });
+      const revenue = buildTransactionRevenueFromBooking(fiscal);
+      const { error: txError } = await supabaseAdmin
+        .from("transactions")
+        .insert(
+          toTransactionInsertRow(revenue, {
+            course_id: course.id,
+            stripe_payment_intent_id: paymentIntent.id,
+          }),
+        );
 
       if (txError || !paymentIntent.client_secret) {
         await supabaseAdmin.from("courses").delete().eq("id", course.id);
@@ -840,15 +865,16 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     }
   }
 
-  const { error: txError } = await supabaseAdmin.from("transactions").insert({
-    course_id: course.id,
-    amount_gross: fiscal.amountGross,
-    commission_sasu: fiscal.commissionSasu,
-    taxes_urssaf: fiscal.taxesUrssaf,
-    net_payout: fiscal.netPayout,
-    status_stripe: "pending",
-    status_urssaf: "pending",
-  });
+  const revenue = buildTransactionRevenueFromBooking(fiscal);
+  const { error: txError } = await supabaseAdmin
+    .from("transactions")
+    .insert(
+      toTransactionInsertRow(revenue, {
+        course_id: course.id,
+        status_stripe: "succeeded",
+        status_urssaf: "pending",
+      }),
+    );
 
   if (txError) {
     await supabaseAdmin.from("courses").delete().eq("id", course.id);

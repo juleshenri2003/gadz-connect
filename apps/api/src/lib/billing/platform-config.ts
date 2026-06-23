@@ -3,6 +3,8 @@ export interface PlatformBillingConfig {
   sapNumber: string;
   address: string;
   siret: string | null;
+  /** Chemin local optionnel vers le logo (PNG/JPG) pour les PDF. */
+  logoPath: string | null;
   vatApplicable: boolean;
   vatRate: number;
   emailFrom: string;
@@ -18,6 +20,7 @@ export function getPlatformBillingConfig(): PlatformBillingConfig {
       process.env.GADZ_PLATFORM_ADDRESS?.trim() ||
       "Arts et Métiers — Paris, France",
     siret: process.env.GADZ_PLATFORM_SIRET?.trim() || null,
+    logoPath: process.env.GADZ_PLATFORM_LOGO_PATH?.trim() || null,
     vatApplicable,
     vatRate: vatApplicable ? Number(process.env.GADZ_VAT_RATE ?? "20") : 0,
     emailFrom:

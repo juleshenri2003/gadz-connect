@@ -7,8 +7,8 @@ import {
   getWeekDays,
   startOfWeek,
 } from "@/features/scheduling/calendar-utils";
+import { calculateCommissionSasu } from "@gadz-connect/types";
 
-const COMMISSION_SASU = 3;
 const URSSAF_RATE_FULL = 0.211;
 const URSSAF_RATE_ACRE = 0.106;
 const LIBERATOIRE_RATE = 0.022;
@@ -22,12 +22,13 @@ export function estimateNetPayout(
   statusAcre: boolean,
   versementLiberatoire: boolean,
 ): number {
-  const baseAfterCommission = round2(amountGross - COMMISSION_SASU);
+  const commissionSasu = calculateCommissionSasu(amountGross);
+  const baseAfterCommission = round2(amountGross - commissionSasu);
   const urssafRate = statusAcre ? URSSAF_RATE_ACRE : URSSAF_RATE_FULL;
   const taxesUrssaf = round2(baseAfterCommission * urssafRate);
   const liberatoireRate = versementLiberatoire ? LIBERATOIRE_RATE : 0;
   const taxesLiberatoire = round2(baseAfterCommission * liberatoireRate);
-  return round2(amountGross - COMMISSION_SASU - taxesUrssaf - taxesLiberatoire);
+  return round2(amountGross - commissionSasu - taxesUrssaf - taxesLiberatoire);
 }
 
 export function sessionDurationHours(startsAt: string, endsAt: string): number {

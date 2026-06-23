@@ -4,6 +4,7 @@ import {
   resolveAdminBudgetCampusId,
 } from "../admin-budget.js";
 import { sendParentInvoiceEmail } from "../email/send-parent-invoice.js";
+import { sendMonthlyParentInvoiceEmail } from "../email/send-monthly-parent-invoice.js";
 import { buildInvoiceDownloadFilename } from "./invoice-filename.js";
 import {
   createInvoiceSignedUrl,
@@ -30,6 +31,8 @@ export interface AdminInvoiceRow {
   campus_name: string | null;
   campus_id: string | null;
   download_filename: string;
+  is_monthly?: boolean;
+  line_count?: number;
 }
 
 export interface AdminInvoicesQuery {
@@ -130,6 +133,51 @@ function mapInvoiceRow(row: Record<string, unknown>): AdminInvoiceRow | null {
   };
 }
 
+function formatBillingPeriodLabel(billingPeriod: string): string {
+  return new Date(`${billingPeriod}T00:00:00.000Z`).toLocaleDateString(
+    "fr-FR",
+    { month: "long", year: "numeric", timeZone: "UTC" },
+  );
+}
+
+function mapMonthlyInvoiceRow(
+  row: Record<string, unknown>,
+): AdminInvoiceRow | null {
+  const profile = pickOne<PersonRow>(row.profile);
+  const invoiceType = row.invoice_type as "parent" | "student";
+  const invoiceNumber = row.invoice_number as string;
+  const billingPeriod = row.billing_period as string;
+  const lineCount = Number(row.line_count ?? 0);
+  const periodLabel = formatBillingPeriodLabel(billingPeriod);
+  const courseSubject = `Facture mensuelle — ${periodLabel} (${lineCount} cours)`;
+  const personName = formatPersonName(profile);
+
+  return {
+    id: row.id as string,
+    invoice_type: invoiceType,
+    invoice_number: invoiceNumber,
+    amount: Number(row.amount),
+    created_at: row.created_at as string,
+    parent_email_sent_at: (row.email_sent_at as string | null) ?? null,
+    transaction_id: row.id as string,
+    course_id: row.id as string,
+    parent_name: invoiceType === "parent" ? personName : "—",
+    prof_name: invoiceType === "student" ? personName : "—",
+    provider_profile_id:
+      invoiceType === "student" ? ((row.profile_id as string) ?? null) : null,
+    client_profile_id:
+      invoiceType === "parent" ? ((row.profile_id as string) ?? null) : null,
+    course_subject: courseSubject,
+    course_title: courseSubject,
+    scheduled_at: `${billingPeriod}T12:00:00.000Z`,
+    campus_name: null,
+    campus_id: null,
+    download_filename: `facture-mensuelle-${invoiceNumber.replace(/\s+/g, "-")}.pdf`,
+    is_monthly: true,
+    line_count: lineCount,
+  };
+}
+
 const INVOICE_SELECT = `
   id,
   transaction_id,
@@ -156,6 +204,20 @@ const INVOICE_SELECT = `
       client:client_id ( first_name, last_name )
     )
   )
+`;
+
+const MONTHLY_INVOICE_SELECT = `
+  id,
+  invoice_type,
+  billing_period,
+  profile_id,
+  invoice_number,
+  amount,
+  line_count,
+  created_at,
+  email_sent_at,
+  storage_path,
+  profile:profile_id ( first_name, last_name )
 `;
 
 function isInPeriod(
@@ -197,21 +259,34 @@ export async function fetchAdminInvoices(
   const page = params.page ?? 1;
   const limit = params.limit ?? 50;
 
-  const { data, error } = await supabaseAdmin
-    .from("payment_invoices")
-    .select(INVOICE_SELECT)
-    .order("created_at", { ascending: false });
+  const [monthlyResult, legacyResult] = await Promise.all([
+    supabaseAdmin
+      .from("monthly_invoices")
+      .select(MONTHLY_INVOICE_SELECT)
+      .order("created_at", { ascending: false }),
+    supabaseAdmin
+      .from("payment_invoices")
+      .select(INVOICE_SELECT)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (monthlyResult.error) {
+    throw new Error(monthlyResult.error.message);
+  }
+  if (legacyResult.error) {
+    throw new Error(legacyResult.error.message);
   }
 
-  let mapped = (data ?? [])
-    .map((row) => mapInvoiceRow(row as Record<string, unknown>))
-    .filter((row): row is AdminInvoiceRow => row !== null)
-    .filter((row) =>
-      isInPeriod(row.scheduled_at ?? row.created_at, start, end),
-    );
+  let mapped = [
+    ...(monthlyResult.data ?? [])
+      .map((row) => mapMonthlyInvoiceRow(row as Record<string, unknown>))
+      .filter((row): row is AdminInvoiceRow => row !== null),
+    ...(legacyResult.data ?? [])
+      .map((row) => mapInvoiceRow(row as Record<string, unknown>))
+      .filter((row): row is AdminInvoiceRow => row !== null),
+  ].filter((row) =>
+    isInPeriod(row.scheduled_at ?? row.created_at, start, end),
+  );
 
   if (effectiveCampusId) {
     mapped = mapped.filter((row) => row.campus_id === effectiveCampusId);
@@ -299,9 +374,9 @@ export async function fetchInvoiceSummariesForTransactions(
   if (transactionIds.length === 0) return result;
 
   const { data, error } = await supabaseAdmin
-    .from("payment_invoices")
-    .select("transaction_id, invoice_type, parent_email_sent_at")
-    .in("transaction_id", transactionIds);
+    .from("transactions")
+    .select("id, invoice_status")
+    .in("id", transactionIds);
 
   if (error) {
     console.warn("[billing] résumé factures:", error.message);
@@ -309,19 +384,11 @@ export async function fetchInvoiceSummariesForTransactions(
   }
 
   for (const row of data ?? []) {
-    const txId = row.transaction_id as string;
-    const current = result.get(txId) ?? {
-      invoice_count: 0,
-      parent_email_sent: false,
-    };
-    current.invoice_count += 1;
-    if (
-      row.invoice_type === "parent" &&
-      row.parent_email_sent_at
-    ) {
-      current.parent_email_sent = true;
-    }
-    result.set(txId, current);
+    const invoiced = row.invoice_status === "invoiced";
+    result.set(row.id as string, {
+      invoice_count: invoiced ? 2 : 0,
+      parent_email_sent: invoiced,
+    });
   }
 
   return result;
@@ -331,6 +398,31 @@ async function loadInvoiceForScope(
   invoiceId: string,
   scopeCampusId: string | undefined,
 ): Promise<AdminInvoiceRow & { storage_path: string; client_profile_id: string | null }> {
+  const { data: monthly, error: monthlyError } = await supabaseAdmin
+    .from("monthly_invoices")
+    .select(MONTHLY_INVOICE_SELECT)
+    .eq("id", invoiceId)
+    .maybeSingle();
+
+  if (monthlyError) {
+    throw new Error(monthlyError.message);
+  }
+
+  if (monthly) {
+    const mapped = mapMonthlyInvoiceRow(monthly as Record<string, unknown>);
+    if (!mapped) {
+      throw new Error("Facture introuvable");
+    }
+    return {
+      ...mapped,
+      storage_path: monthly.storage_path as string,
+      client_profile_id:
+        mapped.invoice_type === "parent"
+          ? ((monthly.profile_id as string) ?? null)
+          : null,
+    };
+  }
+
   const { data: invoice, error } = await supabaseAdmin
     .from("payment_invoices")
     .select(INVOICE_SELECT)
@@ -408,14 +500,16 @@ export async function resendParentInvoiceEmail(
     throw new Error("Seules les factures parent peuvent être renvoyées par e-mail");
   }
 
-  const transaction = await supabaseAdmin
-    .from("transactions")
-    .select("status_stripe")
-    .eq("id", invoice.transaction_id)
-    .maybeSingle();
+  if (!invoice.is_monthly) {
+    const transaction = await supabaseAdmin
+      .from("transactions")
+      .select("status_stripe")
+      .eq("id", invoice.transaction_id)
+      .maybeSingle();
 
-  if (transaction.data?.status_stripe !== "succeeded") {
-    throw new Error("Paiement non confirmé — envoi impossible");
+    if (transaction.data?.status_stripe !== "succeeded") {
+      throw new Error("Paiement non confirmé — envoi impossible");
+    }
   }
 
   if (!invoice.client_profile_id) {
@@ -428,6 +522,31 @@ export async function resendParentInvoiceEmail(
   }
 
   const { buffer } = await downloadAdminInvoicePdf(invoiceId, scopeCampusId);
+
+  if (invoice.is_monthly) {
+    const periodLabel = formatBillingPeriodLabel(
+      (invoice.scheduled_at ?? invoice.created_at).slice(0, 10),
+    );
+    const emailResult = await sendMonthlyParentInvoiceEmail({
+      to: clientEmail,
+      parentName: invoice.parent_name,
+      invoiceNumber: invoice.invoice_number,
+      billingPeriodLabel: periodLabel,
+      totalAmount: invoice.amount,
+      lineCount: invoice.line_count ?? 1,
+      pdfBuffer: buffer,
+      downloadFilename: invoice.download_filename,
+    });
+
+    if (emailResult.sent) {
+      await supabaseAdmin
+        .from("monthly_invoices")
+        .update({ email_sent_at: new Date().toISOString() })
+        .eq("id", invoiceId);
+    }
+
+    return emailResult;
+  }
 
   const emailResult = await sendParentInvoiceEmail({
     to: clientEmail,

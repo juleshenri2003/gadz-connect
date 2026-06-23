@@ -3,6 +3,7 @@ import PDFDocument from "pdfkit";
 import type { PlatformBillingConfig } from "../billing/platform-config.js";
 import {
   formatEuro,
+  formatFrenchDate,
   formatFrenchDateTimeRange,
   formatSiretDisplay,
 } from "../billing/format.js";
@@ -14,28 +15,32 @@ import {
   writeTitle,
 } from "./pdf-layout.js";
 
-export interface ParentInvoiceInput {
-  invoiceNumber: string;
-  invoiceDate: string;
-  platform: PlatformBillingConfig;
-  parentName: string;
-  /** Élève bénéficiaire du cours (souvent le même foyer que le parent payeur). */
-  studentBeneficiaryName: string;
-  tutorName: string;
-  subject: string;
+export interface MonthlyParentInvoiceLine {
   scheduledAt: string | null;
   endsAt: string | null;
-  /** Montant total payé par le parent (TTC). */
-  amountGross: number;
+  subject: string;
+  tutorName: string;
+  amount: number;
+}
+
+export interface MonthlyParentInvoiceInput {
+  invoiceNumber: string;
+  invoiceDate: string;
+  billingPeriodLabel: string;
+  platform: PlatformBillingConfig;
+  parentName: string;
+  lines: MonthlyParentInvoiceLine[];
+  totalAmount: number;
 }
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
-function writePartyBlock(
-  doc: PdfDoc,
-  title: string,
-  lines: string[],
-): void {
+const COL_DATE = 50;
+const COL_SUBJECT = 130;
+const COL_TUTOR = 300;
+const COL_AMOUNT = 480;
+
+function writePartyBlock(doc: PdfDoc, title: string, lines: string[]): void {
   writeSectionTitle(doc, title);
   for (const line of lines) {
     writeBody(doc, line);
@@ -43,8 +48,41 @@ function writePartyBlock(
   doc.moveDown(0.5);
 }
 
-export function buildParentInvoicePdf(
-  input: ParentInvoiceInput,
+function drawTableHeader(doc: PdfDoc): void {
+  ensureSpace(doc, 24);
+  const y = doc.y;
+  doc.font("Helvetica-Bold").fontSize(9).fillColor("#0F172A");
+  doc.text("Date", COL_DATE, y);
+  doc.text("Cours", COL_SUBJECT, y);
+  doc.text("Professeur", COL_TUTOR, y);
+  doc.text("Montant", COL_AMOUNT, y, { width: 70, align: "right" });
+  doc.moveDown(0.6);
+  drawHorizontalRule(doc);
+}
+
+function drawTableRow(doc: PdfDoc, line: MonthlyParentInvoiceLine): void {
+  ensureSpace(doc, 36);
+  const y = doc.y;
+  const dateLabel = line.scheduledAt
+    ? formatFrenchDate(line.scheduledAt)
+    : "—";
+  const timeLabel = formatFrenchDateTimeRange(line.scheduledAt, line.endsAt);
+
+  doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
+  doc.text(dateLabel, COL_DATE, y, { width: 72 });
+  doc.text(line.subject, COL_SUBJECT, y, { width: 160 });
+  doc.text(line.tutorName, COL_TUTOR, y, { width: 170 });
+  doc.text(formatEuro(line.amount), COL_AMOUNT, y, {
+    width: 70,
+    align: "right",
+  });
+  doc.fontSize(7.5).fillColor("#64748B");
+  doc.text(timeLabel, COL_SUBJECT, y + 12, { width: 400 });
+  doc.moveDown(1.2);
+}
+
+export function buildMonthlyParentInvoicePdf(
+  input: MonthlyParentInvoiceInput,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -60,10 +98,11 @@ export function buildParentInvoicePdf(
       doc.moveDown(3.2);
     }
 
-    writeTitle(doc, "FACTURE");
+    writeTitle(doc, "FACTURE MENSUELLE");
     doc.moveDown(0.3);
-    writeBody(doc, `N° ${input.invoiceNumber}`, { indent: 0 });
+    writeBody(doc, `N° ${input.invoiceNumber}`);
     writeBody(doc, `Date d'émission : ${input.invoiceDate}`);
+    writeBody(doc, `Période facturée : ${input.billingPeriodLabel}`);
     doc.moveDown(0.8);
     drawHorizontalRule(doc);
 
@@ -78,24 +117,19 @@ export function buildParentInvoicePdf(
 
     writePartyBlock(doc, "Émetteur", platformLines);
     writePartyBlock(doc, "Client (parent payeur)", [input.parentName]);
-    writePartyBlock(doc, "Élève bénéficiaire", [input.studentBeneficiaryName]);
 
-    writeSectionTitle(doc, "Cours particulier");
-    writeBody(doc, `Professeur : ${input.tutorName}`);
-    writeBody(doc, `Matière / objet : ${input.subject}`);
-    writeBody(
-      doc,
-      `Date et horaires : ${formatFrenchDateTimeRange(input.scheduledAt, input.endsAt)}`,
-    );
-    doc.moveDown(0.5);
+    writeSectionTitle(doc, "Récapitulatif des cours particuliers");
+    drawTableHeader(doc);
+    for (const line of input.lines) {
+      drawTableRow(doc, line);
+    }
 
-    writeSectionTitle(doc, "Montant");
-    ensureSpace(doc, 60);
+    ensureSpace(doc, 50);
     doc
       .font("Helvetica-Bold")
       .fontSize(14)
       .fillColor("#0F172A")
-      .text(`Total TTC : ${formatEuro(input.amountGross)}`);
+      .text(`Total TTC : ${formatEuro(input.totalAmount)}`, { align: "right" });
     doc.moveDown(0.8);
 
     writeSectionTitle(doc, "Mentions légales");
@@ -119,7 +153,7 @@ export function buildParentInvoicePdf(
       .fontSize(9)
       .fillColor("#94A3B8")
       .text(
-        "Document généré automatiquement par Gadz'Connect à réception du paiement.",
+        "Facture mensuelle consolidée générée automatiquement par Gadz'Connect.",
         { align: "center" },
       );
 

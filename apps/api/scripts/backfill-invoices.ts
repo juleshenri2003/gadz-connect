@@ -1,70 +1,34 @@
 /**
- * Génère les factures manquantes pour les transactions Stripe déjà réussies.
+ * Lance la facturation mensuelle (mois précédent par défaut).
  * Usage: pnpm --filter @gadz-connect/api backfill-invoices
+ *        pnpm --filter @gadz-connect/api backfill-invoices -- --period=2026-05
  */
 import "dotenv/config";
-import { generatePaymentInvoices } from "../src/lib/billing/generate-payment-invoices.js";
-import { supabaseAdmin } from "../src/lib/supabase.js";
+import { runMonthlyBilling } from "../src/lib/billing/run-monthly-billing.js";
+
+function parsePeriod(argv: string[]): string | undefined {
+  for (const arg of argv) {
+    if (arg.startsWith("--period=")) return arg.slice("--period=".length);
+  }
+  return undefined;
+}
 
 async function main() {
-  const { data: transactions, error } = await supabaseAdmin
-    .from("transactions")
-    .select("id, course_id, stripe_payment_intent_id, status_stripe")
-    .eq("status_stripe", "succeeded");
+  const period = parsePeriod(process.argv.slice(2));
+  const result = await runMonthlyBilling({ period });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const { data: invoices } = await supabaseAdmin
-    .from("payment_invoices")
-    .select("transaction_id, invoice_type");
-
-  const invoiceCount = new Map<string, number>();
-  for (const row of invoices ?? []) {
-    const txId = row.transaction_id as string;
-    invoiceCount.set(txId, (invoiceCount.get(txId) ?? 0) + 1);
-  }
-
-  const missing = (transactions ?? []).filter(
-    (tx) => (invoiceCount.get(tx.id as string) ?? 0) < 2,
-  );
-
-  if (missing.length === 0) {
-    console.log("Aucune facture à générer — toutes les transactions sont à jour.");
+  if (
+    result.parentInvoices === 0 &&
+    result.studentInvoices === 0 &&
+    result.linesInvoiced === 0
+  ) {
+    console.log("Aucune ligne en attente pour cette période.");
     return;
   }
 
-  console.log(`${missing.length} transaction(s) sans facture — génération…`);
-
-  let ok = 0;
-  let failed = 0;
-
-  for (const tx of missing) {
-    const paymentIntentId =
-      (tx.stripe_payment_intent_id as string | null) ?? `backfill-${tx.id}`;
-
-    try {
-      const result = await generatePaymentInvoices({
-        transactionId: tx.id as string,
-        courseId: tx.course_id as string,
-        paymentIntentId,
-      });
-      ok += 1;
-      console.log(
-        `✓ ${tx.id} → parent=${result.parentInvoiceId ?? "—"} student=${result.studentInvoiceId ?? "—"}`,
-      );
-    } catch (err) {
-      failed += 1;
-      console.error(
-        `✗ ${tx.id}:`,
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
-  console.log(`Terminé : ${ok} OK, ${failed} échec(s).`);
-  if (failed > 0) process.exit(1);
+  console.log(
+    `Terminé : ${result.parentInvoices} facture(s) parent, ${result.studentInvoices} note(s) étudiant, ${result.linesInvoiced} ligne(s) clôturée(s).`,
+  );
 }
 
 main().catch((err: Error) => {

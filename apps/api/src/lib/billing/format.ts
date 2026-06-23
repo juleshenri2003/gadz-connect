@@ -52,3 +52,11 @@ export function formatInvoiceNumber(
   const year = new Date().getFullYear();
   return `GC-${prefix}-${year}-${String(sequence).padStart(6, "0")}`;
 }
+
+export function formatMonthlyInvoiceNumber(
+  prefix: "PARENT" | "STUDENT",
+  periodCompact: string,
+  sequence: number,
+): string {
+  return `GC-${prefix}-M-${periodCompact}-${String(sequence).padStart(4, "0")}`;
+}

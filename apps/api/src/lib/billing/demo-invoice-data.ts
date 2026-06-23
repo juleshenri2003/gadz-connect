@@ -25,11 +25,12 @@ export async function buildDemoParentInvoicePdf(): Promise<Buffer> {
     invoiceDate,
     platform,
     parentName: "Sophie Dupont",
+    studentBeneficiaryName: "Lucas Dupont",
     tutorName: "Marie Martin",
     subject: "SolidWorks — modélisation 3D",
     scheduledAt: scheduledAt.toISOString(),
     endsAt: endsAt.toISOString(),
-    amountGross: 36,
+    amountGross: 40,
   });
 }
 
@@ -48,6 +49,6 @@ export async function buildDemoStudentInvoicePdf(): Promise<Buffer> {
     subject: "SolidWorks — modélisation 3D",
     scheduledAt: scheduledAt.toISOString(),
     endsAt: endsAt.toISOString(),
-    amount: 33,
+    amount: 37,
   });
 }

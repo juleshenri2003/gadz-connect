@@ -239,6 +239,78 @@ export function useResendParentInvoice() {
   });
 }
 
+function invalidateInvoiceQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+  void queryClient.invalidateQueries({ queryKey: ["admin-transaction-invoices"] });
+  void queryClient.invalidateQueries({ queryKey: ["admin-transactions"] });
+}
+
+export function useAdminBackfillInvoices() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: { ok: number; failed: number } }>(
+        "/api/admin/invoices/backfill",
+        { method: "POST", token },
+      );
+      return res.data;
+    },
+    onSuccess: () => invalidateInvoiceQueries(queryClient),
+  });
+}
+
+export function useRegenerateTransactionInvoices() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: { invoices: AdminInvoiceRow[] } }>(
+        `/api/admin/transactions/${transactionId}/regenerate-invoices`,
+        { method: "POST", token },
+      );
+      return res.data;
+    },
+    onSuccess: () => invalidateInvoiceQueries(queryClient),
+  });
+}
+
+export function useAdminExportInvoicesZip() {
+  const { getAccessToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (params: { period?: string; campusId?: string }) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const searchParams = new URLSearchParams();
+      if (params.period) searchParams.set("period", params.period);
+      if (params.campusId) searchParams.set("campus_id", params.campusId);
+      const qs = searchParams.toString();
+      const res = await fetch(
+        `${API_URL}/api/admin/invoices/export${qs ? `?${qs}` : ""}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Erreur HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `gadz-connect-factures-${params.period ?? "month"}.zip`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
 export function useTeacherInvoices() {
   const { getAccessToken } = useAuth();
 

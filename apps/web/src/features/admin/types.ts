@@ -278,6 +278,7 @@ export interface AdminTransactionRow {
   net_payout: number;
   status_stripe: TransactionStripeStatus;
   status_urssaf: TransactionUrssafStatus;
+  invoice_status?: "pending_invoice" | "invoiced";
   created_at: string;
   course: AdminTransactionCourse;
   invoice_summary?: {

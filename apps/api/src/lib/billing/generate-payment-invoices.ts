@@ -29,17 +29,27 @@ export interface GeneratePaymentInvoicesResult {
 async function nextInvoiceSequence(
   invoiceType: "parent" | "student",
 ): Promise<number> {
-  const { count, error } = await supabaseAdmin
+  const prefix = invoiceType === "parent" ? "GC-PARENT-" : "GC-STUDENT-";
+  const year = new Date().getFullYear();
+  const { data, error } = await supabaseAdmin
     .from("payment_invoices")
-    .select("id", { count: "exact", head: true })
-    .eq("invoice_type", invoiceType);
+    .select("invoice_number")
+    .like("invoice_number", `${prefix}${year}-%`);
 
   if (error) {
     console.warn("[billing] compteur factures:", error.message);
     return Date.now() % 1_000_000;
   }
 
-  return (count ?? 0) + 1;
+  let maxSequence = 0;
+  for (const row of data ?? []) {
+    const match = (row.invoice_number as string).match(/-(\d+)$/);
+    if (match) {
+      maxSequence = Math.max(maxSequence, Number.parseInt(match[1]!, 10));
+    }
+  }
+
+  return maxSequence + 1;
 }
 
 async function getClientEmail(clientId: string | null | undefined): Promise<string | null> {
@@ -74,7 +84,7 @@ export async function generatePaymentInvoices(
   const { data: transaction, error: txError } = await supabaseAdmin
     .from("transactions")
     .select(
-      "id, course_id, amount_gross, commission_sasu, net_payout, status_stripe",
+      "id, course_id, amount_gross, commission_sasu, total_paid_parent, platform_commission, teacher_gross_revenue, net_payout, status_stripe",
     )
     .eq("id", input.transactionId)
     .maybeSingle();
@@ -151,9 +161,13 @@ export async function generatePaymentInvoices(
   const studentAddress =
     (provider?.micro_enterprise_address as string | null)?.trim() ||
     "Adresse de l'auto-entreprise non renseignée";
-  const amountGross = Number(transaction.amount_gross);
-  const commissionSasu = Number(transaction.commission_sasu);
-  const studentAmount = Math.round((amountGross - commissionSasu) * 100) / 100;
+  const amountGross = Number(
+    transaction.total_paid_parent ?? transaction.amount_gross,
+  );
+  const studentAmount = Number(
+    transaction.teacher_gross_revenue ??
+      transaction.amount_gross - transaction.commission_sasu,
+  );
 
   const parentSequence = await nextInvoiceSequence("parent");
   const studentSequence = await nextInvoiceSequence("student");
@@ -165,6 +179,7 @@ export async function generatePaymentInvoices(
     invoiceDate,
     platform,
     parentName,
+    studentBeneficiaryName: parentName,
     tutorName,
     subject,
     scheduledAt: (course.scheduled_at as string) ?? null,

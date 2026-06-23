@@ -17,10 +17,13 @@
     "seed-professor-personas": "tsx scripts/seed-professor-personas.ts",
     "seed-professor-fresh": "tsx scripts/seed-professor-fresh.ts",
     "seed-demo-passwords": "tsx scripts/seed-demo-passwords.ts",
-    "test": "tsx --test tests/tutor-visibility.test.ts tests/sirene-verify.test.ts tests/tutor-financial.test.ts tests/admin-profiles-query.test.ts tests/admin-budget.test.ts tests/admin-courses-query.test.ts",
+    "test": "tsx --test tests/tutor-visibility.test.ts tests/sirene-verify.test.ts tests/tutor-financial.test.ts tests/fiscal.test.ts tests/revenue-split.test.ts tests/billing-period.test.ts tests/admin-profiles-query.test.ts tests/admin-budget.test.ts tests/admin-courses-query.test.ts",
     "apply-migration-005": "tsx scripts/apply-migration-005.ts",
     "apply-migration-013": "tsx scripts/apply-migration-013.ts",
     "apply-migration-015": "tsx scripts/apply-migration-015.ts",
+    "apply-migration-016": "tsx scripts/apply-migration-016.ts",
+    "apply-migration-017": "tsx scripts/apply-migration-017.ts",
+    "monthly-billing": "tsx scripts/run-monthly-billing.ts",
     "seed-student": "tsx scripts/seed-student.ts",
     "align-demo-campus": "tsx scripts/align-demo-campus.ts",
     "repair-orphan-slots": "tsx scripts/repair-orphan-slots.ts",
@@ -28,11 +31,13 @@
     "stripe-check": "tsx scripts/stripe-check.ts",
     "stripe-listen": "bash scripts/stripe-listen.sh",
     "test-invoice-pdf": "tsx scripts/test-invoice-pdf.ts",
-    "backfill-invoices": "tsx scripts/backfill-invoices.ts"
+    "backfill-invoices": "tsx scripts/backfill-invoices.ts",
+    "repair-demo-billing": "tsx scripts/repair-demo-billing.ts"
   },
   "dependencies": {
     "@gadz-connect/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
+    "archiver": "^8.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -44,6 +49,7 @@
   },
   "devDependencies": {
     "@gadz-connect/config": "workspace:*",
+    "@types/archiver": "^8.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
