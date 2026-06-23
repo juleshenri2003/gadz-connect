@@ -1,0 +1,12 @@
+---
+description: /pull synchronise main locale depuis origin/main
+alwaysApply: false
+---
+
+# /pull
+
+Quand l'utilisateur tape **`/pull`** (ou « pull », « mettre à jour depuis GitHub », « récupérer main ») :
+
+1. Exécuter **tout de suite** sans demander confirmation (sauf working tree sale ou conflit)
+2. Suivre `.cursor/commands/pull.md` ou `.cursor/skills/pull/SKILL.md`
+3. Terminer par `./.cursor/skills/pull/scripts/pull.sh` — **jamais** `git pull` seul sans `origin main`

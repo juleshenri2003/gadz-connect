@@ -51,6 +51,13 @@ export function getBillingPeriodBounds(period: BillingPeriodYm): BillingPeriodBo
   };
 }
 
+/** Mois civil en cours (tests pilote : facturer les cours du mois courant). */
+export function getCurrentBillingPeriod(
+  reference = new Date(),
+): BillingPeriodYm {
+  return `${reference.getUTCFullYear()}-${pad2(reference.getUTCMonth() + 1)}` as BillingPeriodYm;
+}
+
 /** Mois civil précédent (exécution le 1er du mois). */
 export function getPreviousBillingPeriod(
   reference = new Date(),
@@ -59,6 +66,23 @@ export function getPreviousBillingPeriod(
   const month = reference.getUTCMonth();
   const prev = new Date(Date.UTC(year, month - 1, 1));
   return `${prev.getUTCFullYear()}-${pad2(prev.getUTCMonth() + 1)}` as BillingPeriodYm;
+}
+
+/**
+ * Résout la période CLI : `current` → mois en cours, `YYYY-MM` → explicite, vide → mois précédent.
+ */
+export function resolveBillingPeriodInput(
+  value: string | undefined,
+  reference = new Date(),
+): BillingPeriodYm {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return getPreviousBillingPeriod(reference);
+  }
+  if (trimmed === "current") {
+    return getCurrentBillingPeriod(reference);
+  }
+  return parseBillingPeriodYm(trimmed);
 }
 
 export function isScheduledInPeriod(

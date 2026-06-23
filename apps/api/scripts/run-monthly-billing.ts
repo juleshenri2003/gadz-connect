@@ -2,7 +2,7 @@
  * Facturation mensuelle regroupée — à exécuter le 1er de chaque mois.
  * Usage:
  *   pnpm --filter @gadz-connect/api monthly-billing
- *   pnpm --filter @gadz-connect/api monthly-billing -- --period=2026-05
+ *   pnpm --filter @gadz-connect/api monthly-billing -- --period=current
  *   pnpm --filter @gadz-connect/api monthly-billing -- --dry-run
  */
 import "dotenv/config";

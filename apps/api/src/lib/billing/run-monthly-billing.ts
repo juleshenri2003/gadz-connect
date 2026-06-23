@@ -1,8 +1,7 @@
 import {
   getBillingPeriodBounds,
-  getPreviousBillingPeriod,
+  resolveBillingPeriodInput,
   isScheduledInPeriod,
-  parseBillingPeriodYm,
   type BillingPeriodYm,
 } from "./billing-period.js";
 import {
@@ -464,9 +463,7 @@ async function closeInvoicedTransactions(
 export async function runMonthlyBilling(
   options: RunMonthlyBillingOptions = {},
 ): Promise<RunMonthlyBillingResult> {
-  const period = options.period
-    ? parseBillingPeriodYm(options.period)
-    : getPreviousBillingPeriod();
+  const period = resolveBillingPeriodInput(options.period);
   const bounds = getBillingPeriodBounds(period);
   const dryRun = options.dryRun ?? false;
 
