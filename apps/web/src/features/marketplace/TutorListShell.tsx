@@ -1,4 +1,4 @@
-import { Skeleton } from "@gadz-connect/ui";
+import { Button, Skeleton } from "@gadz-connect/ui";
 import type { MarketplaceTutorBase } from "./marketplaceUtils";
 import { TutorCard } from "./TutorCard";
 
@@ -41,6 +41,7 @@ interface TutorListShellProps<T extends MarketplaceTutorBase> {
   filters?: React.ReactNode;
   onCardClick?: (tutor: T, event: React.MouseEvent) => void;
   renderCard?: (tutor: T, href: string) => React.ReactNode;
+  onRetry?: () => void;
 }
 
 export function TutorListShell<T extends MarketplaceTutorBase>({
@@ -55,14 +56,28 @@ export function TutorListShell<T extends MarketplaceTutorBase>({
   filters,
   onCardClick,
   renderCard,
+  onRetry,
 }: TutorListShellProps<T>) {
   if (isLoading) return <TutorListSkeleton />;
 
   if (isError) {
     return (
-      <p className="text-sm text-danger" role="alert">
-        Impossible de charger la liste des tuteurs.
-      </p>
+      <div className="rounded-md border border-danger/20 bg-danger-bg/30 p-4 text-center">
+        <p className="text-sm text-danger" role="alert">
+          Impossible de charger la liste des tuteurs.
+        </p>
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={onRetry}
+          >
+            Réessayer
+          </Button>
+        ) : null}
+      </div>
     );
   }
 

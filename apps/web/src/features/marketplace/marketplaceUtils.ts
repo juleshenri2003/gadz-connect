@@ -109,3 +109,28 @@ export function countBookableTutors<T extends MarketplaceTutorBase>(
 ): number {
   return tutors.filter((t) => (t.available_slot_count ?? 0) > 0).length;
 }
+
+export function filterBookableTutors<T extends MarketplaceTutorBase>(
+  tutors: T[],
+): T[] {
+  return tutors.filter((t) => (t.available_slot_count ?? 0) > 0);
+}
+
+export function collectTopSubjects<T extends MarketplaceTutorBase>(
+  tutors: T[],
+  limit = 3,
+): string[] {
+  const counts = new Map<string, number>();
+  for (const tutor of tutors) {
+    for (const subject of tutor.subjects) {
+      const trimmed = subject.trim();
+      if (trimmed) counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr"),
+    )
+    .slice(0, limit)
+    .map(([subject]) => subject);
+}

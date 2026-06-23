@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { SELECTED_CAMPUS_KEY, sortCampuses } from "./campusLabels";
+import { useSearchParams } from "react-router-dom";
+import {
+  defaultCampusId,
+  getStoredCampusId,
+  persistCampusId,
+  resolveCampusIdFromParam,
+  sortCampuses,
+} from "./campusLabels";
 import { apiFetch } from "@/lib/api";
 
 export interface CampusOption {
@@ -8,12 +15,9 @@ export interface CampusOption {
   name: string;
 }
 
-function readStoredCampusId(): string {
-  return sessionStorage.getItem(SELECTED_CAMPUS_KEY) ?? "";
-}
-
 export function useSelectedCampus() {
-  const [campusId, setCampusIdState] = useState(readStoredCampusId);
+  const [searchParams] = useSearchParams();
+  const [campusId, setCampusIdState] = useState(getStoredCampusId);
 
   const { data: campuses, isLoading } = useQuery({
     queryKey: ["campus"],
@@ -24,20 +28,31 @@ export function useSelectedCampus() {
   const sortedCampuses = campuses ? sortCampuses(campuses) : [];
 
   const setCampusId = useCallback((id: string) => {
-    sessionStorage.setItem(SELECTED_CAMPUS_KEY, id);
+    persistCampusId(id);
     setCampusIdState(id);
   }, []);
 
   useEffect(() => {
     if (!sortedCampuses.length || campusId) return;
-    const stored = readStoredCampusId();
+
+    const utmCampus = searchParams.get("campus");
+    if (utmCampus) {
+      const fromParam = resolveCampusIdFromParam(utmCampus, sortedCampuses);
+      if (fromParam) {
+        setCampusId(fromParam);
+        return;
+      }
+    }
+
+    const stored = getStoredCampusId();
     if (stored && sortedCampuses.some((c) => c.id === stored)) {
       setCampusIdState(stored);
       return;
     }
-    const paris = sortedCampuses.find((c) => c.name === "Paris");
-    if (paris) setCampusId(paris.id);
-  }, [sortedCampuses, campusId, setCampusId]);
+
+    const fallback = defaultCampusId(sortedCampuses);
+    if (fallback) setCampusId(fallback);
+  }, [sortedCampuses, campusId, setCampusId, searchParams]);
 
   const selectedCampus =
     sortedCampuses.find((c) => c.id === campusId) ?? null;

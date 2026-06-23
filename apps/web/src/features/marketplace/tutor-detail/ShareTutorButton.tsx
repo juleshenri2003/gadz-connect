@@ -1,5 +1,5 @@
 import { Button } from "@gadz-connect/ui";
-import { Share2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { useState } from "react";
 
 interface ShareTutorButtonProps {
@@ -38,7 +38,7 @@ export function ShareTutorButton({ url, tutorName }: ShareTutorButtonProps) {
       size="sm"
       onClick={() => void handleShare()}
     >
-      <Share2 className="mr-1.5 h-4 w-4" />
+      <Send className="mr-1.5 h-4 w-4" />
       {copied ? "Lien copié" : "Partager"}
     </Button>
   );

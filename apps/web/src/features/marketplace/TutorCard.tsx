@@ -35,21 +35,21 @@ export function TutorCardContent({ tutor, className }: TutorCardContentProps) {
   return (
     <div
       className={cn(
-        "rounded-md border bg-surface p-5 transition hover:shadow-raised",
+        "flex h-full flex-col rounded-md border bg-surface p-5 transition hover:shadow-raised",
         hasSlots
           ? "border-line hover:border-brand-100"
           : "border-line opacity-75 hover:border-line",
         className,
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex flex-1 gap-3">
         <TutorAvatar name={name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-6 items-start justify-between gap-2">
             <p className="font-semibold text-ink-900">{name}</p>
             {hasCv ? (
               <span
-                className="rounded-full bg-success-bg px-2 py-0.5 text-[10px] font-medium text-success"
+                className="shrink-0 rounded-full bg-success-bg px-2 py-0.5 text-[10px] font-medium text-success"
                 title="CV disponible"
               >
                 CV
@@ -57,9 +57,14 @@ export function TutorCardContent({ tutor, className }: TutorCardContentProps) {
             ) : null}
           </div>
 
-          {tutor.bio ? (
-            <p className="mt-2 line-clamp-2 text-sm text-ink-600">{tutor.bio}</p>
-          ) : null}
+          <p
+            className={cn(
+              "mt-2 line-clamp-2 min-h-10 text-sm leading-snug",
+              tutor.bio ? "text-ink-600" : "text-transparent",
+            )}
+          >
+            {tutor.bio || "—"}
+          </p>
 
           <p className="mt-2 text-sm font-medium text-ink-600">
             {tutor.hourly_rate
@@ -80,23 +85,27 @@ export function TutorCardContent({ tutor, className }: TutorCardContentProps) {
             </p>
           )}
 
-          {tutor.subjects.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {tutor.subjects.slice(0, 4).map((subject) => (
-                <span
-                  key={subject}
-                  className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700"
-                >
-                  {subject}
-                </span>
-              ))}
-              {tutor.subjects.length > 4 ? (
-                <span className="text-[11px] text-ink-400">
-                  +{tutor.subjects.length - 4}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="mt-3 flex min-h-[26px] flex-wrap content-start gap-1.5">
+            {tutor.subjects.length > 0
+              ? tutor.subjects.slice(0, 4).map((subject) => (
+                  <span
+                    key={subject}
+                    className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700"
+                  >
+                    {subject}
+                  </span>
+                ))
+              : null}
+            {tutor.subjects.length > 4 ? (
+              <span className="text-[11px] text-ink-400">
+                +{tutor.subjects.length - 4}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-auto pt-3 text-xs font-medium text-brand-700">
+            Voir le profil →
+          </p>
         </div>
       </div>
     </div>
@@ -112,7 +121,7 @@ interface TutorCardProps {
 
 export function TutorCard({ tutor, to, className, onClick }: TutorCardProps) {
   return (
-    <Link to={to} className={cn("block no-underline", className)} onClick={onClick}>
+    <Link to={to} className={cn("block h-full no-underline", className)} onClick={onClick}>
       <TutorCardContent tutor={tutor} />
     </Link>
   );

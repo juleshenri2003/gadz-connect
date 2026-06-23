@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
+  computePublicCampusStats,
+  filterPublicTutorRows,
+} from "../../lib/tutor-public-list.js";
+import {
   toPublicTutorDto,
   toPublicTutorSlotDto,
 } from "../../lib/tutor-public-dto.js";
@@ -12,6 +16,15 @@ import { supabaseAdmin } from "../../lib/supabase.js";
 
 const campusIdSchema = z.string().uuid("Campus invalide");
 const tutorIdSchema = z.string().uuid("Tuteur invalide");
+
+const listQuerySchema = z.object({
+  q: z.string().optional(),
+  subject: z.string().optional(),
+  bookable: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
+});
 
 export const publicTutorsRouter = Router();
 
@@ -26,12 +39,44 @@ async function assertCampusExists(campusId: string): Promise<boolean> {
 }
 
 /**
+ * GET /api/public/campus/:campusId/stats
+ */
+publicTutorsRouter.get("/campus/:campusId/stats", async (req, res) => {
+  const parsed = campusIdSchema.safeParse(req.params.campusId);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Campus invalide" });
+    return;
+  }
+
+  const campusExists = await assertCampusExists(parsed.data);
+  if (!campusExists) {
+    res.status(404).json({ error: "Campus introuvable" });
+    return;
+  }
+
+  const { data, error } = await fetchCampusTutors(parsed.data, null);
+  if (error) {
+    console.error("[public/tutors] stats:", error.message);
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.json({ data: computePublicCampusStats(data) });
+});
+
+/**
  * GET /api/public/campus/:campusId/tutors
  */
 publicTutorsRouter.get("/campus/:campusId/tutors", async (req, res) => {
   const parsed = campusIdSchema.safeParse(req.params.campusId);
   if (!parsed.success) {
     res.status(400).json({ error: "Campus invalide" });
+    return;
+  }
+
+  const queryParsed = listQuerySchema.safeParse(req.query);
+  if (!queryParsed.success) {
+    res.status(400).json({ error: "Paramètres de recherche invalides" });
     return;
   }
 
@@ -48,8 +93,10 @@ publicTutorsRouter.get("/campus/:campusId/tutors", async (req, res) => {
     return;
   }
 
+  const filtered = filterPublicTutorRows(data, queryParsed.data);
+
   res.json({
-    data: data.map((row) => toPublicTutorDto(row)),
+    data: filtered.map((row) => toPublicTutorDto(row)),
   });
 });
 

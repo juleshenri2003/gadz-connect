@@ -1,8 +1,7 @@
 import { Button } from "@gadz-connect/ui";
-import { Link } from "react-router-dom";
 import { Modal } from "@/components/Modal";
+import { useAuthModal } from "@/features/auth/authModalContext";
 import type { AuthGateContext } from "./useAuthGate";
-import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 
 interface AuthGateModalProps {
   open: boolean;
@@ -17,6 +16,7 @@ export function AuthGateModal({
   onClose,
   onContinue,
 }: AuthGateModalProps) {
+  const { openAuthModal } = useAuthModal();
   if (!context) return null;
 
   return (
@@ -44,13 +44,16 @@ export function AuthGateModal({
           séparée n&apos;est nécessaire.
         </p>
         <p>
-          <Link
-            to={marketplaceRoutes.login("teacher")}
+          <button
+            type="button"
             className="font-medium text-brand-700 underline-offset-2 hover:underline"
-            onClick={onClose}
+            onClick={() => {
+              onClose();
+              openAuthModal({ mode: "signup", role: "teacher" });
+            }}
           >
             Vous êtes professeur ? Créer un compte prof
-          </Link>
+          </button>
         </p>
       </div>
     </Modal>

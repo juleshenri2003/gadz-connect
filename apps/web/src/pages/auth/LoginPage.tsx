@@ -20,7 +20,9 @@ import { AUTH_REDIRECT_KEY, setAuthIntent } from "@/features/auth/authStorage";
 import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 import {
   campusDisplayName,
-  SELECTED_CAMPUS_KEY,
+  defaultCampusId,
+  getStoredCampusId,
+  persistCampusId,
   sortCampuses,
 } from "@/features/campus/campusLabels";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -38,10 +40,6 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
-
-function getStoredCampusId(): string {
-  return sessionStorage.getItem(SELECTED_CAMPUS_KEY) ?? "";
-}
 
 function AuthShell({
   children,
@@ -150,10 +148,6 @@ export function LoginPage() {
     },
   });
 
-  function persistCampus(campusId: string) {
-    sessionStorage.setItem(SELECTED_CAMPUS_KEY, campusId);
-  }
-
   useEffect(() => {
     if (!sortedCampuses.length) return;
     const stored = getStoredCampusId();
@@ -161,10 +155,10 @@ export function LoginPage() {
       setValue("campusId", stored);
       return;
     }
-    const paris = sortedCampuses.find((c) => c.name === "Paris");
-    if (paris) {
-      setValue("campusId", paris.id);
-      persistCampus(paris.id);
+    const fallback = defaultCampusId(sortedCampuses);
+    if (fallback) {
+      setValue("campusId", fallback);
+      persistCampusId(fallback);
     }
   }, [sortedCampuses, setValue]);
 
@@ -199,7 +193,7 @@ export function LoginPage() {
 
   async function onEmailLogin({ email, password, campusId }: LoginForm) {
     setServerError(null);
-    persistCampus(campusId);
+    persistCampusId(campusId);
     setLoading(true);
     const { error, accessToken, profileSetupComplete } = await emailLogin(
       email,
@@ -223,7 +217,7 @@ export function LoginPage() {
 
   async function onMagicLink({ email, campusId }: LoginForm) {
     setServerError(null);
-    persistCampus(campusId);
+    persistCampusId(campusId);
     const { error } = await signInWithMagicLink(email);
     if (error) {
       setServerError(error);
@@ -347,33 +341,36 @@ export function LoginPage() {
                 <Controller
                   name="campusId"
                   control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        persistCampus(value);
-                      }}
-                      disabled={campusesLoading}
-                    >
-                      <SelectTrigger id="campusId" aria-invalid={Boolean(errors.campusId)}>
-                        <SelectValue
-                          placeholder={
-                            campusesLoading
-                              ? "Chargement…"
-                              : "Sélectionner votre ville"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sortedCampuses.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {campusDisplayName(c.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  render={({ field }) =>
+                    sortedCampuses.length > 0 ? (
+                      <Select
+                        value={field.value || sortedCampuses[0]!.id}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          persistCampusId(value);
+                        }}
+                        disabled={campusesLoading}
+                      >
+                        <SelectTrigger id="campusId" aria-invalid={Boolean(errors.campusId)}>
+                          <SelectValue placeholder="Sélectionner votre ville" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sortedCampuses.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {campusDisplayName(c.name)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div
+                        id="campusId"
+                        className="flex h-10 items-center rounded-md border border-line bg-surface px-3 text-sm text-ink-400"
+                      >
+                        Chargement…
+                      </div>
+                    )
+                  }
                 />
                 {errors.campusId ? (
                   <p className="text-sm text-danger">{errors.campusId.message}</p>

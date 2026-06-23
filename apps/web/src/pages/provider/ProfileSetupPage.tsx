@@ -19,7 +19,7 @@ import { AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
 import { normalizeAuthRedirect, resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import {
   campusDisplayName,
-  SELECTED_CAMPUS_KEY,
+  getStoredCampusId,
   sortCampuses,
 } from "@/features/campus/campusLabels";
 import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
@@ -127,7 +127,7 @@ export function ProfileSetupPage() {
   } = useForm<SetupForm>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
-      campusId: sessionStorage.getItem(SELECTED_CAMPUS_KEY) ?? "",
+      campusId: getStoredCampusId(),
     },
   });
 

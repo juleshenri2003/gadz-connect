@@ -1,12 +1,11 @@
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   buildBookingRedirectPath,
   setAuthIntent,
   setAuthRedirect,
   type AuthIntent,
 } from "./authStorage";
-import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
+import { useAuthModal } from "./authModalContext";
 import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalytics";
 
 export interface AuthGateContext {
@@ -17,7 +16,7 @@ export interface AuthGateContext {
 }
 
 export function useAuthGate() {
-  const navigate = useNavigate();
+  const { openAuthModal } = useAuthModal();
   const [gate, setGate] = useState<AuthGateContext | null>(null);
 
   const openGate = useCallback((context: AuthGateContext) => {
@@ -37,10 +36,15 @@ export function useAuthGate() {
         "public",
       );
       setAuthRedirect(redirect);
-      setAuthIntent(context.intent ?? "student");
-      navigate(marketplaceRoutes.login(context.intent === "teacher" ? "teacher" : undefined));
+      const intent = context.intent ?? "student";
+      setAuthIntent(intent);
+      openAuthModal({
+        mode: "login",
+        role: intent === "teacher" ? "teacher" : "student",
+      });
+      setGate(null);
     },
-    [navigate],
+    [openAuthModal],
   );
 
   return {

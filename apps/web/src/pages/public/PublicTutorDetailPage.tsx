@@ -7,7 +7,8 @@ import { useSelectedCampus } from "@/features/campus/useSelectedCampus";
 import { usePageMeta } from "@/features/layout/usePageMeta";
 import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalytics";
-import { PublicTutorSlotsPanel } from "@/features/marketplace/tutor-detail/PublicTutorSlotsPanel";
+import { TutorAvailableSlotsList } from "@/features/marketplace/tutor-detail/TutorAvailableSlotsList";
+import { TutorBookingCalendar } from "@/features/marketplace/tutor-detail/TutorBookingCalendar";
 import { ShareTutorButton } from "@/features/marketplace/tutor-detail/ShareTutorButton";
 import { TutorCvSection } from "@/features/marketplace/tutor-detail/TutorCvSection";
 import { TutorPresentationSection } from "@/features/marketplace/tutor-detail/TutorPresentationSection";
@@ -25,12 +26,20 @@ export function PublicTutorDetailPage() {
   const { campusId } = useSelectedCampus();
   const { gate, openGate, closeGate, proceedToLogin } = useAuthGate();
 
+  const initialSlotId = searchParams.get("slot");
+
   const { data: tutor, isLoading } = usePublicTutor(campusId, id ?? "");
-  const { data: slots } = usePublicTutorSlots(campusId, id ?? "");
+  const { data: slots, isLoading: slotsLoading } = usePublicTutorSlots(
+    campusId,
+    id ?? "",
+  );
 
   const tutorName = tutor
     ? `${tutor.first_name} ${tutor.last_name}`.trim()
     : "";
+
+  const hasSlots =
+    (slots?.length ?? 0) > 0 || (tutor?.available_slot_count ?? 0) > 0;
 
   usePageMeta(
     tutorName || "Professeur",
@@ -45,12 +54,11 @@ export function PublicTutorDetailPage() {
   }, [id, tutor]);
 
   useEffect(() => {
-    const slotId = searchParams.get("slot");
-    if (!user || !id || !slotId) return;
-    navigate(marketplaceRoutes.detailWithSlot(id, slotId, "app"), {
+    if (!user || !id || !initialSlotId) return;
+    navigate(marketplaceRoutes.detailWithSlot(id, initialSlotId, "app"), {
       replace: true,
     });
-  }, [user, id, searchParams, navigate]);
+  }, [user, id, initialSlotId, navigate]);
 
   function handleBookSlot(slotId: string) {
     if (!tutor || !id) return;
@@ -90,7 +98,7 @@ export function PublicTutorDetailPage() {
 
   return (
     <>
-      <div className="space-y-8">
+      <div className="space-y-6 pb-24 sm:pb-0">
         <TutorProfileHeader
           tutor={tutor}
           backHref="/"
@@ -100,19 +108,39 @@ export function PublicTutorDetailPage() {
           }
         />
 
-        <TutorPresentationSection tutor={tutor} />
+        <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-8">
+            <TutorBookingCalendar
+              hourlyRate={tutor.hourly_rate}
+              slots={slots}
+              loading={slotsLoading}
+              nextAvailableAt={tutor.next_available_slot_at}
+              initialSlotId={initialSlotId}
+              onBookSlot={handleBookSlot}
+              listBackHref="/"
+            />
+          </div>
 
-        <TutorCvSection
-          hasCvPdf={tutor.has_cv_pdf}
-          guestMode
-        />
-
-        <PublicTutorSlotsPanel
-          hourlyRate={tutor.hourly_rate}
-          slots={slots}
-          onBookSlot={handleBookSlot}
-          listBackHref="/"
-        />
+          <aside className="space-y-4 lg:col-span-4">
+            <TutorPresentationSection
+              tutor={tutor}
+              collapsible
+              defaultOpen={!hasSlots}
+            />
+            <TutorCvSection
+              hasCvPdf={tutor.has_cv_pdf}
+              guestMode
+              collapsible
+              defaultOpen={false}
+            />
+            <TutorAvailableSlotsList
+              hourlyRate={tutor.hourly_rate}
+              slots={slots}
+              loading={slotsLoading}
+              onBookSlot={handleBookSlot}
+            />
+          </aside>
+        </div>
       </div>
 
       <AuthGateModal

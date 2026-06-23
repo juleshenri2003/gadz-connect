@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  computePublicCampusStats,
+  filterPublicTutorRows,
+} from "../src/lib/tutor-public-list.js";
+import {
   assertNoInternalFields,
   toPublicTutorDto,
   toPublicTutorSlotDto,
@@ -53,6 +57,57 @@ describe("toPublicTutorDto", () => {
     assert.equal(keys.includes("account_status"), false);
     assert.equal(keys.includes("role"), false);
     assert.equal(keys.includes("siret"), false);
+  });
+});
+
+describe("filterPublicTutorRows", () => {
+  const tutors: TutorRowWithAvailability[] = [
+    sampleTutor,
+    {
+      ...sampleTutor,
+      id: "22222222-2222-2222-2222-222222222222",
+      first_name: "Marie",
+      last_name: "Curie",
+      subjects: ["Physique"],
+      available_slot_count: 0,
+      hourly_rate: 25,
+    },
+  ];
+
+  it("filters bookable tutors only", () => {
+    const filtered = filterPublicTutorRows(tutors, { bookable: true });
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0]?.first_name, "Jean");
+  });
+
+  it("filters by subject and query", () => {
+    const bySubject = filterPublicTutorRows(tutors, { subject: "Physique" });
+    assert.equal(bySubject.length, 1);
+    assert.equal(bySubject[0]?.last_name, "Curie");
+
+    const byQuery = filterPublicTutorRows(tutors, { q: "marie" });
+    assert.equal(byQuery.length, 1);
+    assert.equal(byQuery[0]?.first_name, "Marie");
+  });
+});
+
+describe("computePublicCampusStats", () => {
+  it("returns counts, top subjects and average rate", () => {
+    const stats = computePublicCampusStats([
+      sampleTutor,
+      {
+        ...sampleTutor,
+        id: "22222222-2222-2222-2222-222222222222",
+        subjects: ["Maths", "Physique"],
+        available_slot_count: 0,
+        hourly_rate: 25,
+      },
+    ]);
+
+    assert.equal(stats.tutor_count, 2);
+    assert.equal(stats.bookable_count, 1);
+    assert.deepEqual(stats.top_subjects.slice(0, 2), ["Maths", "Mécanique"]);
+    assert.equal(stats.avg_hourly_rate, 30);
   });
 });
 
