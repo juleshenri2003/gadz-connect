@@ -1,5 +1,5 @@
 /**
- * Aligne tous les comptes de démo sur le même campus (Paris).
+ * Aligne tous les comptes de démo sur le même campus (Aix).
  * Usage: pnpm --filter @gadz-connect/api align-demo-campus
  */
 import "dotenv/config";
@@ -30,6 +30,8 @@ async function main() {
   }
 
   let updated = 0;
+  const profileIds: string[] = [];
+
   for (const email of DEMO_ACCOUNT_EMAILS) {
     const user = userList.users.find(
       (u) => u.email?.toLowerCase() === email.toLowerCase(),
@@ -49,12 +51,33 @@ async function main() {
       continue;
     }
 
-    console.log(`✓ ${email} → campus Paris`);
+    profileIds.push(user.id);
+    console.log(`✓ ${email} → campus Aix`);
     updated += 1;
   }
 
+  if (profileIds.length > 0) {
+    const { error: coursesProviderError } = await admin
+      .from("courses")
+      .update({ campus_id: campusId })
+      .in("provider_id", profileIds);
+
+    if (coursesProviderError) {
+      console.warn("cours (provider):", coursesProviderError.message);
+    }
+
+    const { error: coursesClientError } = await admin
+      .from("courses")
+      .update({ campus_id: campusId })
+      .in("client_id", profileIds);
+
+    if (coursesClientError) {
+      console.warn("cours (client):", coursesClientError.message);
+    }
+  }
+
   console.log("");
-  console.log(`Terminé — ${updated} profil(s) aligné(s) sur Paris.`);
+  console.log(`Terminé — ${updated} profil(s) aligné(s) sur Aix.`);
 }
 
 main().catch((err) => {

@@ -14,6 +14,26 @@ export const DEMO_ACCOUNTS: Record<string, DemoAccount> = {
     password: "Prof-Martin!",
     label: "Prof actif (démo)",
   },
+  "prof.cao@ensam.eu": {
+    password: "Prof-CAO!",
+    label: "Prof CAO / SolidWorks",
+  },
+  "prof.maths@ensam.eu": {
+    password: "Prof-Maths!",
+    label: "Prof maths / physique (ACRE)",
+  },
+  "prof.dev@ensam.eu": {
+    password: "Prof-Dev!",
+    label: "Prof Python / algo (libératoire)",
+  },
+  "prof.meca@ensam.eu": {
+    password: "Prof-Meca!",
+    label: "Prof RDM / fabrication",
+  },
+  "prof.design@ensam.eu": {
+    password: "Prof-Design!",
+    label: "Prof design / sketch",
+  },
   "prof.express@ensam.eu": {
     password: "Prof-Express!",
     label: "Prof parcours express (SIRET existant)",

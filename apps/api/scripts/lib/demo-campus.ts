@@ -1,11 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Campus unique pour tous les comptes de démo (élève, profs, RH). */
-export const DEMO_CAMPUS_NAME = "Paris";
+export const DEMO_CAMPUS_NAME = "Aix";
 
 export const DEMO_ACCOUNT_EMAILS = [
   "eleve.dupont@ensam.eu",
   "prof.martin@ensam.eu",
+  "prof.cao@ensam.eu",
+  "prof.maths@ensam.eu",
+  "prof.dev@ensam.eu",
+  "prof.meca@ensam.eu",
+  "prof.design@ensam.eu",
+  "prof.express@ensam.eu",
+  "prof.complet@ensam.eu",
+  "prof.suspended@ensam.eu",
   "prof.enattente@ensam.eu",
   "jules.henri@ensam.eu",
 ] as const;

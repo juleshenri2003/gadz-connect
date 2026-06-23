@@ -25,6 +25,7 @@
     "apply-migration-017": "tsx scripts/apply-migration-017.ts",
     "apply-migration-018": "tsx scripts/apply-migration-018.ts",
     "monthly-billing": "tsx scripts/run-monthly-billing.ts",
+    "seed-five-profs": "tsx scripts/seed-five-profs.ts",
     "seed-student": "tsx scripts/seed-student.ts",
     "align-demo-campus": "tsx scripts/align-demo-campus.ts",
     "repair-orphan-slots": "tsx scripts/repair-orphan-slots.ts",
