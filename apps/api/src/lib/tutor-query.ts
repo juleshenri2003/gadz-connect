@@ -17,6 +17,8 @@ type TutorRow = {
   account_status: string;
   profile_setup_complete?: boolean | null;
   stripe_connect_onboarding_complete?: boolean | null;
+  siret?: string | null;
+  is_autoentrepreneur_verified?: boolean | null;
   campus: { name: string } | null;
 };
 
@@ -96,20 +98,24 @@ function asTutorRow(data: unknown): TutorRow {
 
 export async function fetchCampusTutors(
   campusId: string,
-  excludeUserId: string,
+  excludeUserId: string | null = null,
 ): Promise<{
   data: TutorRowWithAvailability[];
   error: { message: string } | null;
 }> {
-  const withPdf = await supabaseAdmin
+  let withPdfQuery = supabaseAdmin
     .from("profiles")
     .select(TUTOR_SELECT_WITH_CV_PDF)
     .eq("campus_id", campusId)
     .eq("role", "teacher")
     .eq("account_status", "active")
-    .eq("profile_setup_complete", true)
-    .neq("id", excludeUserId)
-    .order("last_name");
+    .eq("profile_setup_complete", true);
+
+  if (excludeUserId) {
+    withPdfQuery = withPdfQuery.neq("id", excludeUserId);
+  }
+
+  const withPdf = await withPdfQuery.order("last_name");
 
   if (!withPdf.error) {
     const visible = asTutorRows(withPdf.data).filter((row) =>
@@ -128,15 +134,19 @@ export async function fetchCampusTutors(
     return { data: [], error: { message: withPdf.error.message } };
   }
 
-  const withoutPdf = await supabaseAdmin
+  let withoutPdfQuery = supabaseAdmin
     .from("profiles")
     .select(TUTOR_SELECT_WITHOUT_CV_PDF)
     .eq("campus_id", campusId)
     .eq("role", "teacher")
     .eq("account_status", "active")
-    .eq("profile_setup_complete", true)
-    .neq("id", excludeUserId)
-    .order("last_name");
+    .eq("profile_setup_complete", true);
+
+  if (excludeUserId) {
+    withoutPdfQuery = withoutPdfQuery.neq("id", excludeUserId);
+  }
+
+  const withoutPdf = await withoutPdfQuery.order("last_name");
 
   if (withoutPdf.error) {
     return { data: [], error: { message: withoutPdf.error.message } };

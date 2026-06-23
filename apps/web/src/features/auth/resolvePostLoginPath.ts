@@ -1,5 +1,9 @@
 import type { UserRole } from "@gadz-connect/types";
 import { apiFetch } from "@/lib/api";
+import {
+  AUTH_INTENT_KEY,
+  AUTH_REDIRECT_KEY,
+} from "./authStorage";
 
 const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
@@ -8,32 +12,57 @@ interface ProfileMe {
   profile_setup_complete: boolean;
 }
 
+/** Convertit une URL publique en route app connectée. */
+export function normalizeAuthRedirect(stored: string): string {
+  try {
+    const url = new URL(stored, "http://local");
+    const match = url.pathname.match(/^\/tuteurs\/([^/]+)$/);
+    if (match) {
+      url.pathname = `/app/cours/${match[1]}`;
+      return `${url.pathname}${url.search}`;
+    }
+  } catch {
+    // fallback regex
+    const match = stored.match(/^\/tuteurs\/([^/?]+)(\?.*)?$/);
+    if (match) {
+      return `/app/cours/${match[1]}${match[2] ?? ""}`;
+    }
+  }
+  return stored;
+}
+
 export async function resolvePostLoginPath(
   accessToken: string,
 ): Promise<string> {
   try {
     await apiFetch("/api/admin/me", { token: accessToken });
-    sessionStorage.removeItem("gadz_auth_redirect");
+    sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+    sessionStorage.removeItem(AUTH_INTENT_KEY);
     return "/admin";
   } catch {
-    const stored = sessionStorage.getItem("gadz_auth_redirect");
-    if (stored) {
-      sessionStorage.removeItem("gadz_auth_redirect");
-      return stored;
-    }
     try {
       const res = await apiFetch<{ data: ProfileMe }>("/api/profile/me", {
         token: accessToken,
       });
       const profile = res.data;
 
-      if (PROVIDER_ROLES.includes(profile.role)) {
-        if (!profile.profile_setup_complete) return "/app/setup";
-        return "/app";
+      if (
+        PROVIDER_ROLES.includes(profile.role) &&
+        !profile.profile_setup_complete
+      ) {
+        return "/app/setup";
       }
     } catch {
       // ignore
     }
+
+    const stored = sessionStorage.getItem(AUTH_REDIRECT_KEY);
+    if (stored) {
+      sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+      sessionStorage.removeItem(AUTH_INTENT_KEY);
+      return normalizeAuthRedirect(stored);
+    }
+
     return "/app";
   }
 }

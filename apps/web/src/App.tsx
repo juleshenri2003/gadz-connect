@@ -4,6 +4,7 @@ import { AdminRoute } from "@/components/AdminRoute";
 import { ProviderRoute } from "@/components/ProviderRoute";
 import { AdminLayout } from "@/features/admin/AdminLayout";
 import { ProviderLayout } from "@/features/provider/ProviderLayout";
+import { PublicLayout } from "@/features/layout/PublicLayout";
 import { AuthCallbackPage } from "@/pages/auth/AuthCallbackPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { StripeReturnPage } from "@/pages/stripe/StripeReturnPage";
@@ -28,12 +29,26 @@ import {
   StudentRepositoryPage,
 } from "@/pages/provider/StudentRepositoryPage";
 import { TutorOnlyRoute } from "@/pages/provider/TutorOnlyRoute";
+import {
+  PublicMarketplacePage,
+} from "@/pages/public/PublicMarketplacePage";
+import { PublicTutorDetailPage } from "@/pages/public/PublicTutorDetailPage";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/auth/login" element={<Navigate to="/" replace />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<PublicMarketplacePage />} />
+        <Route path="/tuteurs/:id" element={<PublicTutorDetailPage />} />
+        {/* Vision SEO : alias campus */}
+        <Route
+          path="/campus/:campusSlug/tuteurs"
+          element={<PublicMarketplacePage />}
+        />
+      </Route>
+
+      <Route path="/connexion" element={<LoginPage />} />
+      <Route path="/auth/login" element={<Navigate to="/connexion" replace />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
         path="/onboarding/micro-entreprise"

@@ -4,6 +4,7 @@ import type { UserRole } from "@gadz-connect/types";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SuspendedAccountPage } from "@/pages/provider/SuspendedAccountPage";
+import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 
 const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
@@ -40,7 +41,7 @@ function ProviderGate() {
   }
 
   if (!PROVIDER_ROLES.includes(profile.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={marketplaceRoutes.login()} replace />;
   }
 
   if (

@@ -11,28 +11,25 @@ import {
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import type { UserRole } from "@gadz-connect/types";
 import { Mail, MapPin, Sparkles, UserCheck, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { useRhAccess } from "@/features/admin/useRhAccess";
+import { AUTH_REDIRECT_KEY, setAuthIntent } from "@/features/auth/authStorage";
+import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 import {
   campusDisplayName,
   SELECTED_CAMPUS_KEY,
   sortCampuses,
 } from "@/features/campus/campusLabels";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { useMyProfile } from "@/features/auth/useMyProfile";
 import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import { AppLogo } from "@/features/layout/AppLogo";
 import { apiFetch } from "@/lib/api";
 
 const USE_EMAIL_LOGIN =
   import.meta.env.DEV || import.meta.env.VITE_USE_EMAIL_LOGIN === "true";
-
-const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -101,19 +98,23 @@ function HelpCard({
 }
 
 export function LoginPage() {
-  const { user, loading: authLoading, signInWithMagicLink, emailLogin } = useAuth();
+  const { user, loading: authLoading, signInWithMagicLink, emailLogin, getAccessToken } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname
-    ?? "/app";
+  const [searchParams] = useSearchParams();
+  const teacherIntent = searchParams.get("intent") === "teacher";
+  const from =
+    (location.state as { from?: { pathname: string; search?: string } })?.from
+      ?.pathname ??
+    sessionStorage.getItem(AUTH_REDIRECT_KEY) ??
+    "/app";
+  const fromSearch =
+    (location.state as { from?: { search?: string } })?.from?.search ?? "";
+  const redirectTarget = `${from}${fromSearch}`;
 
   const [sent, setSent] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const { data: profile, isLoading: profileLoading } = useMyProfile();
-  const { data: rhAdmin, isSuccess: hasRhAccess, isLoading: rhLoading } =
-    useRhAccess();
 
   const { data: demoAccounts } = useQuery({
     queryKey: ["demo-accounts"],
@@ -167,19 +168,34 @@ export function LoginPage() {
     }
   }, [sortedCampuses, setValue]);
 
-  if (!authLoading && user && hasRhAccess && rhAdmin && !rhLoading) {
-    return <Navigate to="/admin" replace />;
+  useEffect(() => {
+    if (teacherIntent) setAuthIntent("teacher");
+  }, [teacherIntent]);
+
+  async function goToWorkspace() {
+    const token = getAccessToken();
+    if (token) {
+      const path = await resolvePostLoginPath(token);
+      navigate(path, { replace: true });
+      return;
+    }
+    navigate("/app", { replace: true });
   }
 
-  if (
-    !authLoading &&
-    user &&
-    profile &&
-    !profileLoading &&
-    PROVIDER_ROLES.includes(profile.role)
-  ) {
-    return <Navigate to="/app" replace />;
-  }
+  const connectedBanner =
+    !authLoading && user ? (
+      <div className="mb-6 rounded-lg border border-brand-100 bg-brand-50 p-4 text-sm text-ink-700">
+        <p className="font-medium text-ink-900">Vous êtes déjà connecté.</p>
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3"
+          onClick={() => void goToWorkspace()}
+        >
+          Aller à mon espace
+        </Button>
+      </div>
+    ) : null;
 
   async function onEmailLogin({ email, password, campusId }: LoginForm) {
     setServerError(null);
@@ -201,7 +217,7 @@ export function LoginPage() {
     }
     const path = accessToken
       ? await resolvePostLoginPath(accessToken)
-      : from;
+      : redirectTarget;
     navigate(path, { replace: true });
   }
 
@@ -214,7 +230,7 @@ export function LoginPage() {
       return;
     }
     setSent(true);
-    sessionStorage.setItem("gadz_auth_redirect", from);
+    sessionStorage.setItem(AUTH_REDIRECT_KEY, redirectTarget);
   }
 
   const helpAside = (
@@ -245,6 +261,13 @@ export function LoginPage() {
             title="Première connexion"
             description="Inscription guidée selon votre profil — élève ou prof."
           />
+          {teacherIntent ? (
+            <HelpCard
+              icon={UserCheck}
+              title="Parcours professeur"
+              description="Après connexion, vous choisirez le profil enseignant et la micro-entreprise."
+            />
+          ) : null}
         </div>
       ) : null}
     </>
@@ -295,6 +318,7 @@ export function LoginPage() {
         </div>
 
         <div className="rounded-xl border border-line bg-surface p-6 shadow-raised sm:p-8">
+          {connectedBanner}
           <div className="hidden lg:block">
             <h2 className="font-display text-xl font-semibold text-ink-900">
               Connexion
@@ -416,6 +440,19 @@ export function LoginPage() {
             </Button>
           </form>
         </div>
+
+        <p className="mt-4 text-center text-sm text-ink-600">
+          <Link to="/" className="font-medium text-brand-700 hover:underline">
+            Continuer sans compte
+          </Link>
+          {" · "}
+          <Link
+            to={marketplaceRoutes.login("teacher")}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            Espace prof
+          </Link>
+        </p>
 
         {USE_EMAIL_LOGIN && demoAccounts?.data?.length ? (
           <details className="mt-6 rounded-lg border border-line bg-surface/80 p-4 text-sm">

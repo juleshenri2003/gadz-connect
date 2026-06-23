@@ -1,3 +1,5 @@
+import { marketplaceRoutes } from "./marketplaceRoutes";
+
 export type CoursesTab = "slots" | "profile" | "documentation";
 
 const VALID_TABS: CoursesTab[] = ["slots", "profile", "documentation"];
@@ -10,7 +12,7 @@ export function parseCoursesTab(value: string | null | undefined): CoursesTab {
 }
 
 export function coursesTabHref(tab: CoursesTab): string {
-  return `/app/cours?tab=${tab}`;
+  return marketplaceRoutes.tab(tab, "app");
 }
 
 export const BIO_MAX_LENGTH = 2000;

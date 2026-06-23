@@ -3,6 +3,8 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { errorHandler } from "./middleware/error-handler.js";
+import { createRateLimiter } from "./middleware/rate-limit.js";
+import { publicTutorsRouter } from "./routes/public/tutors.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { campusRouter } from "./routes/campus.js";
@@ -42,6 +44,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/campus", campusRouter);
+app.use(
+  "/api/public",
+  createRateLimiter({ keyPrefix: "public", maxRequests: 60, windowMs: 60_000 }),
+  publicTutorsRouter,
+);
 app.use("/api/profile", profileRouter);
 app.use("/api/onboarding/documents", onboardingDocsRouter);
 app.use("/api/fiscal", fiscalRouter);

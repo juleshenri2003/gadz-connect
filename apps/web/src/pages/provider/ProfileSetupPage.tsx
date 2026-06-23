@@ -15,6 +15,8 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
+import { normalizeAuthRedirect, resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import {
   campusDisplayName,
   SELECTED_CAMPUS_KEY,
@@ -198,7 +200,19 @@ export function ProfileSetupPage() {
       await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
 
       if (values.accountType === "student") {
-        navigate("/app", { replace: true });
+        const token = getAccessToken();
+        if (token) {
+          const path = await resolvePostLoginPath(token);
+          navigate(path, { replace: true });
+        } else {
+          const stored = sessionStorage.getItem(AUTH_REDIRECT_KEY);
+          if (stored) {
+            sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+            navigate(normalizeAuthRedirect(stored), { replace: true });
+          } else {
+            navigate("/app", { replace: true });
+          }
+        }
         return;
       }
 

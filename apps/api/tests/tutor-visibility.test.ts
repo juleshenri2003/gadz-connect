@@ -44,6 +44,23 @@ describe("isTeacherVisibleInMarketplace", () => {
       false,
     );
   });
+
+  it("returns false without valid siret", () => {
+    assert.equal(
+      isTeacherVisibleInMarketplace({ ...base, siret: null }),
+      false,
+    );
+  });
+
+  it("returns false when not autoentrepreneur verified", () => {
+    assert.equal(
+      isTeacherVisibleInMarketplace({
+        ...base,
+        is_autoentrepreneur_verified: false,
+      }),
+      false,
+    );
+  });
 });
 
 describe("computeMarketplaceStatus", () => {

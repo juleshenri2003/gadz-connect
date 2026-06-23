@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@gadz-connect/ui";
 import { TutorList } from "@/features/marketplace/TutorList";
+import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 
 interface StudentTutorsPanelProps {
   tutorCount: number;
@@ -22,7 +23,7 @@ export function StudentTutorsPanel({ tutorCount }: StudentTutorsPanelProps) {
         </div>
         {tutorCount > 0 ? (
           <Button size="sm" variant="outline" asChild>
-            <Link to="/app/cours">Voir tout →</Link>
+            <Link to={marketplaceRoutes.list("app")}>Voir tout →</Link>
           </Button>
         ) : null}
       </div>

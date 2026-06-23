@@ -1,4 +1,32 @@
-import type { TutorListItem } from "./useTutors";
+/** Forme minimale partagée entre marketplace auth et public. */
+export interface MarketplaceTutorBase {
+  id: string;
+  first_name: string;
+  last_name: string;
+  bio: string | null;
+  hourly_rate: number | null;
+  subjects: string[];
+  available_slot_count?: number;
+  next_available_slot_at?: string | null;
+  has_cv_pdf?: boolean;
+  cv?: string | null;
+}
+
+export function formatSlotRange(starts: string, ends: string): string {
+  const start = new Date(starts);
+  const end = new Date(ends);
+  return `${start.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · ${start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} – ${end.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+export function formatSlotDuration(starts: string, ends: string): string {
+  const minutes =
+    (new Date(ends).getTime() - new Date(starts).getTime()) / (1000 * 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  return Number.isInteger(hours)
+    ? `${hours} h`
+    : `${hours.toFixed(1).replace(".", ",")} h`;
+}
 
 export function computeSlotPrice(
   hourlyRate: number,
@@ -23,7 +51,9 @@ export function formatNextSlot(iso: string): string {
   })}`;
 }
 
-export function sortTutorsByAvailability(tutors: TutorListItem[]): TutorListItem[] {
+export function sortTutorsByAvailability<T extends MarketplaceTutorBase>(
+  tutors: T[],
+): T[] {
   return [...tutors].sort((a, b) => {
     const aCount = a.available_slot_count ?? 0;
     const bCount = b.available_slot_count ?? 0;
@@ -42,7 +72,9 @@ export function sortTutorsByAvailability(tutors: TutorListItem[]): TutorListItem
   });
 }
 
-export function collectSubjectOptions(tutors: TutorListItem[]): string[] {
+export function collectSubjectOptions<T extends MarketplaceTutorBase>(
+  tutors: T[],
+): string[] {
   const subjects = new Set<string>();
   for (const tutor of tutors) {
     for (const subject of tutor.subjects) {
@@ -52,11 +84,11 @@ export function collectSubjectOptions(tutors: TutorListItem[]): string[] {
   return [...subjects].sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-export function filterTutors(
-  tutors: TutorListItem[],
+export function filterTutors<T extends MarketplaceTutorBase>(
+  tutors: T[],
   query: string,
   subject: string | null,
-): TutorListItem[] {
+): T[] {
   const normalizedQuery = query.trim().toLowerCase();
   return tutors.filter((tutor) => {
     if (subject && !tutor.subjects.includes(subject)) return false;
@@ -72,6 +104,8 @@ export function filterTutors(
   });
 }
 
-export function countBookableTutors(tutors: TutorListItem[]): number {
+export function countBookableTutors<T extends MarketplaceTutorBase>(
+  tutors: T[],
+): number {
   return tutors.filter((t) => (t.available_slot_count ?? 0) > 0).length;
 }
