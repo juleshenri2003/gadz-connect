@@ -168,7 +168,7 @@ export async function fetchCampusTutorById(
   data: TutorRowWithAvailability | null;
   error: { message: string } | null;
 }> {
-  const result = await queryWithSelectVariants((select) =>
+  const result = await queryWithSelectVariants(async (select) =>
     supabaseAdmin
       .from("profiles")
       .select(select)

@@ -132,6 +132,35 @@ function isMissingColumnError(error: { code?: string } | null): boolean {
   return error?.code === "42703";
 }
 
+type MyTutorProfileRow = {
+  id: string;
+  bio: string | null;
+  cv: string | null;
+  cv_pdf_path?: string | null;
+  hourly_rate: number | null;
+  subjects: string[];
+  profile_links: unknown;
+  role: string;
+  account_status: string;
+  profile_setup_complete?: boolean | null;
+  stripe_connect_onboarding_complete?: boolean | null;
+};
+
+type MyTutorProfilePatchRow = Pick<
+  MyTutorProfileRow,
+  "id" | "bio" | "cv" | "hourly_rate" | "subjects" | "profile_links"
+>;
+
+function asMyTutorProfileRow(data: unknown): MyTutorProfileRow {
+  const row = data as MyTutorProfileRow;
+  return { ...row, profile_links: row.profile_links ?? [] };
+}
+
+function asMyTutorProfilePatchRow(data: unknown): MyTutorProfilePatchRow {
+  const row = data as MyTutorProfilePatchRow;
+  return { ...row, profile_links: row.profile_links ?? [] };
+}
+
 async function fetchMyTutorProfileRow(userId: string) {
   for (const select of MY_TUTOR_SELECT_VARIANTS) {
     const { data, error } = await supabaseAdmin
@@ -142,9 +171,7 @@ async function fetchMyTutorProfileRow(userId: string) {
 
     if (!error) {
       return {
-        data: data
-          ? { ...data, profile_links: (data as { profile_links?: unknown }).profile_links ?? [] }
-          : null,
+        data: data ? asMyTutorProfileRow(data) : null,
         error: null,
       };
     }
@@ -175,9 +202,7 @@ async function updateMyTutorProfileRow(
 
     if (!error) {
       return {
-        data: data
-          ? { ...data, profile_links: (data as { profile_links?: unknown }).profile_links ?? [] }
-          : null,
+        data: data ? asMyTutorProfilePatchRow(data) : null,
         error: null,
       };
     }
