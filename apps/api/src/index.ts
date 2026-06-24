@@ -1,7 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
-import helmet from "helmet";
+import { default as helmet } from "helmet";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createRateLimiter } from "./middleware/rate-limit.js";
 import { publicTutorsRouter } from "./routes/public/tutors.js";
@@ -65,6 +65,10 @@ app.use((_req, res) => {
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`[gadz-connect-api] listening on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, () => {
+    console.log(`[gadz-connect-api] listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
