@@ -29,7 +29,6 @@ import {
 import {
   computeMarketplaceStatus,
   isCvComplete,
-  isTeacherVisibleInMarketplace,
 } from "../lib/tutor-visibility.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
