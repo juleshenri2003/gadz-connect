@@ -15,6 +15,7 @@ type TutorRow = {
   avatar_path?: string | null;
   hourly_rate: number | null;
   subjects: string[];
+  profile_links?: unknown;
   account_status: string;
   profile_setup_complete?: boolean | null;
   stripe_connect_onboarding_complete?: boolean | null;
@@ -79,14 +80,38 @@ function attachSlotAvailability(
   });
 }
 
-const TUTOR_SELECT_WITH_CV_PDF = MARKETPLACE_TUTOR_SELECT;
-const TUTOR_SELECT_WITHOUT_CV_PDF = MARKETPLACE_TUTOR_SELECT.replace(
-  ", cv_pdf_path",
-  "",
-);
+const TUTOR_SELECT_VARIANTS = [
+  MARKETPLACE_TUTOR_SELECT,
+  MARKETPLACE_TUTOR_SELECT.replace(", profile_links", ""),
+  MARKETPLACE_TUTOR_SELECT.replace(", cv_pdf_path", "").replace(
+    ", profile_links",
+    "",
+  ),
+] as const;
+
+function normalizeTutorRow(row: TutorRow): TutorRow {
+  return {
+    ...row,
+    cv_pdf_path: row.cv_pdf_path ?? null,
+    profile_links: row.profile_links ?? [],
+  };
+}
 
 function isMissingColumnError(error: { code?: string } | null): boolean {
   return error?.code === "42703";
+}
+
+async function queryWithSelectVariants<T extends { data: unknown; error: { code?: string; message: string } | null }>(
+  run: (select: string) => Promise<T>,
+): Promise<T> {
+  let lastResult: T | null = null;
+  for (const select of TUTOR_SELECT_VARIANTS) {
+    const result = await run(select);
+    lastResult = result;
+    if (!result.error) return result;
+    if (!isMissingColumnError(result.error)) return result;
+  }
+  return lastResult ?? (await run(TUTOR_SELECT_VARIANTS.at(-1)!));
 }
 
 function asTutorRows(data: unknown): TutorRow[] {
@@ -104,67 +129,34 @@ export async function fetchCampusTutors(
   data: TutorRowWithAvailability[];
   error: { message: string } | null;
 }> {
-  let withPdfQuery = supabaseAdmin
-    .from("profiles")
-    .select(TUTOR_SELECT_WITH_CV_PDF)
-    .eq("campus_id", campusId)
-    .eq("role", "teacher")
-    .eq("account_status", "active")
-    .eq("profile_setup_complete", true);
+  const result = await queryWithSelectVariants(async (select) => {
+    let query = supabaseAdmin
+      .from("profiles")
+      .select(select)
+      .eq("campus_id", campusId)
+      .eq("role", "teacher")
+      .eq("account_status", "active")
+      .eq("profile_setup_complete", true);
 
-  if (excludeUserId) {
-    withPdfQuery = withPdfQuery.neq("id", excludeUserId);
+    if (excludeUserId) {
+      query = query.neq("id", excludeUserId);
+    }
+
+    return query.order("last_name");
+  });
+
+  if (result.error) {
+    return { data: [], error: { message: result.error.message } };
   }
 
-  const withPdf = await withPdfQuery.order("last_name");
-
-  if (!withPdf.error) {
-    const visible = asTutorRows(withPdf.data).filter((row) =>
-      isTeacherVisibleInMarketplace(row),
-    );
-    const availability = await fetchSlotAvailabilityByProvider(
-      visible.map((row) => row.id),
-    );
-    return {
-      data: attachSlotAvailability(visible, availability),
-      error: null,
-    };
-  }
-
-  if (!isMissingColumnError(withPdf.error)) {
-    return { data: [], error: { message: withPdf.error.message } };
-  }
-
-  let withoutPdfQuery = supabaseAdmin
-    .from("profiles")
-    .select(TUTOR_SELECT_WITHOUT_CV_PDF)
-    .eq("campus_id", campusId)
-    .eq("role", "teacher")
-    .eq("account_status", "active")
-    .eq("profile_setup_complete", true);
-
-  if (excludeUserId) {
-    withoutPdfQuery = withoutPdfQuery.neq("id", excludeUserId);
-  }
-
-  const withoutPdf = await withoutPdfQuery.order("last_name");
-
-  if (withoutPdf.error) {
-    return { data: [], error: { message: withoutPdf.error.message } };
-  }
-
-  const rows = asTutorRows(withoutPdf.data)
-    .map((row) => ({
-      ...row,
-      cv_pdf_path: null,
-    }))
+  const visible = asTutorRows(result.data)
+    .map(normalizeTutorRow)
     .filter((row) => isTeacherVisibleInMarketplace(row));
-
   const availability = await fetchSlotAvailabilityByProvider(
-    rows.map((row) => row.id),
+    visible.map((row) => row.id),
   );
   return {
-    data: attachSlotAvailability(rows, availability),
+    data: attachSlotAvailability(visible, availability),
     error: null,
   };
 }
@@ -176,50 +168,24 @@ export async function fetchCampusTutorById(
   data: TutorRowWithAvailability | null;
   error: { message: string } | null;
 }> {
-  const withPdf = await supabaseAdmin
-    .from("profiles")
-    .select(TUTOR_SELECT_WITH_CV_PDF)
-    .eq("id", tutorId)
-    .eq("campus_id", campusId)
-    .maybeSingle();
+  const result = await queryWithSelectVariants((select) =>
+    supabaseAdmin
+      .from("profiles")
+      .select(select)
+      .eq("id", tutorId)
+      .eq("campus_id", campusId)
+      .maybeSingle(),
+  );
 
-  if (!withPdf.error && withPdf.data) {
-    const row = asTutorRow(withPdf.data);
-    if (!isTeacherVisibleInMarketplace(row)) {
-      return { data: null, error: null };
-    }
-    const availability = await fetchSlotAvailabilityByProvider([row.id]);
-    return {
-      data: attachSlotAvailability([row], availability)[0] ?? null,
-      error: null,
-    };
+  if (result.error) {
+    return { data: null, error: { message: result.error.message } };
   }
 
-  if (withPdf.error && !isMissingColumnError(withPdf.error)) {
-    return { data: null, error: { message: withPdf.error.message } };
+  if (!result.data) {
+    return { data: null, error: null };
   }
 
-  const withoutPdf = await supabaseAdmin
-    .from("profiles")
-    .select(TUTOR_SELECT_WITHOUT_CV_PDF)
-    .eq("id", tutorId)
-    .eq("campus_id", campusId)
-    .maybeSingle();
-
-  if (withoutPdf.error || !withoutPdf.data) {
-    return {
-      data: null,
-      error: withoutPdf.error
-        ? { message: withoutPdf.error.message }
-        : null,
-    };
-  }
-
-  const row: TutorRow = {
-    ...asTutorRow(withoutPdf.data),
-    cv_pdf_path: null,
-  };
-
+  const row = normalizeTutorRow(asTutorRow(result.data));
   if (!isTeacherVisibleInMarketplace(row)) {
     return { data: null, error: null };
   }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { apiFetch } from "@/lib/api";
+import type { TutorProfileLink } from "@/features/profile/profileLinks";
 
 export interface TutorListItem {
   id: string;
@@ -13,6 +14,7 @@ export interface TutorListItem {
   avatar_url?: string | null;
   hourly_rate: number | null;
   subjects: string[];
+  profile_links?: TutorProfileLink[];
   account_status: string;
   campus: { name: string } | null;
   available_slot_count: number;
@@ -45,6 +47,7 @@ export interface MyTutorProfile {
   cv: string | null;
   hourly_rate: number | null;
   subjects: string[];
+  profile_links?: TutorProfileLink[];
   cv_complete?: boolean;
   marketplace?: MarketplaceStatus;
 }
@@ -146,6 +149,7 @@ export function useUpdateTutorProfile() {
       cv?: string;
       hourlyRate?: number;
       subjects?: string[];
+      profileLinks?: TutorProfileLink[];
     }) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");

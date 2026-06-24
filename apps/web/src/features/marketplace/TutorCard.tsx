@@ -8,13 +8,21 @@ export function TutorAvatar({
   name,
   photoUrl,
   size = "md",
+  className,
 }: {
   name: string;
   photoUrl?: string | null;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
 }) {
   const sizeClass =
-    size === "lg" ? "h-20 w-20 text-lg" : size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-sm";
+    size === "xl"
+      ? "h-24 w-24 text-xl sm:h-28 sm:w-28"
+      : size === "lg"
+        ? "h-20 w-20 text-lg"
+        : size === "sm"
+          ? "h-9 w-9 text-xs"
+          : "h-11 w-11 text-sm";
 
   if (photoUrl) {
     return (
@@ -24,6 +32,7 @@ export function TutorAvatar({
         className={cn(
           "shrink-0 rounded-full border border-brand-100 object-cover",
           sizeClass,
+          className,
         )}
       />
     );
@@ -40,6 +49,7 @@ export function TutorAvatar({
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full border border-brand-100 bg-brand-50 font-display font-semibold text-brand-700",
         sizeClass,
+        className,
       )}
       aria-hidden
     >

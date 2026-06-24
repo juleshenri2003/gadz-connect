@@ -1,4 +1,6 @@
 /** Forme minimale partagée entre marketplace auth et public. */
+import type { TutorProfileLink } from "@/features/profile/profileLinks";
+
 export interface MarketplaceTutorBase {
   id: string;
   first_name: string;
@@ -6,6 +8,7 @@ export interface MarketplaceTutorBase {
   bio: string | null;
   hourly_rate: number | null;
   subjects: string[];
+  profile_links?: TutorProfileLink[];
   available_slot_count?: number;
   next_available_slot_at?: string | null;
   has_cv_pdf?: boolean;

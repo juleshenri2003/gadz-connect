@@ -8,9 +8,6 @@ import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalytics";
 import { TutorAvailableSlotsList } from "@/features/marketplace/tutor-detail/TutorAvailableSlotsList";
 import { TutorBookingCalendar } from "@/features/marketplace/tutor-detail/TutorBookingCalendar";
-import { ShareTutorButton } from "@/features/marketplace/tutor-detail/ShareTutorButton";
-import { TutorCvSection } from "@/features/marketplace/tutor-detail/TutorCvSection";
-import { TutorPresentationSection } from "@/features/marketplace/tutor-detail/TutorPresentationSection";
 import { TutorProfileHeader } from "@/features/marketplace/tutor-detail/TutorProfileHeader";
 import {
   usePublicTutor,
@@ -36,9 +33,6 @@ export function PublicTutorDetailPage() {
   const tutorName = tutor
     ? `${tutor.first_name} ${tutor.last_name}`.trim()
     : "";
-
-  const hasSlots =
-    (slots?.length ?? 0) > 0 || (tutor?.available_slot_count ?? 0) > 0;
 
   usePageMeta(
     tutorName || "Professeur",
@@ -97,14 +91,21 @@ export function PublicTutorDetailPage() {
 
   return (
     <>
-      <div className="space-y-6 pb-24 sm:pb-0">
+      <div className="space-y-5 pb-24 sm:pb-0">
         <TutorProfileHeader
           tutor={tutor}
           backHref="/"
           backLabel="← Accueil"
-          actions={
-            <ShareTutorButton url={shareUrl} tutorName={tutorName} />
-          }
+          className="-mt-2 sm:-mt-3"
+          variant="public"
+          shareUrl={shareUrl}
+          shareTutorName={tutorName}
+          includeAbout
+          cvGuestMode
+          slots={slots}
+          slotsLoading={slotsLoading}
+          onBookSlot={handleBookSlot}
+          listBackHref="/"
         />
 
         <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
@@ -120,18 +121,7 @@ export function PublicTutorDetailPage() {
             />
           </div>
 
-          <aside className="space-y-4 lg:col-span-4">
-            <TutorPresentationSection
-              tutor={tutor}
-              collapsible
-              defaultOpen={!hasSlots}
-            />
-            <TutorCvSection
-              hasCvPdf={tutor.has_cv_pdf}
-              guestMode
-              collapsible
-              defaultOpen={false}
-            />
+          <aside className="lg:sticky lg:top-32 lg:z-30 lg:col-span-4 lg:self-start">
             <TutorAvailableSlotsList
               hourlyRate={tutor.hourly_rate}
               slots={slots}

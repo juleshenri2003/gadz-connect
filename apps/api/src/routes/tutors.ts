@@ -30,6 +30,7 @@ import {
   computeMarketplaceStatus,
   isCvComplete,
 } from "../lib/tutor-visibility.js";
+import { profileLinksSchema } from "../lib/profile-links.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
 
@@ -56,6 +57,7 @@ const tutorProfileSchema = z.object({
   cv: z.string().max(5000).optional(),
   hourlyRate: z.number().positive().max(500).optional(),
   subjects: z.array(z.string().min(1).max(80)).max(20).optional(),
+  profileLinks: profileLinksSchema.optional(),
 });
 
 const slotSchema = z.object({
@@ -116,18 +118,83 @@ async function countFutureSlots(providerId: string): Promise<number> {
   return count ?? 0;
 }
 
+const MY_TUTOR_SELECT_VARIANTS = [
+  "id, bio, cv, cv_pdf_path, hourly_rate, subjects, profile_links, role, account_status, profile_setup_complete, stripe_connect_onboarding_complete",
+  "id, bio, cv, cv_pdf_path, hourly_rate, subjects, role, account_status, profile_setup_complete, stripe_connect_onboarding_complete",
+] as const;
+
+const MY_TUTOR_PATCH_SELECT_VARIANTS = [
+  "id, bio, cv, hourly_rate, subjects, profile_links",
+  "id, bio, cv, hourly_rate, subjects",
+] as const;
+
+function isMissingColumnError(error: { code?: string } | null): boolean {
+  return error?.code === "42703";
+}
+
+async function fetchMyTutorProfileRow(userId: string) {
+  for (const select of MY_TUTOR_SELECT_VARIANTS) {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select(select)
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!error) {
+      return {
+        data: data
+          ? { ...data, profile_links: (data as { profile_links?: unknown }).profile_links ?? [] }
+          : null,
+        error: null,
+      };
+    }
+    if (!isMissingColumnError(error)) {
+      return { data: null, error };
+    }
+  }
+
+  return { data: null, error: { message: "Profil introuvable" } };
+}
+
+async function updateMyTutorProfileRow(
+  userId: string,
+  updates: Record<string, unknown>,
+) {
+  for (const select of MY_TUTOR_PATCH_SELECT_VARIANTS) {
+    const payload = { ...updates };
+    if (!select.includes("profile_links")) {
+      delete payload.profile_links;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId)
+      .select(select)
+      .maybeSingle();
+
+    if (!error) {
+      return {
+        data: data
+          ? { ...data, profile_links: (data as { profile_links?: unknown }).profile_links ?? [] }
+          : null,
+        error: null,
+      };
+    }
+    if (!isMissingColumnError(error)) {
+      return { data: null, error };
+    }
+  }
+
+  return { data: null, error: { message: "Mise à jour impossible" } };
+}
+
 /**
  * GET /api/tutors/me
  */
 tutorsRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.id;
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, bio, cv, cv_pdf_path, hourly_rate, subjects, role, account_status, profile_setup_complete, stripe_connect_onboarding_complete",
-    )
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await fetchMyTutorProfileRow(userId);
 
   if (error || !data) {
     res.status(404).json({ error: "Profil introuvable" });
@@ -144,6 +211,7 @@ tutorsRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       cv: data.cv,
       hourly_rate: data.hourly_rate,
       subjects: data.subjects,
+      profile_links: data.profile_links ?? [],
       cv_complete: isCvComplete(data),
       marketplace,
     },
@@ -171,13 +239,10 @@ tutorsRouter.patch(
   if (parsed.data.hourlyRate !== undefined)
     updates.hourly_rate = parsed.data.hourlyRate;
   if (parsed.data.subjects !== undefined) updates.subjects = parsed.data.subjects;
+  if (parsed.data.profileLinks !== undefined)
+    updates.profile_links = parsed.data.profileLinks;
 
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .update(updates)
-    .eq("id", req.user!.id)
-    .select("id, bio, cv, hourly_rate, subjects")
-    .maybeSingle();
+  const { data, error } = await updateMyTutorProfileRow(req.user!.id, updates);
 
   if (error) {
     res.status(500).json({ error: error.message });

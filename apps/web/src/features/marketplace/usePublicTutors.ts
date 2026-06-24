@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import type { TutorProfileLink } from "@/features/profile/profileLinks";
 
 export interface PublicTutorListItem {
   id: string;
@@ -11,8 +12,16 @@ export interface PublicTutorListItem {
   hourly_rate: number | null;
   subjects: string[];
   campus: { name: string } | null;
+  profile_links: TutorProfileLink[];
   available_slot_count: number;
   next_available_slot_at: string | null;
+  validated_by_rh: true;
+  cheapest_upcoming_slot?: {
+    id: string;
+    starts_at: string;
+    ends_at: string;
+    price: number;
+  } | null;
 }
 
 export interface PublicTutorSlot {

@@ -19,6 +19,11 @@ import {
   useMyTutorProfile,
   useUpdateTutorProfile,
 } from "@/features/marketplace/useTutors";
+import { TeacherProfileLinksEditor } from "./TeacherProfileLinksEditor";
+import {
+  normalizeProfileLinksForSave,
+  type TutorProfileLink,
+} from "./profileLinks";
 
 interface TeacherPublicProfileFormProps {
   profile: MyProfile;
@@ -35,6 +40,7 @@ export function TeacherPublicProfileForm({
   const [bio, setBio] = useState("");
   const [rate, setRate] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [profileLinks, setProfileLinks] = useState<TutorProfileLink[]>([]);
   const [subjectDraft, setSubjectDraft] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -49,6 +55,9 @@ export function TeacherPublicProfileForm({
       hourlyRate != null && hourlyRate > 0 ? String(hourlyRate) : "",
     );
     setSubjects(tutorProfile.subjects ?? profile.subjects ?? []);
+    setProfileLinks(
+      (tutorProfile.profile_links as TutorProfileLink[] | undefined) ?? [],
+    );
   }, [tutorProfile, profile.bio, profile.subjects, hourlyRate]);
 
   useEffect(() => {
@@ -80,6 +89,7 @@ export function TeacherPublicProfileForm({
         bio: bio.trim() || undefined,
         hourlyRate: rate ? Number(rate) : undefined,
         subjects,
+        profileLinks: normalizeProfileLinksForSave(profileLinks),
       });
     } catch (err) {
       setSaveError((err as Error).message);
@@ -158,6 +168,11 @@ export function TeacherPublicProfileForm({
             </Button>
           </div>
         ) : null}
+
+        <TeacherProfileLinksEditor
+          links={profileLinks}
+          onChange={setProfileLinks}
+        />
 
         <div className="space-y-1">
           <Label htmlFor="teacher-rate">Tarif horaire (€)</Label>

@@ -53,7 +53,7 @@ export function TutorAvailableSlotsList({
         </p>
       </div>
 
-      <div className="max-h-[min(420px,50vh)] overflow-y-auto bg-brand-50/30 p-3">
+      <div className="max-h-[min(420px,calc(100dvh-13rem))] overflow-y-auto bg-brand-50/30 p-3">
         {!hourlyRate ? (
           <p className="text-sm text-warning">
             Tarif non renseigné — réservation indisponible.

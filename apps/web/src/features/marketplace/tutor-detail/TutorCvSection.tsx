@@ -9,6 +9,7 @@ interface TutorCvSectionProps {
   guestMode?: boolean;
   defaultOpen?: boolean;
   collapsible?: boolean;
+  embedded?: boolean;
 }
 
 export function TutorCvSection({
@@ -18,8 +19,13 @@ export function TutorCvSection({
   guestMode = false,
   defaultOpen = false,
   collapsible = false,
+  embedded = false,
 }: TutorCvSectionProps) {
   const hasCv = hasCvPdf || Boolean(cvText?.trim());
+
+  if (guestMode && !hasCv) {
+    return null;
+  }
 
   if (!guestMode && !hasCv) {
     return null;
@@ -75,6 +81,7 @@ export function TutorCvSection({
       title="CV"
       summary={guestMode ? guestSummary : hasCv ? "Parcours et compétences" : guestSummary}
       defaultOpen={defaultOpen}
+      embedded={embedded}
     >
       {content}
     </TutorCollapsibleSection>

@@ -5,6 +5,7 @@ import {
   filterPublicTutorRows,
 } from "../../lib/tutor-public-list.js";
 import {
+  computeCheapestUpcomingSlot,
   toPublicTutorDto,
   toPublicTutorSlotDto,
 } from "../../lib/tutor-public-dto.js";
@@ -135,7 +136,30 @@ publicTutorsRouter.get(
       return;
     }
 
-    res.json({ data: toPublicTutorDto(data, { fullBio: true }) });
+    const { data: slotRows, error: slotsError } = await supabaseAdmin
+      .from("tutor_slots")
+      .select("id, starts_at, ends_at, booked")
+      .eq("provider_id", tutorParsed.data)
+      .eq("booked", false)
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at");
+
+    if (slotsError) {
+      res.status(500).json({ error: slotsError.message });
+      return;
+    }
+
+    const cheapestUpcomingSlot = computeCheapestUpcomingSlot(
+      slotRows ?? [],
+      data.hourly_rate,
+    );
+
+    res.json({
+      data: toPublicTutorDto(data, {
+        fullBio: true,
+        cheapestUpcomingSlot,
+      }),
+    });
   },
 );
 

@@ -14,7 +14,7 @@ export function VisitorBanner() {
 
   return (
     <div
-      className="border-b border-brand-100 bg-brand-50/80 px-4 py-2 text-center text-sm text-ink-700 sm:px-6"
+      className="border-b border-brand-100 bg-brand-50 px-4 py-2 text-center text-sm text-ink-700 sm:px-6"
       role="status"
     >
       Mode visiteur —{" "}

@@ -13,6 +13,7 @@ import {
 } from "@/features/marketplace/marketplaceUtils";
 import { TutorCvSection } from "@/features/marketplace/tutor-detail/TutorCvSection";
 import { TutorPresentationSection } from "@/features/marketplace/tutor-detail/TutorPresentationSection";
+import { TutorProfileLinks } from "@/features/profile/TutorProfileLinks";
 import { TutorProfileHeader } from "@/features/marketplace/tutor-detail/TutorProfileHeader";
 import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalytics";
 import {
@@ -248,6 +249,13 @@ export function TutorDetailPage() {
       />
 
       <TutorPresentationSection tutor={tutor} />
+
+      {(tutor.profile_links?.length ?? 0) > 0 ? (
+        <section className="rounded-md border border-line bg-surface p-6">
+          <h2 className="font-semibold text-ink-900">Liens</h2>
+          <TutorProfileLinks links={tutor.profile_links} className="mt-3" />
+        </section>
+      ) : null}
 
       <TutorCvSection
         hasCvPdf={tutor.has_cv_pdf}

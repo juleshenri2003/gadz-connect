@@ -1,13 +1,20 @@
-import { Button } from "@gadz-connect/ui";
+import { Button, cn } from "@gadz-connect/ui";
 import { Send } from "lucide-react";
 import { useState } from "react";
 
 interface ShareTutorButtonProps {
   url: string;
   tutorName: string;
+  variant?: "outline" | "ghost";
+  className?: string;
 }
 
-export function ShareTutorButton({ url, tutorName }: ShareTutorButtonProps) {
+export function ShareTutorButton({
+  url,
+  tutorName,
+  variant = "outline",
+  className,
+}: ShareTutorButtonProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {
@@ -34,8 +41,9 @@ export function ShareTutorButton({ url, tutorName }: ShareTutorButtonProps) {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={variant}
       size="sm"
+      className={cn(variant === "ghost" && "text-ink-600 hover:text-brand-700", className)}
       onClick={() => void handleShare()}
     >
       <Send className="mr-1.5 h-4 w-4" />

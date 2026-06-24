@@ -8,6 +8,8 @@ interface TutorCollapsibleSectionProps {
   defaultOpen?: boolean;
   children: ReactNode;
   className?: string;
+  embedded?: boolean;
+  nested?: boolean;
 }
 
 export function TutorCollapsibleSection({
@@ -16,19 +18,27 @@ export function TutorCollapsibleSection({
   defaultOpen = false,
   children,
   className,
+  embedded = false,
+  nested = false,
 }: TutorCollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-md border border-line bg-surface",
+        embedded
+          ? "border-t border-brand-100 bg-surface"
+          : "overflow-hidden rounded-md border border-line bg-surface",
         className,
       )}
     >
       <button
         type="button"
-        className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-paper"
+        className={cn(
+          "flex w-full items-start gap-3 py-3 text-left",
+          nested ? "px-0" : "px-4 sm:px-6",
+          embedded ? "hover:bg-brand-50/60" : "hover:bg-paper",
+        )}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -48,7 +58,17 @@ export function TutorCollapsibleSection({
           aria-hidden
         />
       </button>
-      {open ? <div className="border-t border-line px-4 py-4">{children}</div> : null}
+      {open ? (
+        <div
+          className={cn(
+            "border-t py-4",
+            nested ? "px-0" : "px-4 sm:px-6",
+            embedded ? "border-brand-100" : "border-line",
+          )}
+        >
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }

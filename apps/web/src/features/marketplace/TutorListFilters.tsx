@@ -1,3 +1,4 @@
+import { BookOpen, ChevronDown, ChevronUp, X } from "lucide-react";
 import { cn, Input } from "@gadz-connect/ui";
 import { useState } from "react";
 
@@ -63,18 +64,28 @@ export function TutorListFilters({
         aria-label="Rechercher un tuteur"
       />
 
+      {showSubjectPills && isCompact ? (
+        <CompactSubjectFilter
+          subjectFilter={subjectFilter}
+          subjectOptions={subjectOptions}
+          subjectsExpanded={subjectsExpanded}
+          onToggleExpanded={() => setSubjectsExpanded((open) => !open)}
+          onSubjectChange={handleSubjectChange}
+        />
+      ) : null}
+
       {topSubjects.length > 0 && isCompact ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-ink-500">Populaires :</span>
+          <span className="text-xs font-medium text-ink-500">Populaires :</span>
           {topSubjects.map((subject) => (
             <button
               key={subject}
               type="button"
               className={cn(
-                "rounded-full px-2.5 py-0.5 text-xs font-medium transition",
+                "rounded-sm border px-2.5 py-1 text-xs font-medium transition",
                 subjectFilter === subject
-                  ? "bg-brand-600 text-white"
-                  : "bg-brand-50 text-brand-700 hover:bg-brand-100",
+                  ? "border-brand-600 bg-brand-600 text-white"
+                  : "border-brand-100 bg-brand-50 text-brand-700 hover:border-brand-200 hover:bg-brand-100",
               )}
               onClick={() =>
                 handleSubjectChange(subjectFilter === subject ? null : subject)
@@ -98,36 +109,99 @@ export function TutorListFilters({
         </label>
       ) : null}
 
-      {showSubjectPills ? (
-        isCompact ? (
-          <div>
-            <button
-              type="button"
-              className="text-xs font-medium text-brand-700 hover:underline"
-              onClick={() => setSubjectsExpanded((open) => !open)}
-              aria-expanded={subjectsExpanded}
-            >
-              Matières {subjectsExpanded ? "▴" : "▾"}
-            </button>
-            {subjectsExpanded ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <SubjectPills
-                  subjectFilter={subjectFilter}
-                  subjectOptions={subjectOptions}
-                  onSubjectChange={handleSubjectChange}
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <SubjectPills
-              subjectFilter={subjectFilter}
-              subjectOptions={subjectOptions}
-              onSubjectChange={handleSubjectChange}
-            />
-          </div>
-        )
+      {showSubjectPills && !isCompact ? (
+        <div className="flex flex-wrap gap-2">
+          <SubjectPills
+            subjectFilter={subjectFilter}
+            subjectOptions={subjectOptions}
+            onSubjectChange={handleSubjectChange}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactSubjectFilter({
+  subjectFilter,
+  subjectOptions,
+  subjectsExpanded,
+  onToggleExpanded,
+  onSubjectChange,
+}: {
+  subjectFilter: string | null;
+  subjectOptions: string[];
+  subjectsExpanded: boolean;
+  onToggleExpanded: () => void;
+  onSubjectChange: (value: string | null) => void;
+}) {
+  const hasFilter = subjectFilter != null;
+
+  return (
+    <div className="space-y-2">
+      <div
+        className={cn(
+          "flex overflow-hidden rounded-sm border transition",
+          hasFilter || subjectsExpanded
+            ? "border-brand-200 bg-brand-50"
+            : "border-line bg-surface hover:border-brand-200",
+        )}
+      >
+        <button
+          type="button"
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium transition",
+            hasFilter ? "text-brand-800" : "text-ink-900",
+          )}
+          onClick={onToggleExpanded}
+          aria-expanded={subjectsExpanded}
+        >
+          <BookOpen
+            className="h-4 w-4 shrink-0 text-brand-600"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 truncate">
+            {hasFilter ? (
+              <>
+                <span className="font-normal text-brand-700">Matière · </span>
+                {subjectFilter}
+              </>
+            ) : (
+              <>
+                Filtrer par matière
+                <span className="font-normal text-ink-500">
+                  {` · ${subjectOptions.length} disponible${subjectOptions.length > 1 ? "s" : ""}`}
+                </span>
+              </>
+            )}
+          </span>
+          {subjectsExpanded ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+          )}
+        </button>
+
+        {hasFilter ? (
+          <button
+            type="button"
+            className="shrink-0 border-l border-brand-200 px-3 text-brand-700 transition hover:bg-brand-100"
+            onClick={() => onSubjectChange(null)}
+            aria-label="Effacer le filtre matière"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+
+      {subjectsExpanded ? (
+        <div className="rounded-sm border border-line bg-paper p-3">
+          <SubjectPills
+            subjectFilter={subjectFilter}
+            subjectOptions={subjectOptions}
+            onSubjectChange={onSubjectChange}
+          />
+        </div>
       ) : null}
     </div>
   );
@@ -147,10 +221,10 @@ function SubjectPills({
       <button
         type="button"
         className={cn(
-          "rounded-full px-3 py-1 text-xs font-medium transition",
+          "rounded-sm border px-3 py-1.5 text-xs font-medium transition",
           subjectFilter === null
-            ? "bg-brand-600 text-white"
-            : "bg-paper text-ink-600 hover:bg-line",
+            ? "border-brand-600 bg-brand-600 text-white"
+            : "border-line bg-surface text-ink-600 hover:border-brand-100 hover:bg-brand-50",
         )}
         onClick={() => onSubjectChange(null)}
       >
@@ -161,10 +235,10 @@ function SubjectPills({
           key={subject}
           type="button"
           className={cn(
-            "rounded-full px-3 py-1 text-xs font-medium transition",
+            "rounded-sm border px-3 py-1.5 text-xs font-medium transition",
             subjectFilter === subject
-              ? "bg-brand-600 text-white"
-              : "bg-brand-50 text-brand-700 hover:bg-brand-100",
+              ? "border-brand-600 bg-brand-600 text-white"
+              : "border-brand-100 bg-surface text-brand-700 hover:border-brand-200 hover:bg-brand-50",
           )}
           onClick={() =>
             onSubjectChange(subjectFilter === subject ? null : subject)

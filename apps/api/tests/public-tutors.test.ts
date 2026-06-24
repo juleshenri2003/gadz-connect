@@ -6,6 +6,7 @@ import {
 } from "../src/lib/tutor-public-list.js";
 import {
   assertNoInternalFields,
+  computeCheapestUpcomingSlot,
   toPublicTutorDto,
   toPublicTutorSlotDto,
 } from "../src/lib/tutor-public-dto.js";
@@ -41,6 +42,7 @@ describe("toPublicTutorDto", () => {
     const dto = toPublicTutorDto(sampleTutor);
     assertNoInternalFields(dto as unknown as Record<string, unknown>);
     assert.equal(dto.has_cv_pdf, true);
+    assert.equal(dto.validated_by_rh, true);
     assert.equal(dto.avatar_url, null);
     assert.equal(dto.first_name, "Jean");
     assert.ok(dto.bio && dto.bio.length <= 303);
@@ -59,6 +61,45 @@ describe("toPublicTutorDto", () => {
     assert.equal(keys.includes("account_status"), false);
     assert.equal(keys.includes("role"), false);
     assert.equal(keys.includes("siret"), false);
+  });
+});
+
+describe("computeCheapestUpcomingSlot", () => {
+  it("returns the lowest priced upcoming slot", () => {
+    const cheapest = computeCheapestUpcomingSlot(
+      [
+        {
+          id: "a",
+          starts_at: "2026-06-25T10:00:00.000Z",
+          ends_at: "2026-06-25T12:00:00.000Z",
+        },
+        {
+          id: "b",
+          starts_at: "2026-06-26T10:00:00.000Z",
+          ends_at: "2026-06-26T11:00:00.000Z",
+        },
+      ],
+      35,
+    );
+
+    assert.equal(cheapest?.id, "b");
+    assert.equal(cheapest?.price, 35);
+  });
+
+  it("returns null without hourly rate", () => {
+    assert.equal(
+      computeCheapestUpcomingSlot(
+        [
+          {
+            id: "a",
+            starts_at: "2026-06-25T10:00:00.000Z",
+            ends_at: "2026-06-25T11:00:00.000Z",
+          },
+        ],
+        null,
+      ),
+      null,
+    );
   });
 });
 
