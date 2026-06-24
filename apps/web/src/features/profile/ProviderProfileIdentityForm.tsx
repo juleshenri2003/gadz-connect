@@ -4,17 +4,14 @@ import {
   Label,
   cn,
 } from "@gadz-connect/ui";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useUpdateProfileIdentity } from "@/features/auth/useMyProfile";
 import {
   campusDisplayName,
-  sortCampuses,
 } from "@/features/campus/campusLabels";
-import { ROLE_LABELS } from "@/features/admin/format";
-import { apiFetch } from "@/lib/api";
+import { useCampusOptions } from "@/features/campus/useCampusOptions";
 
 interface ProviderProfileIdentityFormProps {
   profile: MyProfile;
@@ -30,20 +27,8 @@ export function ProviderProfileIdentityForm({
   variant = "teacher",
 }: ProviderProfileIdentityFormProps) {
   const updateIdentity = useUpdateProfileIdentity();
-  const { data: campuses, isLoading: campusesLoading } = useQuery({
-    queryKey: ["campus"],
-    queryFn: () =>
-      apiFetch<{ data: { id: string; name: string }[] }>("/api/campus"),
-  });
-
-  const [firstName, setFirstName] = useState(profile.first_name);
-  const [lastName, setLastName] = useState(profile.last_name);
-  const [campusId, setCampusId] = useState(profile.campus_id);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [campusConfirmOpen, setCampusConfirmOpen] = useState(false);
-
-  const sortedCampuses = campuses?.data ? sortCampuses(campuses.data) : [];
+  const { campuses: sortedCampuses, isLoading: campusesLoading } =
+    useCampusOptions();
   const isStudentVariant = variant === "student";
 
   useEffect(() => {

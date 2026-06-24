@@ -23,8 +23,8 @@ import {
   defaultCampusId,
   getStoredCampusId,
   persistCampusId,
-  sortCampuses,
 } from "@/features/campus/campusLabels";
+import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import { AppLogo } from "@/features/layout/AppLogo";
@@ -123,15 +123,8 @@ export function LoginPage() {
     enabled: USE_EMAIL_LOGIN,
   });
 
-  const { data: campuses, isLoading: campusesLoading } = useQuery({
-    queryKey: ["campus"],
-    queryFn: () =>
-      apiFetch<{ data: { id: string; name: string }[] }>("/api/campus"),
-  });
-
-  const sortedCampuses = campuses?.data
-    ? sortCampuses(campuses.data)
-    : [];
+  const { campuses: sortedCampuses, isLoading: campusesLoading } =
+    useCampusOptions();
 
   const {
     register,

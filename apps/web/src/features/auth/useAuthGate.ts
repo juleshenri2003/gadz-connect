@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import {
   buildBookingRedirectPath,
   setAuthIntent,
@@ -17,40 +17,30 @@ export interface AuthGateContext {
 
 export function useAuthGate() {
   const { openAuthModal } = useAuthModal();
-  const [gate, setGate] = useState<AuthGateContext | null>(null);
 
-  const openGate = useCallback((context: AuthGateContext) => {
-    trackMarketplaceEvent("auth_gate_open", {
-      tutorId: context.tutorId,
-    });
-    setGate(context);
-  }, []);
-
-  const closeGate = useCallback(() => setGate(null), []);
-
-  const proceedToLogin = useCallback(
+  const openGate = useCallback(
     (context: AuthGateContext) => {
+      trackMarketplaceEvent("auth_gate_open", {
+        tutorId: context.tutorId,
+      });
+
       const redirect = buildBookingRedirectPath(
         context.tutorId,
         context.slotId,
         "public",
       );
       setAuthRedirect(redirect);
+
       const intent = context.intent ?? "student";
       setAuthIntent(intent);
+
       openAuthModal({
-        mode: "login",
+        mode: "signup",
         role: intent === "teacher" ? "teacher" : "student",
       });
-      setGate(null);
     },
     [openAuthModal],
   );
 
-  return {
-    gate,
-    openGate,
-    closeGate,
-    proceedToLogin,
-  };
+  return { openGate };
 }

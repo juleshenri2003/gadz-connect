@@ -24,6 +24,11 @@ export const CAMPUS_DISPLAY_ORDER = [
 
 export const SELECTED_CAMPUS_KEY = "gadz_selected_campus_id";
 
+export interface CampusOption {
+  id: string;
+  name: string;
+}
+
 /** Campus pilote marketing — fallback visiteurs sans préférence enregistrée. */
 export const DEFAULT_PILOT_CAMPUS_NAME = "Aix";
 

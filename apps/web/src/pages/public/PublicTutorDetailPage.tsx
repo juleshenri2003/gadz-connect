@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { AuthGateModal } from "@/features/auth/AuthGateModal";
 import { useAuthGate } from "@/features/auth/useAuthGate";
 import { useSelectedCampus } from "@/features/campus/useSelectedCampus";
 import { usePageMeta } from "@/features/layout/usePageMeta";
@@ -24,7 +23,7 @@ export function PublicTutorDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { campusId } = useSelectedCampus();
-  const { gate, openGate, closeGate, proceedToLogin } = useAuthGate();
+  const { openGate } = useAuthGate();
 
   const initialSlotId = searchParams.get("slot");
 
@@ -142,13 +141,6 @@ export function PublicTutorDetailPage() {
           </aside>
         </div>
       </div>
-
-      <AuthGateModal
-        open={Boolean(gate)}
-        context={gate}
-        onClose={closeGate}
-        onContinue={proceedToLogin}
-      />
     </>
   );
 }

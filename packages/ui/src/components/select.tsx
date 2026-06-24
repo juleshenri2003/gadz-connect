@@ -63,17 +63,17 @@ export const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-2 pl-10 pr-3 text-sm outline-none focus:bg-paper focus:text-ink-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-2 pl-3 pr-3 text-sm outline-none focus:bg-paper focus:text-ink-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
     {...props}
   >
-    <span className="absolute left-2.5 flex h-4 w-4 shrink-0 items-center justify-center">
+    <span className="flex w-6 shrink-0 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
         <span className="text-xs text-accent-600">✓</span>
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText className="truncate">
+    <SelectPrimitive.ItemText className="min-w-0 flex-1 truncate">
       {children}
     </SelectPrimitive.ItemText>
   </SelectPrimitive.Item>

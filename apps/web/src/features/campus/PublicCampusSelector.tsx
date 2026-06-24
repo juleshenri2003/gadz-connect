@@ -43,7 +43,7 @@ export function PublicCampusSelector({
     return (
       <div className={cn("flex items-center gap-2", className)}>
         <span className="shrink-0 text-xs font-medium text-ink-500">
-          Campus
+          Ville
         </span>
         <span
           id={id}
@@ -61,13 +61,13 @@ export function PublicCampusSelector({
         htmlFor={id}
         className="shrink-0 text-xs font-medium text-ink-500"
       >
-        Campus
+        Ville
       </label>
       <Select value={selectValue} onValueChange={selectCampus}>
         <SelectTrigger
           id={id}
           aria-label={
-            campusLabel ? `Campus : ${campusLabel}` : "Choisir un campus"
+            campusLabel ? `Ville : ${campusLabel}` : "Choisir une ville"
           }
           className="h-9 w-auto min-w-[9.5rem] max-w-[13rem] shrink-0 px-3"
         >

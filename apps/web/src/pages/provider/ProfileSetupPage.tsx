@@ -9,7 +9,7 @@ import {
   Label,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -20,8 +20,8 @@ import { normalizeAuthRedirect, resolvePostLoginPath } from "@/features/auth/res
 import {
   campusDisplayName,
   getStoredCampusId,
-  sortCampuses,
 } from "@/features/campus/campusLabels";
+import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
 import { RH_CONTACT_EMAIL } from "@/features/admin/rhContact";
 import { apiFetch } from "@/lib/api";
@@ -110,11 +110,7 @@ export function ProfileSetupPage() {
 
   const setupSchema = useMemo(() => buildSetupSchema(), []);
 
-  const { data: campuses, isLoading } = useQuery({
-    queryKey: ["campus"],
-    queryFn: () =>
-      apiFetch<{ data: { id: string; name: string }[] }>("/api/campus"),
-  });
+  const { campuses: sortedCampuses, isLoading } = useCampusOptions();
 
   const {
     register,
@@ -371,7 +367,7 @@ export function ProfileSetupPage() {
                     disabled={isLoading}
                   >
                     <option value="">Sélectionner…</option>
-                    {(campuses?.data ? sortCampuses(campuses.data) : []).map(
+                    {sortedCampuses.map(
                       (c) => (
                         <option key={c.id} value={c.id}>
                           {campusDisplayName(c.name)}

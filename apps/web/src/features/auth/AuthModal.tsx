@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
 import { Lock, Mail, MapPin } from "lucide-react";
 import {
   useCallback,
@@ -28,8 +27,8 @@ import {
   defaultCampusId,
   getStoredCampusId,
   persistCampusId,
-  sortCampuses,
 } from "@/features/campus/campusLabels";
+import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { setAuthIntent, AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
 import {
@@ -38,7 +37,6 @@ import {
   type AuthModalView,
 } from "@/features/auth/authModalContext";
 import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
-import { apiFetch } from "@/lib/api";
 
 export type { AuthModalMode, AuthModalRole, AuthModalView } from "@/features/auth/authModalContext";
 
@@ -158,14 +156,11 @@ function AuthModalPanel({
   const [loading, setLoading] = useState(false);
   const isSignup = view.mode === "signup";
 
-  const { data: campuses, isLoading: campusesLoading } = useQuery({
-    queryKey: ["campus"],
-    queryFn: () =>
-      apiFetch<{ data: { id: string; name: string }[] }>("/api/campus"),
-    enabled: open && isSignup,
-  });
-
-  const sortedCampuses = campuses?.data ? sortCampuses(campuses.data) : [];
+  const {
+    campuses: sortedCampuses,
+    isLoading: campusesLoading,
+    isError: campusesError,
+  } = useCampusOptions(open && isSignup);
   const copy = copyFor(view);
 
   const {
@@ -236,7 +231,7 @@ function AuthModalPanel({
   async function onEmailLogin(values: AuthFormValues) {
     setServerError(null);
     if (isSignup && !z.string().uuid().safeParse(values.campusId).success) {
-      setError("campusId", { message: "Choisissez votre campus" });
+      setError("campusId", { message: "Choisissez votre ville" });
       return;
     }
     setAuthIntent(view.role);
@@ -261,7 +256,7 @@ function AuthModalPanel({
   async function onMagicLink(values: AuthFormValues) {
     setServerError(null);
     if (isSignup && !z.string().uuid().safeParse(values.campusId).success) {
-      setError("campusId", { message: "Choisissez votre campus" });
+      setError("campusId", { message: "Choisissez votre ville" });
       return;
     }
     if (isSignup && values.campusId) {
@@ -361,23 +356,36 @@ function AuthModalPanel({
                   className="flex items-center gap-1.5"
                 >
                   <MapPin className="h-3.5 w-3.5 text-ink-400" />
-                  Campus
+                  Ville
                 </Label>
                 <Controller
                   name="campusId"
                   control={control}
                   render={({ field }) =>
-                    sortedCampuses.length > 0 ? (
+                    campusesLoading ? (
+                      <div
+                        id={`${formId}-campus`}
+                        className="flex h-10 items-center rounded-md border border-line bg-surface px-3 text-sm text-ink-400"
+                      >
+                        Chargement…
+                      </div>
+                    ) : campusesError || sortedCampuses.length === 0 ? (
+                      <div
+                        id={`${formId}-campus`}
+                        className="flex h-10 items-center rounded-md border border-danger/30 bg-danger-bg px-3 text-sm text-danger"
+                      >
+                        Impossible de charger les villes
+                      </div>
+                    ) : (
                       <Select
                         value={field.value || sortedCampuses[0]!.id}
                         onValueChange={(value) => {
                           field.onChange(value);
                           persistCampusId(value);
                         }}
-                        disabled={campusesLoading}
                       >
                         <SelectTrigger id={`${formId}-campus`}>
-                          <SelectValue placeholder="Choisir un campus" />
+                          <SelectValue placeholder="Choisir une ville" />
                         </SelectTrigger>
                         <SelectContent className="min-w-[16rem]">
                           {sortedCampuses.map((campus) => (
@@ -387,13 +395,6 @@ function AuthModalPanel({
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : (
-                      <div
-                        id={`${formId}-campus`}
-                        className="flex h-10 items-center rounded-md border border-line bg-surface px-3 text-sm text-ink-400"
-                      >
-                        Chargement…
-                      </div>
                     )
                   }
                 />

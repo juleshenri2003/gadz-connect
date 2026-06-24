@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -6,26 +5,14 @@ import {
   getStoredCampusId,
   persistCampusId,
   resolveCampusIdFromParam,
-  sortCampuses,
 } from "./campusLabels";
-import { apiFetch } from "@/lib/api";
-
-export interface CampusOption {
-  id: string;
-  name: string;
-}
+import { useCampusOptions } from "./useCampusOptions";
 
 export function useSelectedCampus() {
   const [searchParams] = useSearchParams();
   const [campusId, setCampusIdState] = useState(getStoredCampusId);
 
-  const { data: campuses, isLoading } = useQuery({
-    queryKey: ["campus"],
-    queryFn: () =>
-      apiFetch<{ data: CampusOption[] }>("/api/campus").then((res) => res.data),
-  });
-
-  const sortedCampuses = campuses ? sortCampuses(campuses) : [];
+  const { campuses: sortedCampuses, isLoading } = useCampusOptions();
 
   const setCampusId = useCallback((id: string) => {
     persistCampusId(id);

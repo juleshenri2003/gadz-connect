@@ -162,7 +162,7 @@ export function PublicMarketplacePage() {
       <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0 space-y-1">
           <h1 className="font-display text-2xl font-semibold leading-tight text-ink-900 sm:text-3xl">
-            Professeurs disponibles sur {campusLabel}
+            Tuteurs des Arts et Métiers sur {campusLabel}
           </h1>
           {bookableCount != null ? (
             <p className="text-sm text-ink-600">
