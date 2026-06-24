@@ -4,10 +4,11 @@ import {
   Label,
   cn,
 } from "@gadz-connect/ui";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useUpdateProfileIdentity } from "@/features/auth/useMyProfile";
+import { ROLE_LABELS } from "@/features/admin/format";
 import {
   campusDisplayName,
 } from "@/features/campus/campusLabels";
@@ -30,6 +31,13 @@ export function ProviderProfileIdentityForm({
   const { campuses: sortedCampuses, isLoading: campusesLoading } =
     useCampusOptions();
   const isStudentVariant = variant === "student";
+
+  const [firstName, setFirstName] = useState(profile.first_name);
+  const [lastName, setLastName] = useState(profile.last_name);
+  const [campusId, setCampusId] = useState(profile.campus_id);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [campusConfirmOpen, setCampusConfirmOpen] = useState(false);
 
   useEffect(() => {
     setFirstName(profile.first_name);

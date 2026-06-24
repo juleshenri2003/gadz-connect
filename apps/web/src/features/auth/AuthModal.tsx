@@ -34,6 +34,7 @@ import { setAuthIntent, AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
 import {
   AuthModalContext,
   type AuthModalOptions,
+  type AuthModalRole,
   type AuthModalView,
 } from "@/features/auth/authModalContext";
 import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
