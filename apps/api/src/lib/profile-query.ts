@@ -31,6 +31,7 @@ export type ProfileRow = Record<string, unknown> & {
   siret_verification_failed?: boolean;
   cv?: string | null;
   cv_pdf_path?: string | null;
+  avatar_path?: string | null;
 };
 
 async function queryProfile(
@@ -62,7 +63,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
 }> {
   const full = await queryProfile(
     userId,
-    ", cv, cv_pdf_path, inpi_declaration_sent_at, registration_path, siret_verification_failed",
+    ", cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed",
   );
   if (!full.error) return full;
 
@@ -76,6 +77,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
     return {
       data: {
         ...(withInpi.data as ProfileRow),
+        avatar_path: null,
         registration_path: null,
         siret_verification_failed: false,
       },
@@ -90,6 +92,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
     return {
       data: {
         ...(withCvPdf.data as ProfileRow),
+        avatar_path: null,
         inpi_declaration_sent_at: null,
         registration_path: null,
         siret_verification_failed: false,
@@ -106,6 +109,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
       data: {
         ...(withCv.data as ProfileRow),
         cv_pdf_path: null,
+        avatar_path: null,
         inpi_declaration_sent_at: null,
         registration_path: null,
         siret_verification_failed: false,
@@ -124,6 +128,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
       ...(base.data as ProfileRow),
       cv: null,
       cv_pdf_path: null,
+      avatar_path: null,
       inpi_declaration_sent_at: null,
       registration_path: null,
       siret_verification_failed: false,

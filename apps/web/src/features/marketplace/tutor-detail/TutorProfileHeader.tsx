@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { formatEuro } from "@/features/admin/format";
+import { TutorAvatar } from "../TutorCard";
 import type { MarketplaceTutorBase } from "../marketplaceUtils";
 import { formatNextSlot } from "../marketplaceUtils";
 
@@ -27,7 +28,9 @@ export function TutorProfileHeader({
       <Link to={backHref} className="text-sm text-ink-400 hover:text-ink-900">
         {backLabel}
       </Link>
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-3 flex flex-wrap items-start gap-4">
+        <TutorAvatar name={name} photoUrl={tutor.avatar_url} size="lg" />
+        <div className="min-w-0 flex-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-ink-900">{name}</h1>
           <p className="mt-1 text-sm text-ink-600">
@@ -68,6 +71,7 @@ export function TutorProfileHeader({
           ) : null}
         </div>
         {actions}
+        </div>
       </div>
     </div>
   );

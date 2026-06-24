@@ -15,7 +15,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
+import { AUTH_REDIRECT_KEY, peekAuthIntent } from "@/features/auth/authStorage";
+import { isStudent } from "@/features/auth/roles";
+import { useMyProfile } from "@/features/auth/useMyProfile";
 import { normalizeAuthRedirect, resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import {
   campusDisplayName,
@@ -24,6 +26,10 @@ import {
 import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { WrongProfileLink } from "@/features/onboarding/WrongProfileContact";
 import { RH_CONTACT_EMAIL } from "@/features/admin/rhContact";
+import {
+  imageFileToBase64,
+  ProfilePhotoUpload,
+} from "@/features/profile/ProfilePhotoUpload";
 import { apiFetch } from "@/lib/api";
 
 const accountTypeSchema = z.enum([
@@ -101,12 +107,23 @@ const ACCOUNT_OPTIONS = [
 
 export function ProfileSetupPage() {
   const { getAccessToken } = useAuth();
+  const { data: profile } = useMyProfile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [cvPdfFile, setCvPdfFile] = useState<File | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const teacherOnlySetup =
+    profile?.role === "teacher" ||
+    peekAuthIntent() === "teacher" ||
+    Boolean(profile?.role && !isStudent(profile.role));
+
+  const accountOptions = teacherOnlySetup
+    ? ACCOUNT_OPTIONS.filter((opt) => opt.value !== "student")
+    : ACCOUNT_OPTIONS;
 
   const setupSchema = useMemo(() => buildSetupSchema(), []);
 
@@ -128,6 +145,8 @@ export function ProfileSetupPage() {
   });
 
   const accountType = watch("accountType");
+  const firstName = watch("firstName");
+  const lastName = watch("lastName");
   const isTeacher = accountType && accountType !== "student";
 
   function validateTeacherCv(cv?: string): boolean {
@@ -172,8 +191,12 @@ export function ProfileSetupPage() {
           : "new_micro";
 
       let pdfBase64: string | undefined;
+      let photoBase64: string | undefined;
       if (role === "teacher" && cvPdfFile) {
         pdfBase64 = await fileToBase64(cvPdfFile);
+      }
+      if (role === "teacher" && photoFile) {
+        photoBase64 = await imageFileToBase64(photoFile);
       }
 
       await apiFetch("/api/profile/setup", {
@@ -189,6 +212,7 @@ export function ProfileSetupPage() {
                 cv: values.cv?.trim() || undefined,
                 registrationPath,
                 pdfBase64,
+                photoBase64,
               }
             : {}),
         }),
@@ -217,7 +241,7 @@ export function ProfileSetupPage() {
           ? "already_registered"
           : "awaiting_registration";
 
-      navigate("/app/micro-entreprise", {
+      navigate("/app/micro-entreprise?step=questionnaire", {
         replace: true,
         state: { registrationStatus },
       });
@@ -246,7 +270,9 @@ export function ProfileSetupPage() {
       <div>
         <h2 className="text-2xl font-bold text-ink-900">Bienvenue</h2>
         <p className="mt-1 text-sm text-ink-600">
-          Choisissez votre parcours pour accéder à Gadz&apos;Connect
+          {teacherOnlySetup
+            ? "Configurez votre profil enseignant sur Gadz'Connect"
+            : "Choisissez votre parcours pour accéder à Gadz'Connect"}
         </p>
       </div>
 
@@ -254,14 +280,18 @@ export function ProfileSetupPage() {
         <CardHeader>
           <CardTitle>
             {step === 1
-              ? "Qui êtes-vous ?"
+              ? teacherOnlySetup
+                ? "Votre parcours micro-entreprise"
+                : "Qui êtes-vous ?"
               : step === 2
                 ? "Vos informations"
                 : "Votre CV"}
           </CardTitle>
           <CardDescription>
             {step === 1
-              ? "Élève ou intervenant — le parcours s'adapte à votre situation."
+              ? teacherOnlySetup
+                ? "Déjà immatriculé ou en cours de création — le parcours s'adapte à votre situation."
+                : "Élève ou intervenant — le parcours s'adapte à votre situation."
               : step === 2
                 ? "Prénom, nom et campus Arts et Métiers."
                 : "Déposez votre CV en PDF ou décrivez votre parcours — les élèves le consulteront avant de réserver."}
@@ -273,7 +303,7 @@ export function ProfileSetupPage() {
               <>
                 <fieldset className="space-y-2">
                   <legend className="sr-only">Type de compte</legend>
-                  {ACCOUNT_OPTIONS.map((opt) => (
+                  {accountOptions.map((opt) => (
                     <label
                       key={opt.value}
                       className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-line p-4 active:bg-paper has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50"
@@ -420,6 +450,13 @@ export function ProfileSetupPage() {
               </>
             ) : (
               <>
+                <ProfilePhotoUpload
+                  displayName={`${firstName ?? ""} ${lastName ?? ""}`.trim() || "Professeur"}
+                  selectedFile={photoFile}
+                  onSelectedFileChange={setPhotoFile}
+                  disabled={isSubmitting}
+                />
+
                 <div className="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
                   <div>
                     <p className="text-sm font-medium text-slate-900">

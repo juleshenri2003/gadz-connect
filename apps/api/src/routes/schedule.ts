@@ -321,6 +321,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       .eq("client_id", userId)
       .not("scheduled_at", "is", null)
       .neq("status", "cancelled")
+      .neq("status", "payment_pending")
       .order("scheduled_at");
 
     if (from) coursesQuery = coursesQuery.gte("scheduled_at", from);

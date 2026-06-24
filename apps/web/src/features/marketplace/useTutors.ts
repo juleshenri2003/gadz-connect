@@ -10,6 +10,7 @@ export interface TutorListItem {
   bio: string | null;
   cv: string | null;
   has_cv_pdf: boolean;
+  avatar_url?: string | null;
   hourly_rate: number | null;
   subjects: string[];
   account_status: string;
@@ -247,6 +248,29 @@ export function useBookSlot() {
       void queryClient.invalidateQueries({ queryKey: ["schedule-admin"] });
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
       void queryClient.invalidateQueries({ queryKey: ["tutor-slots", vars.slotId] });
+    },
+  });
+}
+
+export function useConfirmBookingPayment() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (courseId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      await apiFetch<{ data: { courseId: string; status: string } }>(
+        `/api/tutors/bookings/${courseId}/confirm-payment`,
+        { method: "POST", token },
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutors"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-transactions"] });
     },
   });
 }

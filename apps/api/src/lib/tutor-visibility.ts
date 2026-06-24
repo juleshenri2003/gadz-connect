@@ -71,7 +71,7 @@ export function computeMarketplaceStatus(
 }
 
 export const MARKETPLACE_TUTOR_SELECT =
-  "id, first_name, last_name, role, bio, cv, cv_pdf_path, hourly_rate, subjects, account_status, stripe_connect_onboarding_complete, profile_setup_complete, siret, is_autoentrepreneur_verified, campus:campus_id(name)";
+  "id, first_name, last_name, role, bio, cv, cv_pdf_path, avatar_path, hourly_rate, subjects, account_status, stripe_connect_onboarding_complete, profile_setup_complete, siret, is_autoentrepreneur_verified, campus:campus_id(name)";
 
 export function isCvComplete(profile: {
   cv?: string | null;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_MICRO_ENTERPRISE_ACTIVITY } from "@/features/onboarding/fiscalLabels";
 
 const siretRegex = /^\d{14}$/;
 
@@ -10,9 +11,9 @@ export const onboardingStep0Schema = z.object({
 });
 
 export const onboardingStep1Schema = z.object({
-  activity: z.enum(["enseignement", "conseil", "prestation_intellectuelle"], {
-    required_error: "Sélectionnez une activité",
-  }),
+  activity: z
+    .enum(["enseignement", "conseil", "prestation_intellectuelle"])
+    .default(DEFAULT_MICRO_ENTERPRISE_ACTIVITY),
 });
 
 export const onboardingStep2Schema = z.object({

@@ -7,6 +7,7 @@ export interface PublicTutorListItem {
   last_name: string;
   bio: string | null;
   has_cv_pdf: boolean;
+  avatar_url?: string | null;
   hourly_rate: number | null;
   subjects: string[];
   campus: { name: string } | null;

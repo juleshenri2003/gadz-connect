@@ -27,6 +27,8 @@ export interface MyProfile {
   bio: string | null;
   cv: string | null;
   cv_pdf_path: string | null;
+  avatar_url: string | null;
+  avatar_path?: string | null;
   cv_complete: boolean;
   hourly_rate: number | null;
   subjects: string[];

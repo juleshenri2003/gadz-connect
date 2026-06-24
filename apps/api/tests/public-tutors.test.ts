@@ -23,6 +23,7 @@ const sampleTutor: TutorRowWithAvailability = {
   bio: "Professeur de mécanique avec " + "x".repeat(400),
   cv: "CV texte confidentiel",
   cv_pdf_path: "user/cv.pdf",
+  avatar_path: null,
   hourly_rate: 35,
   subjects: ["Mécanique", "Maths"],
   account_status: "active",
@@ -40,6 +41,7 @@ describe("toPublicTutorDto", () => {
     const dto = toPublicTutorDto(sampleTutor);
     assertNoInternalFields(dto as unknown as Record<string, unknown>);
     assert.equal(dto.has_cv_pdf, true);
+    assert.equal(dto.avatar_url, null);
     assert.equal(dto.first_name, "Jean");
     assert.ok(dto.bio && dto.bio.length <= 303);
     assert.equal(dto.bio?.endsWith("…"), true);

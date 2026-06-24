@@ -17,7 +17,9 @@ import { TeacherScheduleEventDetail } from "@/features/scheduling/TeacherSchedul
 import { TeacherScheduleHeader } from "@/features/scheduling/TeacherScheduleHeader";
 import {
   addDays,
+  formatWeekParam,
   isEventPast,
+  parseWeekParam,
   startOfWeek,
 } from "@/features/scheduling/calendar-utils";
 import type { ScheduleEvent } from "@/features/scheduling/types";
@@ -28,12 +30,6 @@ import {
 } from "@/features/scheduling/useTeacherScheduleView";
 import { useMySchedule } from "@/features/scheduling/useSchedule";
 import { WeekCalendar } from "@/features/scheduling/WeekCalendar";
-
-function parseWeekParam(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? undefined : d;
-}
 
 export function SchedulePage() {
   const { data: profile, isLoading: profileLoading } = useMyProfile();
@@ -47,7 +43,7 @@ export function SchedulePage() {
   const student = Boolean(profile && isStudent(profile.role));
 
   const weekAnchor = useMemo(
-    () => parseWeekParam(searchParams.get("week")) ?? new Date(),
+    () => parseWeekParam(searchParams.get("week")) ?? startOfWeek(new Date()),
     [searchParams],
   );
 
@@ -101,11 +97,10 @@ export function SchedulePage() {
   }
 
   function handleWeekAnchorChange(anchor: Date) {
-    const weekStart = startOfWeek(anchor);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        next.set("week", weekStart.toISOString().slice(0, 10));
+        next.set("week", formatWeekParam(anchor));
         return next;
       },
       { replace: true },

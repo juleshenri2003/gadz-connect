@@ -11,6 +11,12 @@ export function setAuthIntent(intent: AuthIntent): void {
   sessionStorage.setItem(AUTH_INTENT_KEY, intent);
 }
 
+export function peekAuthIntent(): AuthIntent | null {
+  const value = sessionStorage.getItem(AUTH_INTENT_KEY);
+  if (value === "student" || value === "teacher") return value;
+  return null;
+}
+
 export function consumeAuthIntent(): AuthIntent | null {
   const value = sessionStorage.getItem(AUTH_INTENT_KEY);
   sessionStorage.removeItem(AUTH_INTENT_KEY);

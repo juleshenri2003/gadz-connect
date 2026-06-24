@@ -1,5 +1,9 @@
 import { calculateFiscalBreakdown } from "./fiscal.js";
 import { isStripeConfigured, stripe } from "./stripe.js";
+import {
+  resolveStripePaymentStrategy as resolveStripePaymentStrategyImpl,
+  type StripePaymentStrategy,
+} from "./stripe-test-connect.js";
 import { supabaseAdmin } from "./supabase.js";
 import { isTeacherVisibleInMarketplace } from "./tutor-visibility.js";
 
@@ -63,6 +67,25 @@ export async function prepareBooking(
 
   if (slotError || !slot || slot.booked) {
     return { ok: false, status: 404, error: "Créneau indisponible" };
+  }
+
+  const { data: existingBooking } = await supabaseAdmin
+    .from("courses")
+    .select("id, status, client_id")
+    .eq("slot_id", input.slotId)
+    .in("status", ["scheduled", "payment_pending"])
+    .maybeSingle();
+
+  if (existingBooking) {
+    const existingClientId = existingBooking.client_id as string;
+    if (existingBooking.status === "scheduled") {
+      return { ok: false, status: 404, error: "Créneau indisponible" };
+    }
+    if (existingClientId !== input.clientUserId) {
+      return { ok: false, status: 404, error: "Créneau indisponible" };
+    }
+    await supabaseAdmin.from("transactions").delete().eq("course_id", existingBooking.id);
+    await supabaseAdmin.from("courses").delete().eq("id", existingBooking.id);
   }
 
   if (slot.provider_id === client.id) {
@@ -148,6 +171,12 @@ export async function prepareBooking(
       },
     },
   };
+}
+
+export async function resolveStripePaymentStrategy(
+  tutorStripeAccountId: string | null | undefined,
+): Promise<StripePaymentStrategy> {
+  return resolveStripePaymentStrategyImpl(tutorStripeAccountId);
 }
 
 export function shouldUseStripePayment(

@@ -9,6 +9,7 @@ export interface MarketplaceTutorBase {
   available_slot_count?: number;
   next_available_slot_at?: string | null;
   has_cv_pdf?: boolean;
+  avatar_url?: string | null;
   cv?: string | null;
 }
 

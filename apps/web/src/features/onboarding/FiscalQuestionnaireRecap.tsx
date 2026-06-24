@@ -2,6 +2,11 @@ import { Button, cn } from "@gadz-connect/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { MyProfile } from "@/features/auth/useMyProfile";
+import { formatEuro } from "@/features/admin/format";
+import {
+  breakdownForProfile,
+  getFiscalProfileDefinition,
+} from "@/features/onboarding/fiscalProfile";
 import {
   getActivityLabel,
   getUrssafPeriodicityLabel,
@@ -108,6 +113,17 @@ export function FiscalQuestionnaireRecap({
   const activityLabel = getActivityLabel(profile.micro_enterprise_activity);
   const urssafLabel = getUrssafPeriodicityLabel(profile.urssaf_periodicity);
   const isQuarterly = profile.urssaf_periodicity !== "monthly";
+  const fiscalProfile = getFiscalProfileDefinition(
+    profile.status_acre ?? false,
+    profile.versement_liberatoire,
+  );
+  const exampleAmount =
+    profile.hourly_rate && profile.hourly_rate > 0 ? profile.hourly_rate : 40;
+  const fiscalBreakdown = breakdownForProfile(
+    exampleAmount,
+    profile.status_acre ?? false,
+    profile.versement_liberatoire,
+  );
 
   if (compact) {
     return (
@@ -150,9 +166,17 @@ export function FiscalQuestionnaireRecap({
             <span className="text-ink-400">Versement libératoire</span>
             <BoolPill value={profile.versement_liberatoire} />
           </div>
+          <div className="flex items-center justify-between gap-3 border-t border-line/80 pt-2">
+            <span className="text-ink-400">Profil fiscal</span>
+            <span className="text-right font-medium text-ink-900">
+              {fiscalProfile.shortLabel}
+            </span>
+          </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-ink-400">ACRE</span>
-            <BoolPill value={profile.status_acre ?? false} />
+            <span className="text-ink-400">Net estimé / {formatEuro(exampleAmount)}</span>
+            <span className="font-medium tabular-nums text-brand-700">
+              {formatEuro(fiscalBreakdown.netPayout)}
+            </span>
           </div>
         </div>
       </section>
@@ -190,6 +214,25 @@ export function FiscalQuestionnaireRecap({
           </p>
           <p className="mt-1 text-base font-semibold text-brand-700">
             {situationLabel}
+          </p>
+        </div>
+
+        <div className="rounded-md border border-brand-100 bg-brand-50/40 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
+            Profil fiscal appliqué
+          </p>
+          <p className="mt-1 text-base font-semibold text-ink-900">
+            {fiscalProfile.label}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-600">
+            {fiscalProfile.description}
+          </p>
+          <p className="mt-3 text-sm text-ink-600">
+            Sur un cours à{" "}
+            <strong>{formatEuro(exampleAmount)}</strong>, net estimé :{" "}
+            <strong className="text-brand-700">
+              {formatEuro(fiscalBreakdown.netPayout)}
+            </strong>
           </p>
         </div>
 

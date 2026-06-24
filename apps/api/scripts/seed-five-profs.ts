@@ -254,11 +254,8 @@ async function seedProf(
     }
   }
 
-  // Marketplace visible même si Stripe test n'a pas activé charges (UI + créneaux).
-  if (!stripeOnboardingComplete && stripeConnectId) {
-    stripeOnboardingComplete = true;
-  }
-
+  // Marketplace : visible si compte Stripe créé ; le paiement carte utilise
+  // platform_test en local tant que l'onboarding Express n'est pas terminé.
   const profilePayload = {
     id: userId,
     first_name: persona.firstName,

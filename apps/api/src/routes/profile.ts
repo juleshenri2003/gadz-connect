@@ -6,6 +6,12 @@ import {
   removeCvPdf,
   uploadCvPdf,
 } from "../lib/cv-pdf.js";
+import {
+  getProfilePhotoPublicUrl,
+  parseImageBase64,
+  removeProfilePhoto,
+  uploadProfilePhoto,
+} from "../lib/profile-photo.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
@@ -110,6 +116,9 @@ profileRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   res.json({
     data: {
       ...profile,
+      avatar_url: getProfilePhotoPublicUrl(
+        profile.avatar_path as string | null | undefined,
+      ),
       inpi_declaration_sent_at,
       cv_complete,
       ...(marketplace !== undefined ? { marketplace, future_slot_count } : {}),
@@ -442,6 +451,7 @@ const setupSchema = z
     registrationPath: z.enum(["existing_siret", "new_micro"]).optional(),
     cv: z.string().max(5000).optional(),
     pdfBase64: z.string().optional(),
+    photoBase64: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === "teacher") {
@@ -554,6 +564,20 @@ profileRouter.patch(
       await supabaseAdmin
         .from("profiles")
         .update({ cv_pdf_path: path })
+        .eq("id", user.id);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+  }
+
+  if (!isStudent && parsed.data.photoBase64?.trim()) {
+    try {
+      const { buffer, contentType } = parseImageBase64(parsed.data.photoBase64);
+      const { path } = await uploadProfilePhoto(user.id, buffer, contentType);
+      await supabaseAdmin
+        .from("profiles")
+        .update({ avatar_path: path })
         .eq("id", user.id);
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
@@ -862,6 +886,93 @@ profileRouter.delete("/cv-pdf", async (req: AuthenticatedRequest, res) => {
     await supabaseAdmin
       .from("profiles")
       .update({ cv_pdf_path: null })
+      .eq("id", user.id);
+    res.json({ data: { removed: true } });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+const avatarUploadSchema = z.object({
+  photoBase64: z.string().min(32, "Image requise"),
+});
+
+/**
+ * POST /api/profile/avatar
+ * Dépose une photo de profil (JPEG, PNG ou WebP — max 2 Mo).
+ */
+profileRouter.post(
+  "/avatar",
+  express.json({ limit: "4mb" }),
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = avatarUploadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Image requise" });
+      return;
+    }
+
+    const user = req.user!;
+    const teacher = await requireTeacherProfile(user.id);
+    if (!teacher) {
+      res.status(403).json({ error: "Réservé aux enseignants / intervenants." });
+      return;
+    }
+
+    try {
+      const { buffer, contentType } = parseImageBase64(parsed.data.photoBase64);
+      const { path } = await uploadProfilePhoto(user.id, buffer, contentType);
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("profiles")
+        .update({ avatar_path: path })
+        .eq("id", user.id)
+        .select("id, avatar_path")
+        .maybeSingle();
+
+      if (error || !updated) {
+        res.status(500).json({ error: error?.message ?? "Mise à jour impossible" });
+        return;
+      }
+
+      res.json({
+        data: {
+          avatar_url: getProfilePhotoPublicUrl(updated.avatar_path as string),
+        },
+      });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+/**
+ * DELETE /api/profile/avatar
+ * Supprime la photo de profil.
+ */
+profileRouter.delete("/avatar", async (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  const teacher = await requireTeacherProfile(user.id);
+  if (!teacher) {
+    res.status(403).json({ error: "Réservé aux enseignants / intervenants." });
+    return;
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("avatar_path")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.avatar_path) {
+    res.status(404).json({ error: "Aucune photo à supprimer" });
+    return;
+  }
+
+  try {
+    await removeProfilePhoto(profile.avatar_path as string);
+    await supabaseAdmin
+      .from("profiles")
+      .update({ avatar_path: null })
       .eq("id", user.id);
     res.json({ data: { removed: true } });
   } catch (err) {

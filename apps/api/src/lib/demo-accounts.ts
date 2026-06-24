@@ -10,6 +10,10 @@ export const DEMO_ACCOUNTS: Record<string, DemoAccount> = {
     password: "Prof-EnAttente!",
     label: "Prof en attente SIRET (onboarding)",
   },
+  "prof.onboarding@ensam.eu": {
+    password: "Prof-Onboarding!",
+    label: "Prof vierge — onboarding complet à refaire",
+  },
   "prof.martin@ensam.eu": {
     password: "Prof-Martin!",
     label: "Prof actif (démo)",

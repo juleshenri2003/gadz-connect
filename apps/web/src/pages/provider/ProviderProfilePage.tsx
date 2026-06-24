@@ -20,6 +20,7 @@ import {
 import { StudentProfileAccountCard } from "@/features/profile/StudentProfileAccountCard";
 import { StudentProfileHeader } from "@/features/profile/StudentProfileHeader";
 import { StudentProfileJourneyCard } from "@/features/profile/StudentProfileJourneyCard";
+import { TeacherProfilePhotoSection } from "@/features/profile/TeacherProfilePhotoSection";
 import { TeacherProfileCvSection } from "@/features/profile/TeacherProfileCvSection";
 import { TeacherProfileStudentPreview } from "@/features/profile/TeacherProfileStudentPreview";
 import { TeacherPublicProfileForm } from "@/features/profile/TeacherPublicProfileForm";
@@ -166,6 +167,8 @@ export function ProviderProfilePage() {
       <TeacherProfileAccountCard profile={profile} email={user?.email} />
 
       <TeacherPublicProfileForm profile={profile} variant="standalone" />
+
+      <TeacherProfilePhotoSection profile={profile} />
 
       <TeacherProfileCvSection profile={profile} />
 

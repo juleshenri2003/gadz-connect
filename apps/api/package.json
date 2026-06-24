@@ -16,6 +16,7 @@
     "seed-professor-pending": "tsx scripts/seed-professor-pending.ts",
     "seed-professor-personas": "tsx scripts/seed-professor-personas.ts",
     "seed-professor-fresh": "tsx scripts/seed-professor-fresh.ts",
+    "seed-professor-onboarding": "tsx scripts/seed-professor-fresh.ts",
     "seed-demo-passwords": "tsx scripts/seed-demo-passwords.ts",
     "test": "tsx --test tests/tutor-visibility.test.ts tests/public-tutors.test.ts tests/sirene-verify.test.ts tests/tutor-financial.test.ts tests/fiscal.test.ts tests/revenue-split.test.ts tests/billing-period.test.ts tests/admin-profiles-query.test.ts tests/admin-budget.test.ts tests/admin-courses-query.test.ts",
     "apply-migration-005": "tsx scripts/apply-migration-005.ts",
@@ -24,6 +25,7 @@
     "apply-migration-016": "tsx scripts/apply-migration-016.ts",
     "apply-migration-017": "tsx scripts/apply-migration-017.ts",
     "apply-migration-018": "tsx scripts/apply-migration-018.ts",
+    "apply-migration-019": "tsx scripts/apply-migration-019.ts",
     "monthly-billing": "tsx scripts/run-monthly-billing.ts",
     "seed-five-profs": "tsx scripts/seed-five-profs.ts",
     "seed-student": "tsx scripts/seed-student.ts",
@@ -31,10 +33,13 @@
     "repair-orphan-slots": "tsx scripts/repair-orphan-slots.ts",
     "repair-demo": "tsx scripts/repair-orphan-slots.ts",
     "stripe-check": "tsx scripts/stripe-check.ts",
+    "stripe-onboarding-links": "tsx scripts/stripe-onboarding-links.ts",
     "stripe-listen": "bash scripts/stripe-listen.sh",
     "test-invoice-pdf": "tsx scripts/test-invoice-pdf.ts",
     "backfill-invoices": "tsx scripts/backfill-invoices.ts",
-    "repair-demo-billing": "tsx scripts/repair-demo-billing.ts"
+    "repair-demo-billing": "tsx scripts/repair-demo-billing.ts",
+    "promote-rh-admin": "tsx scripts/promote-rh-admin.ts",
+    "run-platform-tests": "tsx scripts/run-platform-tests.ts"
   },
   "dependencies": {
     "@gadz-connect/types": "workspace:*",

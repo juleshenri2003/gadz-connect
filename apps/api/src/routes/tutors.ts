@@ -8,6 +8,7 @@ import {
   requireActiveTeacher,
 } from "../middleware/account-status.js";
 import { createCvPdfSignedUrl } from "../lib/cv-pdf.js";
+import { getProfilePhotoPublicUrl } from "../lib/profile-photo.js";
 import { createInvoiceSignedUrl } from "../lib/billing/invoice-storage.js";
 import {
   buildTransactionRevenueFromBooking,
@@ -16,8 +17,9 @@ import {
 import {
   finalizeBookingSlot,
   prepareBooking,
-  shouldUseStripePayment,
+  resolveStripePaymentStrategy,
 } from "../lib/booking.js";
+import { confirmBookingAfterPayment } from "../lib/booking-payment.js";
 import { stripe } from "../lib/stripe.js";
 import {
   fetchCampusTutorById,
@@ -32,13 +34,17 @@ import {
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
 
-function mapTutorPublic<T extends { cv_pdf_path?: string | null }>(
-  row: T,
-): Omit<T, "cv_pdf_path"> & { has_cv_pdf: boolean } {
-  const { cv_pdf_path, ...rest } = row;
+function mapTutorPublic<
+  T extends { cv_pdf_path?: string | null; avatar_path?: string | null },
+>(row: T): Omit<T, "cv_pdf_path" | "avatar_path"> & {
+  has_cv_pdf: boolean;
+  avatar_url: string | null;
+} {
+  const { cv_pdf_path, avatar_path, ...rest } = row;
   return {
     ...rest,
     has_cv_pdf: Boolean(cv_pdf_path),
+    avatar_url: getProfilePhotoPublicUrl(avatar_path),
   };
 }
 
@@ -728,16 +734,18 @@ tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { data: tutor } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, campus_id, role, account_status, profile_setup_complete, stripe_connect_onboarding_complete, hourly_rate",
-    )
-    .eq("id", req.params.id)
-    .eq("campus_id", caller.campus_id)
-    .maybeSingle();
+  const tutorId = String(req.params.id);
+  const { data: tutor, error: tutorError } = await fetchCampusTutorById(
+    caller.campus_id as string,
+    tutorId,
+  );
 
-  if (!tutor || !isTeacherVisibleInMarketplace(tutor)) {
+  if (tutorError) {
+    res.status(500).json({ error: tutorError.message });
+    return;
+  }
+
+  if (!tutor) {
     res.status(404).json({ error: "Tuteur introuvable" });
     return;
   }
@@ -745,7 +753,7 @@ tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
   const { data, error } = await supabaseAdmin
     .from("tutor_slots")
     .select("id, starts_at, ends_at, booked")
-    .eq("provider_id", req.params.id)
+    .eq("provider_id", tutorId)
     .eq("booked", false)
     .gte("starts_at", new Date().toISOString())
     .order("starts_at");
@@ -782,8 +790,20 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   }
 
   const { slot, client, tutor, subject, fiscal } = prepared.data;
-  const useStripe = shouldUseStripePayment(tutor.stripe_connect_account_id);
+  const paymentStrategy = await resolveStripePaymentStrategy(
+    tutor.stripe_connect_account_id,
+  );
 
+  if (paymentStrategy === "blocked") {
+    res.status(400).json({
+      error:
+        "Ce professeur n'a pas encore finalisé la configuration de ses paiements. Choisissez un autre professeur ou réessayez plus tard.",
+    });
+    return;
+  }
+
+  const useStripe =
+    paymentStrategy === "connect" || paymentStrategy === "platform_test";
   const courseStatus = useStripe ? "payment_pending" : "scheduled";
 
   const { data: course, error: courseError } = await supabaseAdmin
@@ -807,22 +827,35 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  if (useStripe && stripe && tutor.stripe_connect_account_id) {
+  if (useStripe && stripe) {
     try {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(fiscal.amountGross * 100),
-        currency: "eur",
-        application_fee_amount: Math.round(fiscal.commissionSasu * 100),
-        transfer_data: {
+      const paymentIntentParams: Parameters<typeof stripe.paymentIntents.create>[0] =
+        {
+          amount: Math.round(fiscal.amountGross * 100),
+          currency: "eur",
+          metadata: {
+            course_id: course.id,
+            slot_id: slot.id,
+            client_id: client.id,
+          },
+          automatic_payment_methods: { enabled: true },
+        };
+
+      if (
+        paymentStrategy === "connect" &&
+        tutor.stripe_connect_account_id
+      ) {
+        paymentIntentParams.application_fee_amount = Math.round(
+          fiscal.commissionSasu * 100,
+        );
+        paymentIntentParams.transfer_data = {
           destination: tutor.stripe_connect_account_id,
-        },
-        metadata: {
-          course_id: course.id,
-          slot_id: slot.id,
-          client_id: client.id,
-        },
-        automatic_payment_methods: { enabled: true },
-      });
+        };
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create(
+        paymentIntentParams,
+      );
 
       const revenue = buildTransactionRevenueFromBooking(fiscal);
       const { error: txError } = await supabaseAdmin
@@ -901,3 +934,67 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     },
   });
 });
+
+/**
+ * POST /api/tutors/bookings/:courseId/confirm-payment
+ * Confirme la réservation après paiement Stripe côté client (complète le webhook).
+ */
+tutorsRouter.post(
+  "/bookings/:courseId/confirm-payment",
+  async (req: AuthenticatedRequest, res) => {
+    if (!stripe) {
+      res.status(503).json({ error: "Stripe non configuré" });
+      return;
+    }
+
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.id;
+
+    const { data: course } = await supabaseAdmin
+      .from("courses")
+      .select("id, status, client_id")
+      .eq("id", courseId)
+      .eq("client_id", userId)
+      .maybeSingle();
+
+    if (!course) {
+      res.status(404).json({ error: "Réservation introuvable" });
+      return;
+    }
+
+    if (course.status === "scheduled") {
+      res.json({ data: { courseId, status: "scheduled" } });
+      return;
+    }
+
+    if (course.status !== "payment_pending") {
+      res.status(400).json({ error: "Cette réservation ne peut pas être confirmée" });
+      return;
+    }
+
+    const { data: transaction } = await supabaseAdmin
+      .from("transactions")
+      .select("stripe_payment_intent_id")
+      .eq("course_id", courseId)
+      .maybeSingle();
+
+    const paymentIntentId = transaction?.stripe_payment_intent_id as
+      | string
+      | undefined;
+
+    if (!paymentIntentId) {
+      res.status(400).json({ error: "Paiement introuvable pour ce cours" });
+      return;
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const result = await confirmBookingAfterPayment(paymentIntent);
+
+    if (!result.ok) {
+      res.status(402).json({ error: result.error });
+      return;
+    }
+
+    res.json({ data: result });
+  },
+);

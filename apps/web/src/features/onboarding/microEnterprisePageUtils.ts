@@ -63,9 +63,9 @@ export function isMicroEnterpriseRecapView(
   if (!profile) return false;
   const questionnaireDone = Boolean(profile.micro_enterprise_activity);
   if (!questionnaireDone || profile.account_status === "active") return false;
+  if (stepParam === "questionnaire") return !isEditMode;
   if (!stepParam) return true;
-  if (stepParam === "guide") return true;
-  return stepParam === "questionnaire" && !isEditMode;
+  return stepParam === "guide";
 }
 
 export function getRecapNextActionMessage(profile: MyProfile): string {

@@ -17,6 +17,7 @@ import { TutorProfileHeader } from "@/features/marketplace/tutor-detail/TutorPro
 import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalytics";
 import {
   useBookSlot,
+  useConfirmBookingPayment,
   useTutor,
   useTutorSlots,
   type TutorSlot,
@@ -39,15 +40,18 @@ export function TutorDetailPage() {
   const { data: slots } = useTutorSlots(id ?? "");
   const { data: cvPdfUrl } = useTutorCvPdfUrl(id ?? "", Boolean(tutor?.has_cv_pdf));
   const bookSlot = useBookSlot();
+  const confirmPayment = useConfirmBookingPayment();
   const { data: stripeConfig } = useStripeConfig();
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(
     null,
   );
   const [pendingBooking, setPendingBooking] = useState<{
+    courseId: string;
     subject: string;
     amountGross: number;
     netPayout: number;
@@ -106,30 +110,40 @@ export function TutorDetailPage() {
 
   async function handleBook() {
     if (!selectedSlot || !resolvedSubject) return;
-    const result = await bookSlot.mutateAsync({
-      slotId: selectedSlot,
-      subject: resolvedSubject,
-    });
-
-    if (
-      result.requiresPayment &&
-      result.clientSecret &&
-      stripeConfig?.configured &&
-      stripeConfig.publishableKey
-    ) {
-      setPendingBooking({
-        subject: result.subject,
-        amountGross: result.amountGross,
-        netPayout: result.netPayout,
-        scheduledAt: result.scheduledAt,
-        endsAt: result.endsAt,
+    setBookingError(null);
+    try {
+      const result = await bookSlot.mutateAsync({
+        slotId: selectedSlot,
+        subject: resolvedSubject,
       });
-      setPaymentClientSecret(result.clientSecret);
-      return;
-    }
 
-    showBookingSuccess(result);
-    trackMarketplaceEvent("booking_complete", { tutorId: id ?? "" });
+      if (
+        result.requiresPayment &&
+        result.clientSecret &&
+        stripeConfig?.configured &&
+        stripeConfig.publishableKey
+      ) {
+        setPendingBooking({
+          courseId: result.courseId,
+          subject: result.subject,
+          amountGross: result.amountGross,
+          netPayout: result.netPayout,
+          scheduledAt: result.scheduledAt,
+          endsAt: result.endsAt,
+        });
+        setPaymentClientSecret(result.clientSecret);
+        setConfirmOpen(false);
+        return;
+      }
+
+      showBookingSuccess(result);
+      trackMarketplaceEvent("booking_complete", { tutorId: id ?? "" });
+    } catch (err) {
+      setBookingError(
+        err instanceof Error ? err.message : "Réservation impossible",
+      );
+      setConfirmOpen(false);
+    }
   }
 
   function showBookingSuccess(result: {
@@ -155,9 +169,21 @@ export function TutorDetailPage() {
     setPendingBooking(null);
   }
 
-  function handlePaymentSuccess() {
+  async function handlePaymentSuccess() {
     if (!pendingBooking) return;
-    showBookingSuccess(pendingBooking);
+    try {
+      await confirmPayment.mutateAsync(pendingBooking.courseId);
+      showBookingSuccess(pendingBooking);
+      trackMarketplaceEvent("booking_complete", { tutorId: id ?? "" });
+    } catch (err) {
+      setBookingError(
+        err instanceof Error
+          ? err.message
+          : "Paiement reçu mais confirmation impossible — réessayez dans quelques instants.",
+      );
+      setPaymentClientSecret(null);
+      setPendingBooking(null);
+    }
   }
 
   if (isLoading) {
@@ -299,12 +325,17 @@ export function TutorDetailPage() {
           <p className="mt-3 text-sm text-danger">
             {(bookSlot.error as Error).message}
           </p>
+        ) : bookingError ? (
+          <p className="mt-3 text-sm text-danger">{bookingError}</p>
         ) : null}
         {slots?.length ? (
           <Button
             className="mt-4"
             disabled={!canConfirmBooking || bookSlot.isPending}
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => {
+              setBookingError(null);
+              setConfirmOpen(true);
+            }}
           >
             {bookSlot.isPending
               ? "Réservation…"
@@ -317,7 +348,10 @@ export function TutorDetailPage() {
 
       <Modal
         open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={() => {
+          setConfirmOpen(false);
+          setBookingError(null);
+        }}
         title="Confirmer la réservation"
         description="Vérifiez les détails avant de valider."
         footer={
@@ -365,6 +399,9 @@ export function TutorDetailPage() {
                 ? "Le paiement par carte sera demandé à la confirmation."
                 : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
             </p>
+            {bookingError ? (
+              <p className="text-sm text-danger">{bookingError}</p>
+            ) : null}
           </dl>
         ) : null}
       </Modal>

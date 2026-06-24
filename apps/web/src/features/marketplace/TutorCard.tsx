@@ -4,7 +4,31 @@ import { formatEuro } from "@/features/admin/format";
 import type { MarketplaceTutorBase } from "./marketplaceUtils";
 import { formatNextSlot } from "./marketplaceUtils";
 
-export function TutorAvatar({ name }: { name: string }) {
+export function TutorAvatar({
+  name,
+  photoUrl,
+  size = "md",
+}: {
+  name: string;
+  photoUrl?: string | null;
+  size?: "sm" | "md" | "lg";
+}) {
+  const sizeClass =
+    size === "lg" ? "h-20 w-20 text-lg" : size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-sm";
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        className={cn(
+          "shrink-0 rounded-full border border-brand-100 object-cover",
+          sizeClass,
+        )}
+      />
+    );
+  }
+
   const initials = name
     .split(/\s+/)
     .map((p) => p[0])
@@ -13,7 +37,10 @@ export function TutorAvatar({ name }: { name: string }) {
     .toUpperCase();
   return (
     <div
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brand-100 bg-brand-50 font-display text-sm font-semibold text-brand-700"
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full border border-brand-100 bg-brand-50 font-display font-semibold text-brand-700",
+        sizeClass,
+      )}
       aria-hidden
     >
       {initials}
@@ -43,7 +70,7 @@ export function TutorCardContent({ tutor, className }: TutorCardContentProps) {
       )}
     >
       <div className="flex flex-1 gap-3">
-        <TutorAvatar name={name} />
+        <TutorAvatar name={name} photoUrl={tutor.avatar_url} />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex min-h-6 items-start justify-between gap-2">
             <p className="font-semibold text-ink-900">{name}</p>

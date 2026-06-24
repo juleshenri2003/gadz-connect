@@ -12,6 +12,7 @@ type TutorRow = {
   bio: string | null;
   cv: string | null;
   cv_pdf_path?: string | null;
+  avatar_path?: string | null;
   hourly_rate: number | null;
   subjects: string[];
   account_status: string;

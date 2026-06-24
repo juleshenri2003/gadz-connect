@@ -2,6 +2,7 @@ import { Button } from "@gadz-connect/ui";
 import { formatEuro } from "@/features/admin/format";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useMyCvPdfUrl } from "@/features/cv/useCvPdf";
+import { TutorAvatar } from "@/features/marketplace/TutorCard";
 
 interface TeacherProfileStudentPreviewProps {
   profile: MyProfile;
@@ -32,12 +33,19 @@ export function TeacherProfileStudentPreview({
         </span>
       </summary>
       <div className="space-y-6 border-t border-line px-6 pb-6 pt-4">
-        <div>
-          <p className="text-lg font-bold text-ink-900">{fullName}</p>
+        <div className="flex items-start gap-4">
+          <TutorAvatar
+            name={fullName}
+            photoUrl={profile.avatar_url}
+            size="lg"
+          />
+          <div>
+            <p className="text-lg font-bold text-ink-900">{fullName}</p>
           <p className="mt-1 text-sm text-ink-600">
             {profile.campus?.name} —{" "}
             {displayRate ? `${formatEuro(displayRate)} / heure` : "Tarif non renseigné"}
           </p>
+          </div>
         </div>
 
         <section>

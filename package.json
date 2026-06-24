@@ -14,7 +14,10 @@
     "typecheck": "pnpm --filter @gadz-connect/types build && pnpm run -r typecheck",
     "clean": "pnpm run -r clean && rm -rf node_modules",
     "stripe-listen": "pnpm --filter @gadz-connect/api stripe-listen",
-    "stripe-check": "pnpm --filter @gadz-connect/api stripe-check"
+    "stripe-check": "pnpm --filter @gadz-connect/api stripe-check",
+    "test:platform": "pnpm --filter @gadz-connect/api run-platform-tests",
+    "test:e2e": "pnpm --filter @gadz-connect/web test:e2e",
+    "seed:demo": "pnpm --filter @gadz-connect/api seed-demo-passwords && pnpm --filter @gadz-connect/api seed-five-profs && pnpm --filter @gadz-connect/api seed-student && pnpm --filter @gadz-connect/api seed-professor-personas && pnpm --filter @gadz-connect/api align-demo-campus && pnpm --filter @gadz-connect/api promote-rh-admin"
   },
   "engines": {
     "node": ">=20.0.0",

@@ -15,6 +15,7 @@ export const DEMO_ACCOUNT_EMAILS = [
   "prof.complet@ensam.eu",
   "prof.suspended@ensam.eu",
   "prof.enattente@ensam.eu",
+  "prof.onboarding@ensam.eu",
   "jules.henri@ensam.eu",
 ] as const;
 

@@ -8,16 +8,16 @@ import {
   Label,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { FiscalQuestionnaireRecap } from "@/features/onboarding/FiscalQuestionnaireRecap";
+import { FiscalProfileStep } from "@/features/onboarding/FiscalProfileStep";
 import {
-  ACTIVITY_OPTIONS,
+  DEFAULT_MICRO_ENTERPRISE_ACTIVITY,
   hasValidSiret,
   isQuestionnaireEditable,
-  type MicroEnterpriseActivity,
 } from "@/features/onboarding/fiscalLabels";
 import { MicroEnterpriseAlerts } from "@/features/onboarding/MicroEnterpriseAlerts";
 import { MicroEnterpriseTimeline } from "@/features/onboarding/MicroEnterpriseTimeline";
@@ -47,9 +47,8 @@ import {
 
 const STEPS = [
   { id: 1, title: "Situation", description: "SIRET existant ou en cours" },
-  { id: 2, title: "Activité", description: "Type d'activité micro-entreprise" },
-  { id: 3, title: "URSSAF", description: "Périodicité des déclarations" },
-  { id: 4, title: "Fiscalité", description: "Option versement libératoire" },
+  { id: 2, title: "URSSAF", description: "Périodicité des déclarations" },
+  { id: 3, title: "Fiscalité", description: "Profil URSSAF et simulation net" },
 ] as const;
 
 type OnboardingLocationState = {
@@ -160,7 +159,7 @@ export function OnboardingMicroEnterpriseForm() {
     defaultValues: {
       registrationStatus: undefined,
       siret: "",
-      activity: undefined,
+      activity: DEFAULT_MICRO_ENTERPRISE_ACTIVITY,
       urssafPeriodicity: "quarterly",
       versementLiberatoire: false,
       statusAcre: false,
@@ -178,6 +177,7 @@ export function OnboardingMicroEnterpriseForm() {
 
   const registrationStatus = watch("registrationStatus");
   const versementLiberatoire = watch("versementLiberatoire");
+  const statusAcre = watch("statusAcre");
   const alreadyRegistered = registrationStatus === "already_registered";
   const lockedRegistrationPath = profile?.registration_path ?? null;
 
@@ -203,7 +203,9 @@ export function OnboardingMicroEnterpriseForm() {
     form.reset({
       registrationStatus: registrationPathToStatus(inferRegistrationPath(profile)),
       siret: "",
-      activity: profile.micro_enterprise_activity as MicroEnterpriseActivity,
+      activity:
+        (profile.micro_enterprise_activity as typeof DEFAULT_MICRO_ENTERPRISE_ACTIVITY) ??
+        DEFAULT_MICRO_ENTERPRISE_ACTIVITY,
       urssafPeriodicity:
         profile.urssaf_periodicity === "monthly" ? "monthly" : "quarterly",
       versementLiberatoire: profile.versement_liberatoire,
@@ -223,12 +225,11 @@ export function OnboardingMicroEnterpriseForm() {
   async function goNext() {
     const fieldsByStep: (keyof OnboardingFormValues)[][] = [
       ["registrationStatus", "siret"],
-      ["activity"],
       ["urssafPeriodicity"],
-      ["versementLiberatoire"],
+      ["versementLiberatoire", "statusAcre"],
     ];
     const valid = await trigger(fieldsByStep[step - 1]);
-    if (valid) setStep((s) => Math.min(s + 1, 4));
+    if (valid) setStep((s) => Math.min(s + 1, STEPS.length));
   }
 
   function goBack() {
@@ -248,6 +249,15 @@ export function OnboardingMicroEnterpriseForm() {
     } else {
       navigate("/app", { replace: true });
     }
+  }
+
+  function onFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (step < STEPS.length) {
+      void goNext();
+      return;
+    }
+    void handleSubmit(onSubmit)(event);
   }
 
   const pageShell = (content: ReactNode) => (
@@ -346,7 +356,8 @@ export function OnboardingMicroEnterpriseForm() {
 
   if (
     isMicroEnterpriseRecapView(profile, stepParam, isEditMode) &&
-    profile
+    profile &&
+    !isEditMode
   ) {
     return pageShell(
       <RecapPanel
@@ -389,7 +400,7 @@ export function OnboardingMicroEnterpriseForm() {
         </CardHeader>
 
         <CardContent className="px-6 pb-8 sm:px-8">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={onFormSubmit} className="space-y-6">
             {step === 1 && (
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Votre situation</legend>
@@ -458,29 +469,6 @@ export function OnboardingMicroEnterpriseForm() {
 
             {step === 2 && (
               <fieldset className="space-y-3">
-                <legend className="text-sm font-medium">Activité choisie</legend>
-                {ACTIVITY_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 hover:bg-paper has-[:checked]:border-brand-700 has-[:checked]:bg-paper"
-                  >
-                    <input
-                      type="radio"
-                      value={opt.value}
-                      className="mt-1"
-                      {...register("activity")}
-                    />
-                    <span className="text-sm">{opt.label}</span>
-                  </label>
-                ))}
-                {errors.activity && (
-                  <p className="text-sm text-danger">{errors.activity.message}</p>
-                )}
-              </fieldset>
-            )}
-
-            {step === 3 && (
-              <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">
                   Périodicité URSSAF
                 </legend>
@@ -517,49 +505,14 @@ export function OnboardingMicroEnterpriseForm() {
               </fieldset>
             )}
 
-            {step === 4 && (
-              <fieldset className="space-y-4">
-                <legend className="text-sm font-medium">Option fiscale</legend>
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <Label htmlFor="versementLiberatoire">
-                      Versement libératoire (+2,2 %)
-                    </Label>
-                    <p className="mt-1 text-xs text-ink-400">
-                      Paiement de l&apos;impôt sur le revenu en même temps que les
-                      cotisations URSSAF.
-                    </p>
-                  </div>
-                  <input
-                    id="versementLiberatoire"
-                    type="checkbox"
-                    className="h-5 w-5"
-                    {...register("versementLiberatoire")}
-                  />
-                </div>
-                {versementLiberatoire && (
-                  <p className="text-xs text-ink-600">
-                    Sur un cours de 40 € brut, le libératoire représente environ
-                    0,77 € (2,2 % de la base après commission).
-                  </p>
-                )}
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <Label htmlFor="statusAcre">ACRE (exonération partielle)</Label>
-                    <p className="mt-1 text-xs text-ink-400">
-                      Cochez si vous bénéficiez de l&apos;Aide à la Création
-                      d&apos;Entreprise (12 mois).
-                    </p>
-                  </div>
-                  <input
-                    id="statusAcre"
-                    type="checkbox"
-                    className="h-5 w-5"
-                    {...register("statusAcre")}
-                  />
-                </div>
-              </fieldset>
-            )}
+            {step === 3 ? (
+              <FiscalProfileStep
+                register={register}
+                statusAcre={Boolean(statusAcre)}
+                versementLiberatoire={Boolean(versementLiberatoire)}
+                exampleAmount={profile?.hourly_rate}
+              />
+            ) : null}
 
             {submitError && (
               <p className="text-sm text-danger" role="alert">
@@ -576,7 +529,7 @@ export function OnboardingMicroEnterpriseForm() {
               >
                 Retour
               </Button>
-              {step < 4 ? (
+              {step < STEPS.length ? (
                 <Button type="button" onClick={() => void goNext()}>
                   Continuer
                 </Button>

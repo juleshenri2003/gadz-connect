@@ -1,4 +1,5 @@
 import type { TutorRowWithAvailability } from "./tutor-query.js";
+import { getProfilePhotoPublicUrl } from "./profile-photo.js";
 
 const BIO_EXCERPT_LENGTH = 300;
 
@@ -8,6 +9,7 @@ export interface PublicTutorDto {
   last_name: string;
   bio: string | null;
   has_cv_pdf: boolean;
+  avatar_url: string | null;
   hourly_rate: number | null;
   subjects: string[];
   campus: { name: string } | null;
@@ -24,6 +26,7 @@ export interface PublicTutorSlotDto {
 const INTERNAL_FIELDS = [
   "cv",
   "cv_pdf_path",
+  "avatar_path",
   "role",
   "account_status",
   "stripe_connect_onboarding_complete",
@@ -49,6 +52,9 @@ export function toPublicTutorDto(
     last_name: row.last_name,
     bio: options?.fullBio ? row.bio : excerptBio(row.bio),
     has_cv_pdf: Boolean(row.cv_pdf_path),
+    avatar_url: getProfilePhotoPublicUrl(
+      (row as { avatar_path?: string | null }).avatar_path,
+    ),
     hourly_rate: row.hourly_rate,
     subjects: row.subjects ?? [],
     campus: row.campus,

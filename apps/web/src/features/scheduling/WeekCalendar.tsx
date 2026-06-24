@@ -13,6 +13,7 @@ import {
   formatWeekRange,
   getWeekDays,
   isEventPast,
+  startOfWeek,
 } from "./calendar-utils";
 import type { ScheduleEvent } from "./types";
 
@@ -304,20 +305,27 @@ export function WeekCalendar({
   renderEventActions,
   renderEventExtra,
 }: WeekCalendarProps) {
-  const [anchor, setAnchor] = useState(() => initialAnchor ?? new Date());
+  const [anchor, setAnchor] = useState(() =>
+    startOfWeek(initialAnchor ?? new Date()),
+  );
   const weekDays = useMemo(() => getWeekDays(anchor), [anchor]);
   const today = new Date();
 
-  function updateAnchor(next: Date) {
-    setAnchor(next);
-    onAnchorChange?.(next);
-  }
-
   useEffect(() => {
-    if (initialAnchor) {
-      setAnchor(initialAnchor);
-    }
+    if (!initialAnchor) return;
+    setAnchor((current) => {
+      const nextWeek = startOfWeek(initialAnchor).getTime();
+      const currentWeek = startOfWeek(current).getTime();
+      if (nextWeek === currentWeek) return current;
+      return startOfWeek(initialAnchor);
+    });
   }, [initialAnchor]);
+
+  function updateAnchor(next: Date) {
+    const weekStart = startOfWeek(next);
+    setAnchor(weekStart);
+    onAnchorChange?.(weekStart);
+  }
 
   const weekHasEvents = weekDays.some(
     (day) => eventsForDay(events, day).length > 0,

@@ -4,6 +4,9 @@ import {
   registrationPathToStatus,
 } from "@/features/onboarding/registrationPath";
 
+/** Tous les profs Gadz'Connect exercent en soutien scolaire / cours particuliers. */
+export const DEFAULT_MICRO_ENTERPRISE_ACTIVITY = "enseignement" as const;
+
 export const ACTIVITY_OPTIONS = [
   { value: "enseignement", label: "Enseignement / cours particuliers" },
   { value: "conseil", label: "Conseil et accompagnement" },

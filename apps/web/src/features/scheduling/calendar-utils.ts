@@ -17,6 +17,21 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
+/** Clé `YYYY-MM-DD` en heure locale (évite le décalage UTC de toISOString). */
+export function formatWeekParam(date: Date): string {
+  const weekStart = startOfWeek(date);
+  const y = weekStart.getFullYear();
+  const m = String(weekStart.getMonth() + 1).padStart(2, "0");
+  const d = String(weekStart.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function parseWeekParam(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(`${value}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? undefined : startOfWeek(parsed);
+}
+
 export function getWeekDays(anchor: Date): Date[] {
   const start = startOfWeek(anchor);
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));

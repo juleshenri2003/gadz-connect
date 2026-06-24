@@ -33,7 +33,7 @@ const EXPRESS_TASKS: Omit<OnboardingTask, "status">[] = [
   {
     id: "questionnaire",
     title: "Questionnaire fiscal",
-    description: "Activité, URSSAF et options fiscales",
+    description: "URSSAF et options fiscales",
     href: "/app/micro-entreprise?step=questionnaire",
   },
   {
@@ -66,7 +66,7 @@ const FULL_TASKS: Omit<OnboardingTask, "status">[] = [
   {
     id: "questionnaire",
     title: "Questionnaire fiscal",
-    description: "Activité, URSSAF et options fiscales",
+    description: "URSSAF et options fiscales",
     href: "/app/micro-entreprise?step=questionnaire",
   },
   {

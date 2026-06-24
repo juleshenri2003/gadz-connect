@@ -9,7 +9,15 @@ import { getDemoCampusId } from "./lib/demo-campus.js";
 import { ensureDemoUserPassword } from "./lib/demo-auth.js";
 import { getDemoAccount } from "../src/lib/demo-accounts.js";
 
-const PROF_EMAIL = process.env.PROF_EMAIL ?? "prof.enattente@ensam.eu";
+const PROF_EMAIL = process.env.PROF_EMAIL ?? "prof.onboarding@ensam.eu";
+
+const FRESH_PERSONAS: Record<string, { firstName: string; lastName: string }> = {
+  "prof.onboarding@ensam.eu": { firstName: "Pierre", lastName: "Sanchez" },
+  "prof.enattente@ensam.eu": { firstName: "Paul", lastName: "Bernard" },
+};
+
+const persona =
+  FRESH_PERSONAS[PROF_EMAIL] ?? { firstName: "Prof", lastName: "Démo" };
 
 const admin = createClient(
   process.env.SUPABASE_URL!,
@@ -35,8 +43,8 @@ async function main() {
 
   await admin.auth.admin.updateUserById(userId, {
     user_metadata: {
-      first_name: "Léa",
-      last_name: "Moreau",
+      first_name: persona.firstName,
+      last_name: persona.lastName,
       inpi_declaration_sent_at: null,
     },
   });
@@ -46,8 +54,8 @@ async function main() {
 
   const freshProfile = {
     id: userId,
-    first_name: "Léa",
-    last_name: "Moreau",
+    first_name: persona.firstName,
+    last_name: persona.lastName,
     role: "teacher" as const,
     campus_id: campusId,
     siret: null,
@@ -55,8 +63,14 @@ async function main() {
     micro_enterprise_activity: null,
     urssaf_periodicity: null,
     versement_liberatoire: false,
+    status_acre: false,
     profile_setup_complete: false,
     inpi_declaration_sent_at: null,
+    registration_path: null,
+    siret_verification_failed: false,
+    is_autoentrepreneur_verified: false,
+    micro_enterprise_address: null,
+    avatar_path: null,
     bio: null,
     cv: null,
     cv_pdf_path: null,

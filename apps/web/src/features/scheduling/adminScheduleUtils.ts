@@ -23,21 +23,13 @@ export interface AdminScheduleUrlState {
   month?: string;
 }
 
-export function parseWeekParam(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? undefined : d;
-}
-
 export function parseMonthParam(value: string | null): Date | undefined {
   if (!value) return undefined;
   const d = new Date(`${value}-01T12:00:00`);
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-export function formatWeekParam(date: Date): string {
-  return startOfWeek(date).toISOString().slice(0, 10);
-}
+export { formatWeekParam, parseWeekParam } from "./calendar-utils";
 
 export function formatMonthParam(date: Date): string {
   const y = date.getFullYear();
