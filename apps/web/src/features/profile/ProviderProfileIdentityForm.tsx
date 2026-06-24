@@ -4,7 +4,7 @@ import {
   Label,
   cn,
 } from "@gadz-connect/ui";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Modal } from "@/components/Modal";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useUpdateProfileIdentity } from "@/features/auth/useMyProfile";

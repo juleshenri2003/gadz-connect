@@ -1,6 +1,5 @@
 import { Button } from "@gadz-connect/ui";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { useOnboardingGuide } from "@/features/onboarding/guide/OnboardingGuideContext";
 import { marketplaceRoutes } from "./marketplaceRoutes";
 import { TutorListFilters } from "./TutorListFilters";
