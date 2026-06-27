@@ -1,8 +1,8 @@
 # Rapport d'exécution — Plan de test Gadz'Connect
 
-**Date :** 2026-06-24T15:43:06.669Z
+**Date :** 2026-06-26T08:12:10.331Z
 **API :** http://localhost:3001
-**Résultat :** 45 passés, 0 échoués sur 45
+**Résultat :** 43 passés, 2 échoués sur 45
 
 ## 1. Préparation
 
@@ -17,9 +17,9 @@
 
 | ID | Test | Résultat | Détail |
 |----|------|----------|--------|
-| E-PUB-01 | Liste tuteurs campus | PASS | 6 tuteur(s) |
-| E-PUB-02 | Filtre bookable=true | PASS | 5 réservable(s) |
-| E-PUB-03 | Fiche tuteur publique | PASS | c6a8afa0-d0d5-4e12-9fba-5a693d33ffda |
+| E-PUB-01 | Liste tuteurs campus | PASS | 1 tuteur(s) |
+| E-PUB-02 | Filtre bookable=true | PASS | 0 réservable(s) |
+| E-PUB-03 | Fiche tuteur publique | PASS | 41fe3a2f-6cef-4984-9cbf-8a967c221ed1 |
 | E-PUB-04 | Stats campus publiques | PASS |  |
 
 ## 3.2 Élève — Auth
@@ -38,7 +38,7 @@
 | E-APP-02 | GET /api/notifications | PASS |  |
 | E-APP-03 | GET /api/repository/folders | PASS |  |
 | E-BOOK-01 | Liste tuteurs (authentifié) | PASS |  |
-| E-BOOK-02 | GET /api/tutors/:id/slots (élève) | PASS | 3 créneau(x) |
+| E-BOOK-02 | GET /api/tutors/:id/slots (élève) | FAIL | 0 créneau(x) |
 
 ## 4. Prof — API
 
@@ -70,14 +70,14 @@
 | A-PLAN-01 | GET /api/admin/schedule (Planning) | PASS |  |
 | A-CAMP-01 | GET /api/admin/campuses (Campuses) | PASS |  |
 | A-INV-01 | GET /api/admin/invoices (Factures) | PASS |  |
-| A-USER-02 | Preset pending_siret | PASS | 3 prof(s) |
+| A-USER-02 | Preset pending_siret | PASS | 4 prof(s) |
 
 ## 6. Scénarios bout-en-bout (API)
 
 | ID | Test | Résultat | Détail |
 |----|------|----------|--------|
-| E2E-01 | Profs réservables visibles marketplace | PASS | 5 prof(s) |
-| E2E-02 | Pipeline activation RH (profils pending) | PASS | 3 en attente |
+| E2E-01 | Profs réservables visibles marketplace | FAIL | 0 prof(s) |
+| E2E-02 | Pipeline activation RH (profils pending) | PASS | 4 en attente |
 | E2E-03 | Élève et profs sur même campus (Aix) | PASS | 62c0a6d7-ef2c-4380-bbbc-a08e7b22b1a2 |
 
 ## 7. Cas limites

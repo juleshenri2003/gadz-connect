@@ -5,6 +5,10 @@
 import "dotenv/config";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ensureStripeConnectAccount } from "../src/lib/stripe-connect-account.js";
+import {
+  completeStripeTestConnectAccount,
+  isStripeTestMode,
+} from "../src/lib/stripe-test-connect.js";
 import { stripe } from "../src/lib/stripe.js";
 import { getDemoCampusId } from "./lib/demo-campus.js";
 import { ensureDemoUserPassword } from "./lib/demo-auth.js";
@@ -162,33 +166,6 @@ function slotRange(
   return { starts_at: start.toISOString(), ends_at: end.toISOString() };
 }
 
-async function tryCompleteStripeTestAccount(
-  accountId: string,
-): Promise<boolean> {
-  if (!stripe) return false;
-
-  try {
-    await stripe.accounts.update(accountId, {
-      tos_acceptance: {
-        date: Math.floor(Date.now() / 1000),
-        ip: "127.0.0.1",
-      },
-      business_profile: {
-        url: "https://gadzconnect.fr",
-        product_description: "Cours particuliers et tutorat",
-      },
-    });
-    const account = await stripe.accounts.retrieve(accountId);
-    return Boolean(account.charges_enabled && account.payouts_enabled);
-  } catch (err) {
-    console.warn(
-      "  Stripe onboarding test:",
-      err instanceof Error ? err.message : err,
-    );
-    return false;
-  }
-}
-
 async function seedSlots(
   adminClient: SupabaseClient,
   providerId: string,
@@ -245,12 +222,28 @@ async function seedProf(
       email: persona.email,
       firstName: persona.firstName,
       lastName: persona.lastName,
+      testPrefill: true,
     });
     stripeConnectId = connect.accountId;
     if (stripeConnectId) {
-      stripeOnboardingComplete = await tryCompleteStripeTestAccount(
-        stripeConnectId,
-      );
+      try {
+        const status = await completeStripeTestConnectAccount(stripeConnectId, {
+          email: persona.email,
+          firstName: persona.firstName,
+          lastName: persona.lastName,
+        });
+        stripeOnboardingComplete = status.onboardingComplete;
+      } catch (err) {
+        console.warn(
+          "  Stripe onboarding test:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+      // En local : visibilité marketplace même si l'onboarding Express n'est pas fini
+      // (paiements via platform_test — voir resolveStripePaymentStrategy).
+      if (isStripeTestMode() && stripeConnectId && !stripeOnboardingComplete) {
+        stripeOnboardingComplete = true;
+      }
     }
   }
 

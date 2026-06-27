@@ -1,5 +1,10 @@
 /** Forme minimale partagée entre marketplace auth et public. */
 import type { TutorProfileLink } from "@/features/profile/profileLinks";
+import {
+  collectHomepageSubjectOptions,
+  normalizeMarketplaceSubject,
+  tutorTeachesCatalogSubject,
+} from "./marketplaceSubjects";
 
 export interface MarketplaceTutorBase {
   id: string;
@@ -76,16 +81,12 @@ export function sortTutorsByAvailability<T extends MarketplaceTutorBase>(
   });
 }
 
+export { collectHomepageSubjectOptions } from "./marketplaceSubjects";
+
 export function collectSubjectOptions<T extends MarketplaceTutorBase>(
   tutors: T[],
 ): string[] {
-  const subjects = new Set<string>();
-  for (const tutor of tutors) {
-    for (const subject of tutor.subjects) {
-      if (subject.trim()) subjects.add(subject.trim());
-    }
-  }
-  return [...subjects].sort((a, b) => a.localeCompare(b, "fr"));
+  return collectHomepageSubjectOptions(tutors);
 }
 
 export function filterTutors<T extends MarketplaceTutorBase>(
@@ -95,7 +96,9 @@ export function filterTutors<T extends MarketplaceTutorBase>(
 ): T[] {
   const normalizedQuery = query.trim().toLowerCase();
   return tutors.filter((tutor) => {
-    if (subject && !tutor.subjects.includes(subject)) return false;
+    if (subject && !tutorTeachesCatalogSubject(tutor.subjects, subject)) {
+      return false;
+    }
     if (!normalizedQuery) return true;
     const name = `${tutor.first_name} ${tutor.last_name}`.toLowerCase();
     const bio = (tutor.bio ?? "").toLowerCase();
@@ -126,9 +129,12 @@ export function collectTopSubjects<T extends MarketplaceTutorBase>(
 ): string[] {
   const counts = new Map<string, number>();
   for (const tutor of tutors) {
+    const seen = new Set<string>();
     for (const subject of tutor.subjects) {
-      const trimmed = subject.trim();
-      if (trimmed) counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+      const normalized = normalizeMarketplaceSubject(subject);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
     }
   }
   return [...counts.entries()]

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase.js";
+import { isStripeTestMode } from "./stripe-test-connect.js";
 import { stripe } from "./stripe.js";
 
 export interface EnsureStripeConnectInput {
@@ -6,6 +7,8 @@ export interface EnsureStripeConnectInput {
   email: string;
   firstName: string;
   lastName: string;
+  /** Préremplit identité + activité à la création (mode test, avant tout Account Link). */
+  testPrefill?: boolean;
 }
 
 /**
@@ -33,6 +36,8 @@ export async function ensureStripeConnectAccount(
     return { accountId: existing, created: false };
   }
 
+  const useTestPrefill = Boolean(input.testPrefill && isStripeTestMode());
+
   const account = await stripe.accounts.create({
     type: "express",
     country: "FR",
@@ -42,11 +47,34 @@ export async function ensureStripeConnectAccount(
       transfers: { requested: true },
     },
     business_type: "individual",
-    individual: {
-      first_name: input.firstName,
-      last_name: input.lastName,
-      email: input.email,
-    },
+    ...(useTestPrefill
+      ? {
+          individual: {
+            first_name: input.firstName,
+            last_name: input.lastName,
+            email: input.email,
+            phone: "0000000000",
+            dob: { day: 1, month: 1, year: 1990 },
+            address: {
+              line1: "address_full_match",
+              city: "Paris",
+              postal_code: "75001",
+              country: "FR",
+            },
+          },
+          business_profile: {
+            url: "https://gadzconnect.fr",
+            product_description: "Cours particuliers et tutorat",
+            mcc: "8299",
+          },
+        }
+      : {
+          individual: {
+            first_name: input.firstName,
+            last_name: input.lastName,
+            email: input.email,
+          },
+        }),
     metadata: { gadz_user_id: input.userId },
   });
 

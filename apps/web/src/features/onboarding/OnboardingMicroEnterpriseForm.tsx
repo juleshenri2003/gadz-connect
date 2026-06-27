@@ -8,7 +8,8 @@ import {
   Label,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMyProfile } from "@/features/auth/useMyProfile";
@@ -143,6 +144,7 @@ export function OnboardingMicroEnterpriseForm() {
   const prefilledStatus = (location.state as OnboardingLocationState | null)
     ?.registrationStatus;
   const { data: profile, isLoading: profileLoading } = useMyProfile();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [submittedSiret, setSubmittedSiret] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -243,21 +245,31 @@ export function OnboardingMicroEnterpriseForm() {
       setSubmitError(error);
       return;
     }
+    await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
     if (accountStatus === "active") {
       setSubmittedSiret(values.siret?.replace(/\s/g, "") ?? null);
       navigate("/app", { replace: true });
-    } else {
-      navigate("/app", { replace: true });
+      return;
     }
+    navigate("/app/micro-entreprise", { replace: true });
   }
 
-  function onFormSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function handleFormKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    if (event.target instanceof HTMLTextAreaElement) return;
+
     if (step < STEPS.length) {
+      event.preventDefault();
       void goNext();
       return;
     }
-    void handleSubmit(onSubmit)(event);
+
+    // Étape fiscalité : Entrée ne doit pas enregistrer le questionnaire.
+    event.preventDefault();
+  }
+
+  function submitQuestionnaire() {
+    void handleSubmit(onSubmit)();
   }
 
   const pageShell = (content: ReactNode) => (
@@ -400,7 +412,11 @@ export function OnboardingMicroEnterpriseForm() {
         </CardHeader>
 
         <CardContent className="px-6 pb-8 sm:px-8">
-          <form onSubmit={onFormSubmit} className="space-y-6">
+          <form
+            onSubmit={(event) => event.preventDefault()}
+            onKeyDown={handleFormKeyDown}
+            className="space-y-6"
+          >
             {step === 1 && (
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Votre situation</legend>
@@ -534,7 +550,11 @@ export function OnboardingMicroEnterpriseForm() {
                   Continuer
                 </Button>
               ) : (
-                <Button type="submit" disabled={isSubmitting}>
+                <Button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={submitQuestionnaire}
+                >
                   {isEditing
                     ? "Enregistrer les modifications"
                     : alreadyRegistered

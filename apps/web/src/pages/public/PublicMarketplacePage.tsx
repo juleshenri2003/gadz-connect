@@ -11,7 +11,7 @@ import { trackMarketplaceEvent } from "@/features/marketplace/marketplaceAnalyti
 import { TutorListFilters } from "@/features/marketplace/TutorListFilters";
 import { TutorListShell } from "@/features/marketplace/TutorListShell";
 import {
-  collectSubjectOptions,
+  collectHomepageSubjectOptions,
   collectTopSubjects,
   countBookableTutors,
   filterBookableTutors,
@@ -53,7 +53,7 @@ export function PublicTutorList({
   );
 
   const subjectOptions = useMemo(
-    () => collectSubjectOptions(sortedTutors),
+    () => collectHomepageSubjectOptions(sortedTutors),
     [sortedTutors],
   );
 

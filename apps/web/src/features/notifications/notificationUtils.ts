@@ -8,6 +8,7 @@ export const KIND_LABELS: Record<string, string> = {
   student_unavailable: "Séance annulée (élève)",
   account_activated: "Compte activé",
   payment_received: "Paiement reçu",
+  stripe_connect_email: "Configuration Stripe",
 };
 
 export type NotificationFilter = "all" | "student_unavailable";
@@ -65,6 +66,8 @@ export function getKindBadgeClasses(kind: string): string {
     case "account_activated":
       return "bg-success-bg text-success";
     case "payment_received":
+      return "bg-brand-50 text-brand-700";
+    case "stripe_connect_email":
       return "bg-brand-50 text-brand-700";
     default:
       return "bg-paper text-ink-600";

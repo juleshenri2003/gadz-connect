@@ -28,7 +28,7 @@ import {
   computeMarketplaceStatus,
   isCvComplete,
 } from "../lib/tutor-visibility.js";
-import { notifyAccountActivated } from "../lib/notification-helpers.js";
+import { onTeacherAccountActivated } from "../lib/admin-activate-teacher.js";
 import { assertSiretUnique } from "../lib/siret-uniqueness.js";
 import { verifySiretWithSirene } from "../lib/sirene-verify.js";
 import { isSchoolEmail, schoolEmailError } from "../lib/school-email.js";
@@ -178,7 +178,9 @@ profileRouter.patch(
 
   const { data: existingProfile, error: existingError } = await supabaseAdmin
     .from("profiles")
-    .select("id, account_status, siret, campus_id")
+    .select(
+      "id, role, first_name, last_name, account_status, siret, campus_id",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -261,7 +263,18 @@ profileRouter.patch(
   }
 
   if (accountStatus === "active" && existingProfile.campus_id) {
-    await notifyAccountActivated(user.id, existingProfile.campus_id as string);
+    await onTeacherAccountActivated(
+      {
+        id: user.id,
+        role: existingProfile.role as string,
+        campus_id: existingProfile.campus_id as string,
+        siret: (updated.siret as string | null) ?? normalizedSiret ?? null,
+        account_status: accountStatus,
+        first_name: (existingProfile.first_name as string) ?? "",
+        last_name: (existingProfile.last_name as string) ?? "",
+      },
+      "auto",
+    );
   }
 
   res.json({ data: updated });
@@ -297,7 +310,9 @@ profileRouter.patch(
 
   const { data: profile, error: fetchError } = await supabaseAdmin
     .from("profiles")
-    .select("id, role, account_status, siret, campus_id, siret_verification_failed")
+    .select(
+      "id, role, first_name, last_name, account_status, siret, campus_id, siret_verification_failed",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -371,7 +386,18 @@ profileRouter.patch(
   }
 
   if (accountStatus === "active" && profile.campus_id) {
-    await notifyAccountActivated(user.id, profile.campus_id as string);
+    await onTeacherAccountActivated(
+      {
+        id: user.id,
+        role: profile.role as string,
+        campus_id: profile.campus_id as string,
+        siret: parsed.data.siret,
+        account_status: accountStatus,
+        first_name: (profile.first_name as string) ?? "",
+        last_name: (profile.last_name as string) ?? "",
+      },
+      "auto",
+    );
   }
 
   res.json({ data: updated });
