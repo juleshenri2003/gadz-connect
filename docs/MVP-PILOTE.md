@@ -8,7 +8,9 @@
 |---|---|
 | `SUPABASE_*` | Base + auth |
 | `STRIPE_*` | Paiements Connect |
-| `RESEND_API_KEY` | E-mail facture parent (optionnel en dev) |
+| `RESEND_API_KEY` | E-mails (factures parent + relances Stripe Connect) |
+| `GADZ_PLATFORM_EMAIL_FROM` | Expéditeur prod (domaine vérifié Resend) |
+| `GADZ_APP_URL` | URL HTTPS du front (liens dans les e-mails) |
 | `GADZ_SAP_NUMBER`, `GADZ_PLATFORM_*` | En-tête PDF factures |
 
 ## Démarrage

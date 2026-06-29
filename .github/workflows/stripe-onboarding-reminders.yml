@@ -1,0 +1,36 @@
+name: Stripe onboarding reminders
+
+on:
+  schedule:
+    # Tous les jours à 07:00 UTC (09:00 Paris hiver)
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  stripe-onboarding-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Send Stripe Connect reminder emails
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GADZ_PLATFORM_EMAIL_FROM: ${{ vars.GADZ_PLATFORM_EMAIL_FROM }}
+          GADZ_APP_URL: ${{ vars.GADZ_APP_URL }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          STRIPE_ONBOARDING_REMINDER_DAYS: ${{ vars.STRIPE_ONBOARDING_REMINDER_DAYS }}
+        run: pnpm --filter @gadz-connect/api stripe-onboarding-reminders
