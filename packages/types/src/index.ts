@@ -44,6 +44,7 @@ export interface Profile {
   siret_verification_failed: boolean;
   micro_enterprise_activity: MicroEnterpriseActivity | null;
   urssaf_periodicity: UrssafPeriodicity | null;
+  acre_start_date: string | null;
   stripe_connect_account_id: string | null;
   stripe_connect_onboarding_complete: boolean;
   created_at: string;
@@ -150,6 +151,73 @@ export function getFiscalProfileKey(
   if (statusAcre) return "acre";
   if (versementLiberatoire) return "liberatoire";
   return "standard";
+}
+
+/** Durée de l'ACRE micro-entreprise (mois glissants à partir du début). */
+export const ACRE_DURATION_MONTHS = 12;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function parseDateOnly(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Ancre en UTC minuit pour éviter les décalages de fuseau.
+  const date = new Date(`${trimmed.slice(0, 10)}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Date de fin de l'ACRE = début + 12 mois. Null si pas de date de début. */
+export function getAcreEndDate(
+  startDate: string | null | undefined,
+): Date | null {
+  const start = parseDateOnly(startDate);
+  if (!start) return null;
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + ACRE_DURATION_MONTHS);
+  return end;
+}
+
+/**
+ * ACRE encore active à la date de référence (défaut : maintenant).
+ * Nécessite une date de début ; l'ACRE couvre [début, début + 12 mois).
+ */
+export function isAcreActive(
+  startDate: string | null | undefined,
+  reference: Date = new Date(),
+): boolean {
+  const start = parseDateOnly(startDate);
+  const end = getAcreEndDate(startDate);
+  if (!start || !end) return false;
+  const refMs = reference.getTime();
+  return refMs >= start.getTime() && refMs < end.getTime();
+}
+
+/** Nombre de jours d'ACRE restants (0 si absente ou expirée). */
+export function getAcreDaysRemaining(
+  startDate: string | null | undefined,
+  reference: Date = new Date(),
+): number {
+  const end = getAcreEndDate(startDate);
+  if (!end) return 0;
+  const diffMs = end.getTime() - reference.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.ceil(diffMs / MS_PER_DAY);
+}
+
+/**
+ * ACRE effective = accordée (statusAcre) ET dans la fenêtre de 12 mois.
+ * Si aucune date de début n'est renseignée, on retombe sur le booléen brut
+ * (compatibilité avec les profils existants avant la migration 023).
+ */
+export function resolveEffectiveAcre(input: {
+  statusAcre: boolean;
+  acreStartDate: string | null | undefined;
+  referenceDate?: Date;
+}): boolean {
+  if (!input.statusAcre) return false;
+  if (!input.acreStartDate) return true;
+  return isAcreActive(input.acreStartDate, input.referenceDate ?? new Date());
 }
 
 export interface FiscalCalculateResult {

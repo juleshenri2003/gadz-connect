@@ -16,6 +16,7 @@ interface FiscalProfileStepProps {
   statusAcre: boolean;
   versementLiberatoire: boolean;
   exampleAmount?: number | null;
+  acreStartDateError?: string;
 }
 
 function BreakdownLines({
@@ -85,6 +86,7 @@ export function FiscalProfileStep({
   statusAcre,
   versementLiberatoire,
   exampleAmount,
+  acreStartDateError,
 }: FiscalProfileStepProps) {
   const amount = exampleAmount && exampleAmount > 0 ? exampleAmount : DEFAULT_EXAMPLE_AMOUNT;
   const selected = getFiscalProfileDefinition(statusAcre, versementLiberatoire);
@@ -123,6 +125,28 @@ export function FiscalProfileStep({
             {...register("statusAcre")}
           />
         </div>
+
+        {statusAcre ? (
+          <div className="space-y-1.5 rounded-lg border border-brand-100 bg-brand-50/40 p-4">
+            <Label htmlFor="acreStartDate" className="text-sm font-medium">
+              Date de début de l&apos;ACRE
+            </Label>
+            <p className="text-xs leading-relaxed text-ink-400">
+              L&apos;ACRE dure 12 mois. Cette date sert à calculer les jours
+              restants et à repasser automatiquement au taux plein (21,1 %) à
+              son expiration.
+            </p>
+            <input
+              id="acreStartDate"
+              type="date"
+              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+              {...register("acreStartDate")}
+            />
+            {acreStartDateError ? (
+              <p className="text-xs text-danger">{acreStartDateError}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex items-start justify-between gap-4 rounded-lg border border-line p-4">
           <div className="space-y-1">

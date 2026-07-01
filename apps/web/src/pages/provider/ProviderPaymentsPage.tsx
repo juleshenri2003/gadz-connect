@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button, cn } from "@gadz-connect/ui";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { TeacherInvoicesList } from "@/features/billing/TeacherInvoicesList";
+import { AcreCountdown } from "@/features/fiscal/AcreCountdown";
 import { TeacherFinancialSummarySection } from "@/features/dashboard/teacher-cockpit/TeacherFinancialSummary";
 import { TeacherTransactionsList } from "@/features/dashboard/teacher-cockpit/TeacherTransactionsList";
 import { useTeacherFinancial } from "@/features/dashboard/teacher-cockpit/useTeacherFinancial";
@@ -205,6 +206,7 @@ export function ProviderPaymentsPage() {
       <TeacherStripeConnectSection />
 
       <div className="space-y-4">
+        <AcreCountdown profile={profile} />
         <TeacherFinancialSummarySection
           financial={financial}
           isLoading={financialLoading}
@@ -212,11 +214,9 @@ export function ProviderPaymentsPage() {
           stripeConfigured={stripeConfigured}
         />
         {stripeConfigured ? (
-          <>
-            <TeacherTransactionsList limit={15} id="transactions" />
-            <TeacherInvoicesList />
-          </>
+          <TeacherTransactionsList limit={15} id="transactions" />
         ) : null}
+        <TeacherInvoicesList />
       </div>
     </div>
   );

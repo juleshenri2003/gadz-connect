@@ -11,6 +11,7 @@ const PROFILE_SELECT_BASE = `
   micro_enterprise_address,
   account_status,
   status_acre,
+  acre_start_date,
   versement_liberatoire,
   micro_enterprise_activity,
   urssaf_periodicity,

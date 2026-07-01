@@ -22,6 +22,10 @@ export async function saveOnboardingToProfile(
         urssafPeriodicity: values.urssafPeriodicity,
         versementLiberatoire: values.versementLiberatoire,
         statusAcre: values.statusAcre ?? false,
+        acreStartDate:
+          values.statusAcre && values.acreStartDate?.trim()
+            ? values.acreStartDate
+            : undefined,
         registrationStatus: values.registrationStatus,
         siret:
           values.registrationStatus === "already_registered"

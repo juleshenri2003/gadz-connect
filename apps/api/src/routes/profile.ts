@@ -32,6 +32,10 @@ import { onTeacherAccountActivated } from "../lib/admin-activate-teacher.js";
 import { assertSiretUnique } from "../lib/siret-uniqueness.js";
 import { verifySiretWithSirene } from "../lib/sirene-verify.js";
 import { isSchoolEmail, schoolEmailError } from "../lib/school-email.js";
+import {
+  acreStartDateSchema,
+  acreUpdateSchema,
+} from "../lib/acre-validation.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const profileRouter = Router();
@@ -44,6 +48,7 @@ const onboardingSchema = z
     urssafPeriodicity: z.enum(["monthly", "quarterly"]),
     versementLiberatoire: z.boolean(),
     statusAcre: z.boolean().optional(),
+    acreStartDate: acreStartDateSchema.optional(),
     registrationStatus: z.enum(["already_registered", "awaiting_registration"]),
     siret: z.string().optional(),
   })
@@ -57,6 +62,13 @@ const onboardingSchema = z
           path: ["siret"],
         });
       }
+    }
+    if (data.statusAcre && !data.acreStartDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Renseignez la date de début de votre ACRE",
+        path: ["acreStartDate"],
+      });
     }
   });
 
@@ -152,6 +164,7 @@ profileRouter.patch(
     urssafPeriodicity,
     versementLiberatoire,
     statusAcre,
+    acreStartDate,
     registrationStatus,
     siret,
   } = parsed.data;
@@ -238,6 +251,7 @@ profileRouter.patch(
       urssaf_periodicity: urssafPeriodicity,
       versement_liberatoire: versementLiberatoire,
       status_acre: statusAcre ?? false,
+      acre_start_date: statusAcre ? (acreStartDate ?? null) : null,
       registration_path: registrationPath,
       siret: alreadyRegistered ? normalizedSiret : null,
       account_status: accountStatus,
@@ -278,6 +292,72 @@ profileRouter.patch(
   }
 
   res.json({ data: updated });
+  },
+);
+
+/**
+ * PATCH /api/profile/acre
+ * Met à jour uniquement le statut ACRE + sa date de début.
+ * Autorisé même après déclaration du SIRET (cas d'un prof qui obtient l'ACRE
+ * plus tard). Ne touche pas au reste du questionnaire fiscal.
+ */
+profileRouter.patch(
+  "/acre",
+  loadAccountStatus,
+  rejectSuspended,
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = acreUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    const user = req.user!;
+    const { statusAcre, acreStartDate } = parsed.data;
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    if (profile.role !== "teacher") {
+      res.status(403).json({
+        error: "Seuls les professeurs auto-entrepreneurs gèrent l'ACRE.",
+      });
+      return;
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        status_acre: statusAcre,
+        acre_start_date: statusAcre ? (acreStartDate ?? null) : null,
+      })
+      .eq("id", user.id)
+      .select("id, status_acre, acre_start_date")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[profile] acre:", error.message);
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    if (!updated) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    res.json({ data: updated });
   },
 );
 

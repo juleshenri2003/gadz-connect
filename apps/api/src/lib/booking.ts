@@ -1,4 +1,4 @@
-import { calculateFiscalBreakdown } from "./fiscal.js";
+import { calculateFiscalBreakdown, resolveEffectiveAcre } from "./fiscal.js";
 import { isStripeConfigured, stripe } from "./stripe.js";
 import {
   resolveStripePaymentStrategy as resolveStripePaymentStrategyImpl,
@@ -99,7 +99,7 @@ export async function prepareBooking(
   const { data: tutor } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id, campus_id, hourly_rate, status_acre, versement_liberatoire, first_name, last_name, role, account_status, profile_setup_complete, stripe_connect_account_id, stripe_connect_onboarding_complete, siret, is_autoentrepreneur_verified",
+      "id, campus_id, hourly_rate, status_acre, acre_start_date, versement_liberatoire, first_name, last_name, role, account_status, profile_setup_complete, stripe_connect_account_id, stripe_connect_onboarding_complete, siret, is_autoentrepreneur_verified",
     )
     .eq("id", slot.provider_id)
     .eq("campus_id", client.campus_id)
@@ -139,9 +139,17 @@ export async function prepareBooking(
     (1000 * 60 * 60);
   const amountGross = Math.round(tutor.hourly_rate * durationHours * 100) / 100;
 
+  // ACRE effective à la date du cours : le taux réduit ne s'applique que dans
+  // la fenêtre de 12 mois. Un cours au-delà repasse au taux plein.
+  const effectiveAcre = resolveEffectiveAcre({
+    statusAcre: tutor.status_acre,
+    acreStartDate: (tutor.acre_start_date as string | null) ?? null,
+    referenceDate: new Date(slot.starts_at),
+  });
+
   const fiscalResult = calculateFiscalBreakdown({
     amountGross,
-    statusAcre: tutor.status_acre,
+    statusAcre: effectiveAcre,
     versementLiberatoire: tutor.versement_liberatoire,
   });
 

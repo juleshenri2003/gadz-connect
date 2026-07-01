@@ -17,6 +17,7 @@ export interface MyProfile {
   registration_path: RegistrationPath | null;
   siret_verification_failed: boolean;
   status_acre: boolean;
+  acre_start_date: string | null;
   micro_enterprise_activity: string | null;
   micro_enterprise_address: string | null;
   urssaf_periodicity: string | null;
@@ -85,6 +86,37 @@ export function useUpdateProfileIdentity() {
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
       void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
       void queryClient.invalidateQueries({ queryKey: ["provider-progress"] });
+    },
+  });
+}
+
+export function useUpdateAcre() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: {
+      statusAcre: boolean;
+      acreStartDate: string | null;
+    }) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{
+        data: {
+          id: string;
+          status_acre: boolean;
+          acre_start_date: string | null;
+        };
+      }>("/api/profile/acre", {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(body),
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["profile-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
     },
   });
 }

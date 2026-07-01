@@ -13,6 +13,7 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { AcreStatusCard } from "@/features/fiscal/AcreStatusCard";
 import { FiscalQuestionnaireRecap } from "@/features/onboarding/FiscalQuestionnaireRecap";
 import { FiscalProfileStep } from "@/features/onboarding/FiscalProfileStep";
 import {
@@ -165,6 +166,7 @@ export function OnboardingMicroEnterpriseForm() {
       urssafPeriodicity: "quarterly",
       versementLiberatoire: false,
       statusAcre: false,
+      acreStartDate: "",
     },
     mode: "onChange",
   });
@@ -212,6 +214,7 @@ export function OnboardingMicroEnterpriseForm() {
         profile.urssaf_periodicity === "monthly" ? "monthly" : "quarterly",
       versementLiberatoire: profile.versement_liberatoire,
       statusAcre: profile.status_acre ?? false,
+      acreStartDate: profile.acre_start_date ?? "",
     });
   }, [profile, isEditMode, form]);
 
@@ -228,7 +231,7 @@ export function OnboardingMicroEnterpriseForm() {
     const fieldsByStep: (keyof OnboardingFormValues)[][] = [
       ["registrationStatus", "siret"],
       ["urssafPeriodicity"],
-      ["versementLiberatoire", "statusAcre"],
+      ["versementLiberatoire", "statusAcre", "acreStartDate"],
     ];
     const valid = await trigger(fieldsByStep[step - 1]);
     if (valid) setStep((s) => Math.min(s + 1, STEPS.length));
@@ -381,12 +384,15 @@ export function OnboardingMicroEnterpriseForm() {
 
   if (isEditMode && questionnaireDone && !questionnaireEditable) {
     return pageShell(
-      <Card>
-        <CardContent className="py-8 text-center text-sm text-ink-600">
-          Le questionnaire fiscal n&apos;est plus modifiable — votre SIRET a
-          déjà été transmis.
-        </CardContent>
-      </Card>,
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-ink-600">
+            Le questionnaire fiscal n&apos;est plus modifiable — votre SIRET a
+            déjà été transmis.
+          </CardContent>
+        </Card>
+        {profile ? <AcreStatusCard profile={profile} /> : null}
+      </div>,
     );
   }
 
@@ -527,6 +533,7 @@ export function OnboardingMicroEnterpriseForm() {
                 statusAcre={Boolean(statusAcre)}
                 versementLiberatoire={Boolean(versementLiberatoire)}
                 exampleAmount={profile?.hourly_rate}
+                acreStartDateError={errors.acreStartDate?.message}
               />
             ) : null}
 
