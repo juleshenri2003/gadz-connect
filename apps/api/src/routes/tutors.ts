@@ -20,6 +20,7 @@ import {
   resolveStripePaymentStrategy,
 } from "../lib/booking.js";
 import { confirmBookingAfterPayment } from "../lib/booking-payment.js";
+import { triggerPaymentInvoicesForCourse } from "../lib/billing/trigger-payment-invoices.js";
 import { stripe } from "../lib/stripe.js";
 import {
   fetchCampusTutorById,
@@ -68,6 +69,8 @@ const slotSchema = z.object({
 const bookingSchema = z.object({
   slotId: z.string().uuid(),
   subject: z.string().min(1).max(120).optional(),
+  payerName: z.string().trim().min(1).max(120).optional(),
+  beneficiaryName: z.string().trim().min(1).max(120).optional(),
 });
 
 async function getCallerProfile(userId: string) {
@@ -647,7 +650,7 @@ tutorsRouter.get("/me/transactions", async (req: AuthenticatedRequest, res) => {
 
 /**
  * GET /api/tutors/me/invoices
- * Factures émises par l'auto-entreprise du prestataire (comptabilité URSSAF).
+ * Factures par cours + relevés mensuels (comptabilité URSSAF).
  */
 tutorsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.id;
@@ -668,48 +671,109 @@ tutorsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { data: invoices, error } = await supabaseAdmin
-    .from("monthly_invoices")
-    .select(
-      "id, invoice_number, invoice_type, amount, line_count, billing_period, created_at, email_sent_at",
-    )
-    .eq("profile_id", userId)
-    .eq("invoice_type", "student")
-    .order("billing_period", { ascending: false });
+  const [courseInvoicesResult, summariesResult] = await Promise.all([
+    supabaseAdmin
+      .from("payment_invoices")
+      .select(
+        `
+        id,
+        invoice_number,
+        invoice_type,
+        amount,
+        created_at,
+        transaction:transaction_id (
+          course:course_id ( subject, title, scheduled_at )
+        )
+      `,
+      )
+      .eq("provider_profile_id", userId)
+      .eq("invoice_type", "student")
+      .order("created_at", { ascending: false }),
+    supabaseAdmin
+      .from("monthly_invoices")
+      .select(
+        "id, invoice_number, invoice_type, amount, line_count, billing_period, created_at",
+      )
+      .eq("profile_id", userId)
+      .eq("invoice_type", "student")
+      .order("billing_period", { ascending: false }),
+  ]);
 
-  if (error) {
-    res.status(500).json({ error: error.message });
+  if (courseInvoicesResult.error) {
+    res.status(500).json({ error: courseInvoicesResult.error.message });
+    return;
+  }
+  if (summariesResult.error) {
+    res.status(500).json({ error: summariesResult.error.message });
     return;
   }
 
-  const mapped = (invoices ?? []).map((row) => {
+  type CourseJoin = {
+    subject: string | null;
+    title: string;
+    scheduled_at: string | null;
+  };
+
+  const courseRows = (courseInvoicesResult.data ?? []).map((row) => {
+    const transaction = Array.isArray(row.transaction)
+      ? row.transaction[0]
+      : row.transaction;
+    const course = (
+      Array.isArray(transaction?.course)
+        ? transaction?.course[0]
+        : transaction?.course
+    ) as CourseJoin | null | undefined;
+    const subject = course?.subject ?? course?.title ?? "Cours particulier";
+
+    return {
+      id: row.id as string,
+      invoice_number: row.invoice_number as string,
+      invoice_type: "student" as const,
+      amount: Number(row.amount),
+      created_at: row.created_at as string,
+      course_subject: subject,
+      course_title: subject,
+      scheduled_at: (course?.scheduled_at as string | null) ?? null,
+      is_monthly: false,
+      line_count: 1,
+    };
+  });
+
+  const summaryRows = (summariesResult.data ?? []).map((row) => {
     const billingPeriod = row.billing_period as string;
     const lineCount = Number(row.line_count ?? 0);
     const periodLabel = new Date(`${billingPeriod}T00:00:00.000Z`).toLocaleDateString(
       "fr-FR",
       { month: "long", year: "numeric", timeZone: "UTC" },
     );
-    const label = `Note de débours — ${periodLabel} (${lineCount} cours)`;
+    const label = `Relevé mensuel — ${periodLabel} (${lineCount} facture${lineCount > 1 ? "s" : ""})`;
+
     return {
-      id: row.id,
-      invoice_number: row.invoice_number,
-      invoice_type: row.invoice_type,
-      amount: row.amount,
-      created_at: row.created_at,
-      line_count: lineCount,
-      billing_period: billingPeriod,
+      id: row.id as string,
+      invoice_number: row.invoice_number as string,
+      invoice_type: "student" as const,
+      amount: Number(row.amount),
+      created_at: row.created_at as string,
       course_subject: label,
       course_title: label,
       scheduled_at: `${billingPeriod}T12:00:00.000Z`,
+      is_monthly: true,
+      line_count: lineCount,
     };
   });
 
-  res.json({ data: mapped });
+  const merged = [...courseRows, ...summaryRows].sort(
+    (a, b) =>
+      new Date(b.scheduled_at ?? b.created_at).getTime() -
+      new Date(a.scheduled_at ?? a.created_at).getTime(),
+  );
+
+  res.json({ data: merged });
 });
 
 /**
  * GET /api/tutors/me/invoices/:id/url
- * URL signée pour télécharger une facture étudiant.
+ * URL signée pour télécharger une facture ou un relevé mensuel.
  */
 tutorsRouter.get(
   "/me/invoices/:id/url",
@@ -717,29 +781,62 @@ tutorsRouter.get(
     const userId = req.user!.id;
     const invoiceId = req.params.id;
 
-    const { data: invoice, error } = await supabaseAdmin
+    const { data: monthlyInvoice, error: monthlyError } = await supabaseAdmin
       .from("monthly_invoices")
       .select("id, storage_path, profile_id, invoice_type")
       .eq("id", invoiceId)
       .maybeSingle();
 
-    if (error) {
-      res.status(500).json({ error: error.message });
+    if (monthlyError) {
+      res.status(500).json({ error: monthlyError.message });
       return;
     }
 
-    if (!invoice || invoice.profile_id !== userId) {
+    if (monthlyInvoice) {
+      if (monthlyInvoice.profile_id !== userId) {
+        res.status(404).json({ error: "Facture introuvable" });
+        return;
+      }
+      if (monthlyInvoice.invoice_type !== "student") {
+        res.status(403).json({ error: "Accès réservé aux factures prestataire" });
+        return;
+      }
+
+      try {
+        const url = await createInvoiceSignedUrl(
+          monthlyInvoice.storage_path as string,
+        );
+        res.json({ data: { url } });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Impossible de générer le lien";
+        res.status(500).json({ error: message });
+      }
+      return;
+    }
+
+    const { data: courseInvoice, error: courseError } = await supabaseAdmin
+      .from("payment_invoices")
+      .select("id, storage_path, provider_profile_id, invoice_type")
+      .eq("id", invoiceId)
+      .maybeSingle();
+
+    if (courseError) {
+      res.status(500).json({ error: courseError.message });
+      return;
+    }
+
+    if (
+      !courseInvoice ||
+      courseInvoice.provider_profile_id !== userId ||
+      courseInvoice.invoice_type !== "student"
+    ) {
       res.status(404).json({ error: "Facture introuvable" });
       return;
     }
 
-    if (invoice.invoice_type !== "student") {
-      res.status(403).json({ error: "Accès réservé aux factures prestataire" });
-      return;
-    }
-
     try {
-      const url = await createInvoiceSignedUrl(invoice.storage_path as string);
+      const url = await createInvoiceSignedUrl(courseInvoice.storage_path as string);
       res.json({ data: { url } });
     } catch (err) {
       const message =
@@ -879,6 +976,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   }
 
   const { slot, client, tutor, subject, fiscal } = prepared.data;
+  const payerName = parsed.data.payerName?.trim() || null;
+  const beneficiaryName = parsed.data.beneficiaryName?.trim() || null;
   const paymentStrategy = await resolveStripePaymentStrategy(
     tutor.stripe_connect_account_id,
   );
@@ -907,6 +1006,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       scheduled_at: slot.starts_at,
       slot_id: slot.id,
       status: courseStatus,
+      payer_name: payerName,
+      beneficiary_name: beneficiaryName,
     })
     .select("id")
     .single();
@@ -1010,6 +1111,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     res.status(500).json({ error: "Créneau déjà réservé" });
     return;
   }
+
+  await triggerPaymentInvoicesForCourse(course.id as string);
 
   res.status(201).json({
     data: {

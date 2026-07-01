@@ -1,8 +1,8 @@
-name: Monthly billing
+name: Monthly summaries
 
 on:
   schedule:
-    # 1er de chaque mois à 06:00 UTC (08:00 Paris hiver)
+    # 1er du mois à 06:00 UTC — relevé du mois civil précédent (ex. 1er juil. → juin)
     - cron: "0 6 1 * *"
   workflow_dispatch:
     inputs:
@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run monthly billing
+      - name: Run monthly summaries
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

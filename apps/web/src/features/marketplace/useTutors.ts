@@ -235,7 +235,12 @@ export function useBookSlot() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: { slotId: string; subject?: string }) => {
+    mutationFn: async (body: {
+      slotId: string;
+      subject?: string;
+      payerName?: string;
+      beneficiaryName?: string;
+    }) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");
       const res = await apiFetch<{ data: BookingResult }>("/api/tutors/bookings", {

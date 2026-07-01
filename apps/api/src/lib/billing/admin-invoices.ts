@@ -4,7 +4,8 @@ import {
   resolveAdminBudgetCampusId,
 } from "../admin-budget.js";
 import { sendParentInvoiceEmail } from "../email/send-parent-invoice.js";
-import { sendMonthlyParentInvoiceEmail } from "../email/send-monthly-parent-invoice.js";
+import { sendProfInvoiceEmail } from "../email/send-prof-invoice-email.js";
+import { sendMonthlyParentSummaryEmail } from "../email/send-monthly-parent-invoice.js";
 import { buildInvoiceDownloadFilename } from "./invoice-filename.js";
 import {
   createInvoiceSignedUrl,
@@ -19,6 +20,7 @@ export interface AdminInvoiceRow {
   amount: number;
   created_at: string;
   parent_email_sent_at: string | null;
+  provider_email_sent_at: string | null;
   transaction_id: string;
   course_id: string;
   parent_name: string;
@@ -112,6 +114,7 @@ function mapInvoiceRow(row: Record<string, unknown>): AdminInvoiceRow | null {
     amount: Number(row.amount),
     created_at: row.created_at as string,
     parent_email_sent_at: (row.parent_email_sent_at as string | null) ?? null,
+    provider_email_sent_at: (row.provider_email_sent_at as string | null) ?? null,
     transaction_id: (row.transaction_id as string) ?? transaction.id,
     course_id: (row.course_id as string) ?? course.id,
     parent_name: formatPersonName(client),
@@ -149,7 +152,9 @@ function mapMonthlyInvoiceRow(
   const billingPeriod = row.billing_period as string;
   const lineCount = Number(row.line_count ?? 0);
   const periodLabel = formatBillingPeriodLabel(billingPeriod);
-  const courseSubject = `Facture mensuelle — ${periodLabel} (${lineCount} cours)`;
+  const courseSubject = invoiceNumber.startsWith("GC-RELEVE-")
+    ? `Relevé mensuel — ${periodLabel} (${lineCount} facture${lineCount > 1 ? "s" : ""})`
+    : `Facture mensuelle — ${periodLabel} (${lineCount} cours)`;
   const personName = formatPersonName(profile);
 
   return {
@@ -159,6 +164,7 @@ function mapMonthlyInvoiceRow(
     amount: Number(row.amount),
     created_at: row.created_at as string,
     parent_email_sent_at: (row.email_sent_at as string | null) ?? null,
+    provider_email_sent_at: null,
     transaction_id: row.id as string,
     course_id: row.id as string,
     parent_name: invoiceType === "parent" ? personName : "—",
@@ -172,7 +178,9 @@ function mapMonthlyInvoiceRow(
     scheduled_at: `${billingPeriod}T12:00:00.000Z`,
     campus_name: null,
     campus_id: null,
-    download_filename: `facture-mensuelle-${invoiceNumber.replace(/\s+/g, "-")}.pdf`,
+    download_filename: invoiceNumber.startsWith("GC-RELEVE-")
+      ? `releve-mensuel-${invoiceNumber.replace(/\s+/g, "-")}.pdf`
+      : `facture-mensuelle-${invoiceNumber.replace(/\s+/g, "-")}.pdf`,
     is_monthly: true,
     line_count: lineCount,
   };
@@ -187,6 +195,7 @@ const INVOICE_SELECT = `
   amount,
   created_at,
   parent_email_sent_at,
+  provider_email_sent_at,
   storage_path,
   provider_profile_id,
   client_profile_id,
@@ -284,9 +293,7 @@ export async function fetchAdminInvoices(
     ...(legacyResult.data ?? [])
       .map((row) => mapInvoiceRow(row as Record<string, unknown>))
       .filter((row): row is AdminInvoiceRow => row !== null),
-  ].filter((row) =>
-    isInPeriod(row.scheduled_at ?? row.created_at, start, end),
-  );
+  ].filter((row) => isInPeriod(row.created_at, start, end));
 
   if (effectiveCampusId) {
     mapped = mapped.filter((row) => row.campus_id === effectiveCampusId);
@@ -298,8 +305,10 @@ export async function fetchAdminInvoices(
 
   if (params.emailStatus) {
     mapped = mapped.filter((row) => {
-      if (row.invoice_type !== "parent") return false;
-      const sent = Boolean(row.parent_email_sent_at);
+      const sent =
+        row.invoice_type === "parent"
+          ? Boolean(row.parent_email_sent_at)
+          : Boolean(row.provider_email_sent_at);
       return params.emailStatus === "sent" ? sent : !sent;
     });
   }
@@ -527,10 +536,10 @@ export async function resendParentInvoiceEmail(
     const periodLabel = formatBillingPeriodLabel(
       (invoice.scheduled_at ?? invoice.created_at).slice(0, 10),
     );
-    const emailResult = await sendMonthlyParentInvoiceEmail({
+    const emailResult = await sendMonthlyParentSummaryEmail({
       to: clientEmail,
       parentName: invoice.parent_name,
-      invoiceNumber: invoice.invoice_number,
+      summaryNumber: invoice.invoice_number,
       billingPeriodLabel: periodLabel,
       totalAmount: invoice.amount,
       lineCount: invoice.line_count ?? 1,
@@ -562,6 +571,61 @@ export async function resendParentInvoiceEmail(
     await supabaseAdmin
       .from("payment_invoices")
       .update({ parent_email_sent_at: new Date().toISOString() })
+      .eq("id", invoiceId);
+  }
+
+  return emailResult;
+}
+
+export async function resendProviderInvoiceEmail(
+  invoiceId: string,
+  scopeCampusId: string | undefined,
+): Promise<{ sent: boolean; skipped: boolean; reason?: string }> {
+  const invoice = await loadInvoiceForScope(invoiceId, scopeCampusId);
+
+  if (invoice.invoice_type !== "student") {
+    throw new Error("Seules les factures professeur peuvent être renvoyées ici");
+  }
+
+  if (invoice.is_monthly) {
+    throw new Error("Facture mensuelle — renvoi non disponible sur ce type");
+  }
+
+  const transaction = await supabaseAdmin
+    .from("transactions")
+    .select("status_stripe")
+    .eq("id", invoice.transaction_id)
+    .maybeSingle();
+
+  if (transaction.data?.status_stripe !== "succeeded") {
+    throw new Error("Paiement non confirmé — envoi impossible");
+  }
+
+  if (!invoice.provider_profile_id) {
+    throw new Error("Professeur introuvable pour cette facture");
+  }
+
+  const providerEmail = await getClientEmail(invoice.provider_profile_id);
+  if (!providerEmail) {
+    throw new Error("E-mail du professeur introuvable");
+  }
+
+  const { buffer } = await downloadAdminInvoicePdf(invoiceId, scopeCampusId);
+
+  const emailResult = await sendProfInvoiceEmail({
+    to: providerEmail,
+    profName: invoice.prof_name,
+    invoiceNumber: invoice.invoice_number,
+    amount: invoice.amount,
+    subject: invoice.course_subject,
+    pdfBuffer: buffer,
+    downloadFilename: invoice.download_filename,
+  });
+
+  if (emailResult.sent) {
+    await supabaseAdmin
+      .from("payment_invoices")
+      .update({ provider_email_sent_at: new Date().toISOString() })
       .eq("id", invoiceId);
   }
 

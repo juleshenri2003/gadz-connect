@@ -4,6 +4,7 @@ import {
   Building2,
   Calendar,
   CreditCard,
+  FileText,
   FolderOpen,
   LayoutDashboard,
   User,
@@ -24,6 +25,7 @@ export function buildStudentNav(progressLabel?: string): AppNavItem[] {
     { to: "/app/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
     { to: "/app/repertoire", label: "Mon répertoire", shortLabel: "Répertoire", icon: FolderOpen },
     { to: "/app/cours", label: "Trouver mon tuteur", shortLabel: "Tuteurs", icon: BookOpen },
+    { to: "/app/factures", label: "Mes factures", shortLabel: "Factures", icon: FileText },
     { to: "/app/profil", label: "Mon profil", shortLabel: "Profil", icon: User },
   ];
 }

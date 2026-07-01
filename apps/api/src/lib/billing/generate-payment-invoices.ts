@@ -9,6 +9,7 @@ import {
   uploadInvoicePdf,
 } from "./invoice-storage.js";
 import { sendParentInvoiceEmail } from "../email/send-parent-invoice.js";
+import { sendProfInvoiceEmail } from "../email/send-prof-invoice-email.js";
 import { buildParentInvoicePdf } from "../pdf/parent-invoice.js";
 import { buildStudentInvoicePdf } from "../pdf/student-invoice.js";
 import { buildInvoiceDownloadFilename } from "./invoice-filename.js";
@@ -24,6 +25,7 @@ export interface GeneratePaymentInvoicesResult {
   parentInvoiceId: string | null;
   studentInvoiceId: string | null;
   parentEmailSent: boolean;
+  providerEmailSent: boolean;
 }
 
 async function nextInvoiceSequence(
@@ -52,9 +54,9 @@ async function nextInvoiceSequence(
   return maxSequence + 1;
 }
 
-async function getClientEmail(clientId: string | null | undefined): Promise<string | null> {
-  if (!clientId) return null;
-  const { data, error } = await supabaseAdmin.auth.admin.getUserById(clientId);
+async function getProfileEmail(userId: string | null | undefined): Promise<string | null> {
+  if (!userId) return null;
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
   if (error || !data.user?.email) return null;
   return data.user.email;
 }
@@ -68,16 +70,17 @@ export async function generatePaymentInvoices(
 ): Promise<GeneratePaymentInvoicesResult> {
   const { data: existing } = await supabaseAdmin
     .from("payment_invoices")
-    .select("id, invoice_type, parent_email_sent_at")
+    .select("id, invoice_type, parent_email_sent_at, provider_email_sent_at")
     .eq("transaction_id", input.transactionId);
 
   if (existing && existing.length >= 2) {
     const parentRow = existing.find((row) => row.invoice_type === "parent");
+    const studentRow = existing.find((row) => row.invoice_type === "student");
     return {
       parentInvoiceId: parentRow?.id ?? null,
-      studentInvoiceId:
-        existing.find((row) => row.invoice_type === "student")?.id ?? null,
+      studentInvoiceId: studentRow?.id ?? null,
       parentEmailSent: Boolean(parentRow?.parent_email_sent_at),
+      providerEmailSent: Boolean(studentRow?.provider_email_sent_at),
     };
   }
 
@@ -100,7 +103,7 @@ export async function generatePaymentInvoices(
   const { data: course, error: courseError } = await supabaseAdmin
     .from("courses")
     .select(
-      "id, subject, title, scheduled_at, slot_id, client_id, provider_id",
+      "id, subject, title, scheduled_at, slot_id, client_id, provider_id, payer_name, beneficiary_name",
     )
     .eq("id", input.courseId)
     .maybeSingle();
@@ -149,9 +152,13 @@ export async function generatePaymentInvoices(
   const invoiceDate = formatFrenchDate(new Date().toISOString());
   const subject =
     (course.subject as string) ?? (course.title as string) ?? "Cours particulier";
-  const parentName = client
+  const clientAccountName = client
     ? `${client.first_name} ${client.last_name}`.trim()
     : "Client";
+  const parentName =
+    (course.payer_name as string | null)?.trim() || clientAccountName;
+  const beneficiaryName =
+    (course.beneficiary_name as string | null)?.trim() || clientAccountName;
   const tutorName = provider
     ? `${provider.first_name} ${provider.last_name}`.trim()
     : "Prestataire";
@@ -179,7 +186,7 @@ export async function generatePaymentInvoices(
     invoiceDate,
     platform,
     parentName,
-    studentBeneficiaryName: parentName,
+    studentBeneficiaryName: beneficiaryName,
     tutorName,
     subject,
     scheduledAt: (course.scheduled_at as string) ?? null,
@@ -209,6 +216,7 @@ export async function generatePaymentInvoices(
   let parentInvoiceId: string | null = null;
   let studentInvoiceId: string | null = null;
   let parentEmailSent = false;
+  let providerEmailSent = false;
 
   const hasParent = existing?.some((row) => row.invoice_type === "parent");
   const hasStudent = existing?.some((row) => row.invoice_type === "student");
@@ -234,7 +242,7 @@ export async function generatePaymentInvoices(
     }
     parentInvoiceId = parentRow.id as string;
 
-    const clientEmail = await getClientEmail(clientId);
+    const clientEmail = await getProfileEmail(clientId);
     if (clientEmail) {
       const parentLastName = (client?.last_name as string | undefined)?.trim();
       const profLastName = (provider?.last_name as string | undefined)?.trim();
@@ -294,14 +302,58 @@ export async function generatePaymentInvoices(
       throw new Error(studentInsertError.message);
     }
     studentInvoiceId = studentRow.id as string;
+
+    const providerEmail = await getProfileEmail(providerId);
+    if (providerEmail) {
+      const profLastName = (provider?.last_name as string | undefined)?.trim();
+      const parentLastName = (client?.last_name as string | undefined)?.trim();
+      const emailResult = await sendProfInvoiceEmail({
+        to: providerEmail,
+        profName: tutorName,
+        invoiceNumber: studentInvoiceNumber,
+        amount: studentAmount,
+        subject,
+        pdfBuffer: studentPdf,
+        downloadFilename: buildInvoiceDownloadFilename({
+          invoiceNumber: studentInvoiceNumber,
+          invoiceType: "student",
+          parentLastName,
+          profLastName,
+          subject,
+        }),
+      });
+
+      if (emailResult.sent) {
+        providerEmailSent = true;
+        await supabaseAdmin
+          .from("payment_invoices")
+          .update({ provider_email_sent_at: new Date().toISOString() })
+          .eq("id", studentInvoiceId);
+      }
+    } else {
+      console.warn(
+        `[billing] e-mail prof introuvable (${providerId}) — facture prof stockée uniquement`,
+      );
+    }
   } else {
     studentInvoiceId =
       existing?.find((row) => row.invoice_type === "student")?.id ?? null;
+    providerEmailSent = Boolean(
+      existing?.find((row) => row.invoice_type === "student")
+        ?.provider_email_sent_at,
+    );
   }
 
   // Vérifie que les URLs signées sont générables (sanity check stockage)
   await createInvoiceSignedUrl(parentStoragePath, 60);
   await createInvoiceSignedUrl(studentStoragePath, 60);
 
-  return { parentInvoiceId, studentInvoiceId, parentEmailSent };
+  if (parentInvoiceId && studentInvoiceId) {
+    await supabaseAdmin
+      .from("transactions")
+      .update({ invoice_status: "invoiced" })
+      .eq("id", input.transactionId);
+  }
+
+  return { parentInvoiceId, studentInvoiceId, parentEmailSent, providerEmailSent };
 }

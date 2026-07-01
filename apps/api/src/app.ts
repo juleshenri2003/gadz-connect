@@ -16,6 +16,7 @@ import { stripeRouter } from "./routes/stripe.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { repositoryRouter } from "./routes/repository.js";
 import { scheduleRouter } from "./routes/schedule.js";
+import { studentsRouter } from "./routes/students.js";
 import { tutorsRouter } from "./routes/tutors.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 
@@ -55,6 +56,7 @@ app.use("/api/schedule", scheduleRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/repository", repositoryRouter);
 app.use("/api/tutors", tutorsRouter);
+app.use("/api/students", studentsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/stripe", stripeRouter);
 

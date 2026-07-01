@@ -58,6 +58,10 @@ export const DEMO_ACCOUNTS: Record<string, DemoAccount> = {
     password: "Pilotage-RH!",
     label: "Admin RH",
   },
+  "alexandreandre2004@gmail.com": {
+    password: "Prof-Alexandre!",
+    label: "Prof test facture (Gmail)",
+  },
 };
 
 export function getDemoAccount(email: string): DemoAccount | undefined {

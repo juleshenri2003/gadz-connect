@@ -1,3 +1,9 @@
+import {
+  getPlatformEmailFrom,
+  getResendApiKey,
+  resolveEmailRecipient,
+} from "./resend-config.js";
+
 export interface SendParentInvoiceEmailInput {
   to: string;
   parentName: string;
@@ -28,9 +34,8 @@ function formatEuro(amount: number): string {
 export async function sendParentInvoiceEmail(
   input: SendParentInvoiceEmailInput,
 ): Promise<SendParentInvoiceEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.GADZ_BILLING_EMAIL_FROM?.trim() || "facturation@gadzconnect.fr";
+  const apiKey = getResendApiKey();
+  const from = getPlatformEmailFrom();
 
   if (!apiKey) {
     console.warn(
@@ -39,14 +44,19 @@ export async function sendParentInvoiceEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY non configurée" };
   }
 
+  const { to, redirected } = resolveEmailRecipient(input.to);
   const subject = `Facture Gadz'Connect n° ${input.invoiceNumber}`;
   const attachmentName =
     input.downloadFilename?.trim() ||
     `facture-${input.invoiceNumber.replace(/\s+/g, "-")}.pdf`;
+  const redirectNote = redirected
+    ? `<p><em>[Dev] E-mail redirigé — destinataire prévu : ${input.to}</em></p>`
+    : "";
   const html = `
     <p>Bonjour ${input.parentName},</p>
     <p>Votre paiement de <strong>${formatEuro(input.amountGross)}</strong> pour le cours « ${input.subject} » a bien été reçu.</p>
     <p>Vous trouverez en pièce jointe votre facture n° <strong>${input.invoiceNumber}</strong>.</p>
+    ${redirectNote}
     <p>Cordialement,<br/>L'équipe Gadz'Connect</p>
   `.trim();
 
@@ -58,7 +68,7 @@ export async function sendParentInvoiceEmail(
     },
     body: JSON.stringify({
       from,
-      to: [input.to],
+      to: [to],
       subject,
       html,
       attachments: [
@@ -78,6 +88,12 @@ export async function sendParentInvoiceEmail(
       skipped: false,
       reason: `Resend HTTP ${res.status}`,
     };
+  }
+
+  if (redirected) {
+    console.info(
+      `[billing] facture parent ${input.invoiceNumber} → ${to} (dev, prévu ${input.to})`,
+    );
   }
 
   return { sent: true, skipped: false };

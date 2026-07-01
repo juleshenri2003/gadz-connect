@@ -13,6 +13,7 @@ import {
   useAdminExportInvoicesZip,
   useRegenerateTransactionInvoices,
   useResendParentInvoice,
+  useResendProviderInvoice,
   type AdminInvoiceRow,
 } from "./useInvoices";
 
@@ -150,9 +151,11 @@ function mergeTransactionPlaceholders(
       ...group,
       totalAmount: Math.round(group.totalAmount * 100) / 100,
       invoices: [...group.invoices].sort((a, b) => {
+        if (a.is_monthly && !b.is_monthly) return 1;
+        if (!a.is_monthly && b.is_monthly) return -1;
         const dateA = a.scheduled_at ?? a.created_at;
         const dateB = b.scheduled_at ?? b.created_at;
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
       }),
       pending: [...group.pending].sort((a, b) => {
         const dateA = a.scheduledAt ?? "";
@@ -176,8 +179,34 @@ function formatCourseDate(iso: string | null, fallback?: string): string {
   });
 }
 
+function formatInvoiceTabLabel(invoice: AdminInvoiceRow): string {
+  if (invoice.is_monthly) {
+    const value = invoice.scheduled_at ?? invoice.created_at;
+    const period = new Date(value).toLocaleDateString("fr-FR", {
+      month: "long",
+      year: "numeric",
+    });
+    return `Relevé · ${period}`;
+  }
+
+  const value = invoice.scheduled_at ?? invoice.created_at;
+  if (!value) return invoice.invoice_number;
+
+  return new Date(value).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function InvoicePdfEmbed({ invoiceId }: { invoiceId: string }) {
-  const { data: pdfUrl, isLoading, isError } = useAdminInvoicePdfEmbed(invoiceId);
+  const { data: pdfBlob, isLoading, isError } = useAdminInvoicePdfEmbed(invoiceId);
+  const pdfUrl = useMemo(
+    () => (pdfBlob ? URL.createObjectURL(pdfBlob) : null),
+    [pdfBlob],
+  );
 
   useEffect(() => {
     return () => {
@@ -248,7 +277,7 @@ function PersonInvoicePreview({
         <p className="text-sm font-medium text-ink-900">Aperçu facture</p>
         {group.invoices.length > 1 ? (
           <div className="flex flex-wrap gap-1">
-            {group.invoices.map((invoice, index) => (
+            {group.invoices.map((invoice) => (
               <Button
                 key={invoice.id}
                 type="button"
@@ -256,13 +285,13 @@ function PersonInvoicePreview({
                 variant={activeId === invoice.id ? "default" : "outline"}
                 onClick={() => onSelectInvoice(invoice.id)}
               >
-                Cours {index + 1}
+                {formatInvoiceTabLabel(invoice)}
               </Button>
             ))}
           </div>
         ) : null}
       </div>
-      {activeId ? <InvoicePdfEmbed invoiceId={activeId} /> : null}
+      {activeId ? <InvoicePdfEmbed key={activeId} invoiceId={activeId} /> : null}
     </div>
   );
 }
@@ -317,19 +346,18 @@ function InvoiceLineItem({
         </p>
       </button>
       <div className="flex shrink-0 flex-wrap gap-2">
-        {tab === "parents" ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={resendingId === invoice.id}
-            onClick={() => onResend(invoice.id)}
-          >
-            <Mail className="mr-1.5 h-4 w-4" aria-hidden />
-            {resendingId === invoice.id ? "Envoi…" : "Renvoyer"}
-          </Button>
-        ) : null}
-        {tab === "parents" && invoice.parent_email_sent_at ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={resendingId === invoice.id}
+          onClick={() => onResend(invoice.id)}
+        >
+          <Mail className="mr-1.5 h-4 w-4" aria-hidden />
+          {resendingId === invoice.id ? "Envoi…" : "Renvoyer"}
+        </Button>
+        {(tab === "parents" && invoice.parent_email_sent_at) ||
+        (tab === "prof" && invoice.provider_email_sent_at) ? (
           <span className="inline-flex items-center gap-1 self-center text-xs text-success">
             <MailCheck className="h-3.5 w-3.5" aria-hidden />
             Envoyé
@@ -374,7 +402,7 @@ function PendingLineItem({
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <p className="text-xs text-warning">
-          Facture non générée — webhook Stripe absent ou paiement antérieur.
+          Facture non générée — paiement antérieur ou erreur de génération.
         </p>
         <Button
           type="button"
@@ -525,11 +553,11 @@ export function AdminInvoicesHub({
     period: filters.period,
     campusId: filters.campusId !== "all" ? filters.campusId : undefined,
     search: filters.search.trim() || undefined,
-    emailStatus:
-      tab === "parents" && emailStatus !== "all" ? emailStatus : undefined,
+    emailStatus: emailStatus !== "all" ? emailStatus : undefined,
   });
 
   const resendParent = useResendParentInvoice();
+  const resendProvider = useResendProviderInvoice();
   const backfillInvoices = useAdminBackfillInvoices();
   const exportZip = useAdminExportInvoicesZip();
   const regenerateTx = useRegenerateTransactionInvoices();
@@ -555,7 +583,11 @@ export function AdminInvoicesHub({
   async function handleResend(invoiceId: string) {
     setResendingId(invoiceId);
     try {
-      await resendParent.mutateAsync(invoiceId);
+      if (tab === "prof") {
+        await resendProvider.mutateAsync(invoiceId);
+      } else {
+        await resendParent.mutateAsync(invoiceId);
+      }
     } finally {
       setResendingId(null);
     }

@@ -1,22 +1,23 @@
 import {
   getBillingPeriodBounds,
   resolveBillingPeriodInput,
-  isScheduledInPeriod,
+  isInBillingPeriod,
   type BillingPeriodYm,
 } from "./billing-period.js";
 import {
   formatFrenchDate,
-  formatMonthlyInvoiceNumber,
+  formatMonthlySummaryNumber,
 } from "./format.js";
 import {
   monthlyInvoiceStoragePath,
   uploadInvoicePdf,
 } from "./invoice-storage.js";
 import { getPlatformBillingConfig } from "./platform-config.js";
-import { sendMonthlyParentInvoiceEmail } from "../email/send-monthly-parent-invoice.js";
-import { sendMonthlyStudentInvoiceEmail } from "../email/send-monthly-student-invoice.js";
-import { buildMonthlyParentInvoicePdf } from "../pdf/monthly-parent-invoice.js";
-import { buildMonthlyStudentInvoicePdf } from "../pdf/monthly-student-invoice.js";
+import { aggregateProviderUrssafSynthesis } from "./provider-monthly-urssaf.js";
+import { sendMonthlyParentSummaryEmail } from "../email/send-monthly-parent-invoice.js";
+import { sendMonthlyProviderSummaryEmail } from "../email/send-monthly-student-invoice.js";
+import { buildMonthlyParentSummaryPdf } from "../pdf/monthly-parent-invoice.js";
+import { buildMonthlyProviderSummaryPdf } from "../pdf/monthly-student-invoice.js";
 import { supabaseAdmin } from "../supabase.js";
 
 export interface RunMonthlyBillingOptions {
@@ -27,9 +28,9 @@ export interface RunMonthlyBillingOptions {
 
 export interface RunMonthlyBillingResult {
   period: BillingPeriodYm;
-  parentInvoices: number;
-  studentInvoices: number;
-  linesInvoiced: number;
+  parentSummaries: number;
+  providerSummaries: number;
+  linesIncluded: number;
   emailsSent: number;
   skippedExisting: number;
 }
@@ -42,41 +43,44 @@ interface PersonProfile {
   micro_enterprise_address?: string | null;
 }
 
-interface PendingBillingLine {
+interface SummaryLine {
   transactionId: string;
-  courseId: string;
-  clientId: string;
-  providerId: string;
-  parentAmount: number;
-  studentAmount: number;
+  paymentInvoiceId: string;
+  invoiceNumber: string;
+  amount: number;
   subject: string;
   scheduledAt: string | null;
+  invoicedAt: string | null;
   endsAt: string | null;
+  profileId: string;
   client: PersonProfile | null;
   provider: PersonProfile | null;
 }
 
-const TRANSACTION_SELECT = `
+const PAYMENT_INVOICE_SELECT = `
   id,
-  course_id,
-  amount_gross,
-  commission_sasu,
-  total_paid_parent,
-  platform_commission,
-  teacher_gross_revenue,
-  invoice_status,
-  status_stripe,
-  course:courses!inner (
+  invoice_type,
+  invoice_number,
+  amount,
+  created_at,
+  transaction_id,
+  provider_profile_id,
+  client_profile_id,
+  transaction:transaction_id (
     id,
-    subject,
-    title,
-    scheduled_at,
-    client_id,
-    provider_id,
-    slot_id,
-    client:client_id ( id, first_name, last_name ),
-    provider:provider_id (
-      id, first_name, last_name, siret, micro_enterprise_address
+    status_stripe,
+    course:course_id (
+      id,
+      subject,
+      title,
+      scheduled_at,
+      slot_id,
+      client_id,
+      provider_id,
+      client:client_id ( id, first_name, last_name ),
+      provider:provider_id (
+        id, first_name, last_name, siret, micro_enterprise_address
+      )
     )
   )
 `;
@@ -95,22 +99,19 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-async function nextMonthlyInvoiceSequence(
-  invoiceType: "parent" | "student",
+async function nextSummarySequence(
+  prefix: "RELEVE-PROF" | "RELEVE-PARENT",
   periodCompact: string,
 ): Promise<number> {
-  const prefix =
-    invoiceType === "parent"
-      ? `GC-PARENT-M-${periodCompact}-`
-      : `GC-STUDENT-M-${periodCompact}-`;
+  const likePrefix = `GC-${prefix}-${periodCompact}-`;
 
   const { data, error } = await supabaseAdmin
     .from("monthly_invoices")
     .select("invoice_number")
-    .like("invoice_number", `${prefix}%`);
+    .like("invoice_number", `${likePrefix}%`);
 
   if (error) {
-    console.warn("[billing] compteur factures mensuelles:", error.message);
+    console.warn("[billing] compteur relevés mensuels:", error.message);
     return 1;
   }
 
@@ -141,62 +142,123 @@ async function loadSlotEndsAt(slotId: string | null): Promise<string | null> {
   return (data?.ends_at as string) ?? null;
 }
 
-async function fetchPendingLines(
-  bounds: ReturnType<typeof getBillingPeriodBounds>,
-): Promise<PendingBillingLine[]> {
+async function fetchLinkedTransactionIds(
+  transactionIds: string[],
+): Promise<Set<string>> {
+  if (transactionIds.length === 0) return new Set();
+
   const { data, error } = await supabaseAdmin
-    .from("transactions")
-    .select(TRANSACTION_SELECT)
-    .eq("status_stripe", "succeeded")
-    .eq("invoice_status", "pending_invoice");
+    .from("monthly_invoice_lines")
+    .select("transaction_id")
+    .in("transaction_id", transactionIds);
+
+  if (error) {
+    console.warn("[billing] lignes relevé existantes:", error.message);
+    return new Set();
+  }
+
+  return new Set((data ?? []).map((row) => row.transaction_id as string));
+}
+
+async function fetchInvoicedLinesForPeriod(
+  invoiceType: "parent" | "student",
+  bounds: ReturnType<typeof getBillingPeriodBounds>,
+  options?: { onlyUnlinked?: boolean; profileId?: string },
+): Promise<SummaryLine[]> {
+  const onlyUnlinked = options?.onlyUnlinked ?? true;
+  const profileIdFilter = options?.profileId?.trim();
+
+  const { data, error } = await supabaseAdmin
+    .from("payment_invoices")
+    .select(PAYMENT_INVOICE_SELECT)
+    .eq("invoice_type", invoiceType);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const lines: PendingBillingLine[] = [];
+  const lines: SummaryLine[] = [];
 
   for (const row of data ?? []) {
+    const transaction = pickOne<{
+      id: string;
+      status_stripe: string;
+      course: unknown;
+    }>(row.transaction);
+
+    if (transaction?.status_stripe !== "succeeded") continue;
+
     const course = pickOne<{
       id: string;
       subject: string | null;
       title: string;
       scheduled_at: string | null;
-      client_id: string;
-      provider_id: string;
       slot_id: string | null;
       client: PersonProfile | PersonProfile[] | null;
       provider: PersonProfile | PersonProfile[] | null;
-    }>(row.course);
+    }>(transaction.course);
 
-    if (!course?.scheduled_at) continue;
-    if (!isScheduledInPeriod(course.scheduled_at, bounds)) continue;
+    if (!course) continue;
+    if (
+      !isInBillingPeriod(
+        course.scheduled_at,
+        row.created_at as string,
+        bounds,
+      )
+    ) {
+      continue;
+    }
 
     const endsAt = await loadSlotEndsAt(course.slot_id);
-    const parentAmount = Number(
-      row.total_paid_parent ?? row.amount_gross ?? 0,
-    );
-    const studentAmount = Number(
-      row.teacher_gross_revenue ??
-        parentAmount - Number(row.commission_sasu ?? 0),
-    );
+    const profileId =
+      invoiceType === "parent"
+        ? ((row.client_profile_id as string | null) ??
+          pickOne<PersonProfile>(course.client)?.id ??
+          "")
+        : ((row.provider_profile_id as string | null) ??
+          pickOne<PersonProfile>(course.provider)?.id ??
+          "");
+
+    if (profileIdFilter && profileId !== profileIdFilter) continue;
 
     lines.push({
-      transactionId: row.id as string,
-      courseId: course.id,
-      clientId: course.client_id,
-      providerId: course.provider_id,
-      parentAmount: round2(parentAmount),
-      studentAmount: round2(studentAmount),
+      transactionId: row.transaction_id as string,
+      paymentInvoiceId: row.id as string,
+      invoiceNumber: row.invoice_number as string,
+      amount: round2(Number(row.amount)),
       subject: course.subject ?? course.title ?? "Cours particulier",
       scheduledAt: course.scheduled_at,
+      invoicedAt: (row.created_at as string | null) ?? null,
       endsAt,
+      profileId,
       client: pickOne<PersonProfile>(course.client),
       provider: pickOne<PersonProfile>(course.provider),
     });
   }
 
-  return lines;
+  if (!onlyUnlinked) {
+    return sortSummaryLines(lines);
+  }
+
+  const linked = await fetchLinkedTransactionIds(
+    lines.map((line) => line.transactionId),
+  );
+
+  return sortSummaryLines(
+    lines.filter((line) => !linked.has(line.transactionId)),
+  );
+}
+
+function sortSummaryLines(lines: SummaryLine[]): SummaryLine[] {
+  return [...lines].sort((left, right) => {
+    const leftTime = new Date(
+      left.scheduledAt ?? left.invoicedAt ?? 0,
+    ).getTime();
+    const rightTime = new Date(
+      right.scheduledAt ?? right.invoicedAt ?? 0,
+    ).getTime();
+    return leftTime - rightTime;
+  });
 }
 
 function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
@@ -210,255 +272,325 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   return map;
 }
 
-async function monthlyInvoiceExists(
+async function getExistingMonthlySummary(
   invoiceType: "parent" | "student",
   profileId: string,
   billingPeriodStart: string,
-): Promise<boolean> {
+): Promise<{
+  id: string;
+  invoice_number: string;
+  storage_path: string;
+} | null> {
   const { data } = await supabaseAdmin
     .from("monthly_invoices")
-    .select("id")
+    .select("id, invoice_number, storage_path")
     .eq("invoice_type", invoiceType)
     .eq("profile_id", profileId)
     .eq("billing_period", billingPeriodStart)
     .maybeSingle();
-  return Boolean(data);
+  return data ?? null;
 }
 
-async function finalizeMonthlyInvoice(input: {
+function computeTotalAmount(lines: SummaryLine[]): number {
+  return round2(lines.reduce((sum, line) => sum + line.amount, 0));
+}
+
+async function buildMonthlySummaryPdf(input: {
   invoiceType: "parent" | "student";
   profileId: string;
-  bounds: ReturnType<typeof getBillingPeriodBounds>;
-  lines: PendingBillingLine[];
-  dryRun: boolean;
-}): Promise<{ created: boolean; emailSent: boolean }> {
-  const { invoiceType, profileId, bounds, lines, dryRun } = input;
-
-  if (lines.length === 0) {
-    return { created: false, emailSent: false };
-  }
-
-  const exists = await monthlyInvoiceExists(
-    invoiceType,
-    profileId,
-    bounds.start,
-  );
-  if (exists) {
-    console.info(
-      `[billing] facture ${invoiceType} déjà émise pour ${profileId} — ${bounds.period}`,
-    );
-    return { created: false, emailSent: false };
-  }
-
+  summaryNumber: string;
+  invoiceDate: string;
+  billingPeriodLabel: string;
+  lines: SummaryLine[];
+  totalAmount: number;
+}): Promise<{
+  pdfBuffer: Buffer;
+  providerUrssafSynthesis?: Awaited<
+    ReturnType<typeof aggregateProviderUrssafSynthesis>
+  >;
+}> {
   const platform = getPlatformBillingConfig();
-  const invoiceDate = formatFrenchDate(new Date().toISOString());
-  const sequence = await nextMonthlyInvoiceSequence(
-    invoiceType,
-    bounds.compact,
-  );
-  const invoiceNumber = formatMonthlyInvoiceNumber(
-    invoiceType === "parent" ? "PARENT" : "STUDENT",
-    bounds.compact,
-    sequence,
-  );
 
-  const totalAmount = round2(
-    lines.reduce(
-      (sum, line) =>
-        sum + (invoiceType === "parent" ? line.parentAmount : line.studentAmount),
-      0,
-    ),
-  );
-
-  if (dryRun) {
-    console.info(
-      `[billing] [dry-run] ${invoiceType} ${invoiceNumber} — ${lines.length} lignes — ${totalAmount} €`,
-    );
-    return { created: true, emailSent: false };
+  if (input.invoiceType === "parent") {
+    return {
+      pdfBuffer: await buildMonthlyParentSummaryPdf({
+        summaryNumber: input.summaryNumber,
+        invoiceDate: input.invoiceDate,
+        billingPeriodLabel: input.billingPeriodLabel,
+        platform,
+        parentName: personName(input.lines[0]!.client),
+        lines: input.lines.map((line) => ({
+          scheduledAt: line.scheduledAt ?? line.invoicedAt,
+          endsAt: line.endsAt,
+          subject: line.subject,
+          tutorName: personName(line.provider),
+          amount: line.amount,
+          invoiceNumber: line.invoiceNumber,
+        })),
+        totalAmount: input.totalAmount,
+      }),
+    };
   }
 
-  let pdfBuffer: Buffer;
-  const person =
-    invoiceType === "parent" ? lines[0]!.client : lines[0]!.provider;
+  const provider = input.lines[0]!.provider;
+  const providerUrssafSynthesis = await aggregateProviderUrssafSynthesis({
+    transactionIds: input.lines.map((line) => line.transactionId),
+    providerProfileId: input.profileId,
+    courseCount: input.lines.length,
+  });
 
-  if (invoiceType === "parent") {
-    pdfBuffer = await buildMonthlyParentInvoicePdf({
-      invoiceNumber,
-      invoiceDate,
-      billingPeriodLabel: bounds.label,
-      platform,
-      parentName: personName(person),
-      lines: lines.map((line) => ({
-        scheduledAt: line.scheduledAt,
-        endsAt: line.endsAt,
-        subject: line.subject,
-        tutorName: personName(line.provider),
-        amount: line.parentAmount,
-      })),
-      totalAmount,
-    });
-  } else {
-    const provider = lines[0]!.provider;
-    pdfBuffer = await buildMonthlyStudentInvoicePdf({
-      invoiceNumber,
-      invoiceDate,
-      billingPeriodLabel: bounds.label,
+  return {
+    providerUrssafSynthesis,
+    pdfBuffer: await buildMonthlyProviderSummaryPdf({
+      summaryNumber: input.summaryNumber,
+      invoiceDate: input.invoiceDate,
+      billingPeriodLabel: input.billingPeriodLabel,
       platform,
       studentLegalName: `${personName(provider)} EI`,
       studentSiret: provider?.siret ?? "00000000000000",
       studentAddress:
         provider?.micro_enterprise_address?.trim() ||
         "Adresse de l'auto-entreprise non renseignée",
-      lines: lines.map((line) => ({
-        scheduledAt: line.scheduledAt,
+      lines: input.lines.map((line) => ({
+        scheduledAt: line.scheduledAt ?? line.invoicedAt,
         subject: line.subject,
-        amount: line.studentAmount,
+        amount: line.amount,
+        invoiceNumber: line.invoiceNumber,
       })),
-      totalAmount,
+      totalAmount: input.totalAmount,
+      urssafSynthesis: providerUrssafSynthesis,
+    }),
+  };
+}
+
+async function sendMonthlySummaryEmail(input: {
+  invoiceType: "parent" | "student";
+  profileId: string;
+  lines: SummaryLine[];
+  summaryNumber: string;
+  billingPeriodLabel: string;
+  totalAmount: number;
+  pdfBuffer: Buffer;
+  providerUrssafSynthesis?: Awaited<
+    ReturnType<typeof aggregateProviderUrssafSynthesis>
+  >;
+}): Promise<boolean> {
+  const email = await getProfileEmail(input.profileId);
+  if (!email) {
+    console.warn(
+      `[billing] e-mail introuvable pour ${input.profileId} — relevé stocké uniquement`,
+    );
+    return false;
+  }
+
+  if (input.invoiceType === "parent") {
+    const result = await sendMonthlyParentSummaryEmail({
+      to: email,
+      parentName: personName(input.lines[0]!.client),
+      summaryNumber: input.summaryNumber,
+      billingPeriodLabel: input.billingPeriodLabel,
+      totalAmount: input.totalAmount,
+      lineCount: input.lines.length,
+      pdfBuffer: input.pdfBuffer,
     });
+    return result.sent;
   }
 
-  const { data: monthlyRow, error: insertError } = await supabaseAdmin
-    .from("monthly_invoices")
-    .insert({
-      invoice_type: invoiceType,
-      billing_period: bounds.start,
-      profile_id: profileId,
-      invoice_number: invoiceNumber,
-      amount: totalAmount,
-      line_count: lines.length,
-      storage_path: "pending",
-    })
-    .select("id")
-    .single();
+  const result = await sendMonthlyProviderSummaryEmail({
+    to: email,
+    studentName: personName(input.lines[0]!.provider),
+    summaryNumber: input.summaryNumber,
+    billingPeriodLabel: input.billingPeriodLabel,
+    totalAmount: input.totalAmount,
+    lineCount: input.lines.length,
+    pdfBuffer: input.pdfBuffer,
+    urssafSynthesis: input.providerUrssafSynthesis,
+  });
+  return result.sent;
+}
 
-  if (insertError || !monthlyRow) {
-    throw new Error(insertError?.message ?? "Insertion facture mensuelle échouée");
-  }
+async function finalizeMonthlySummary(input: {
+  invoiceType: "parent" | "student";
+  profileId: string;
+  bounds: ReturnType<typeof getBillingPeriodBounds>;
+  lines: SummaryLine[];
+  dryRun: boolean;
+}): Promise<{ created: boolean; emailSent: boolean; lineCount: number }> {
+  const { invoiceType, profileId, bounds, lines: newLines, dryRun } = input;
 
-  const monthlyInvoiceId = monthlyRow.id as string;
-  const storagePath = monthlyInvoiceStoragePath(
+  const existing = await getExistingMonthlySummary(
     invoiceType,
-    bounds.compact,
-    monthlyInvoiceId,
+    profileId,
+    bounds.start,
   );
+
+  if (newLines.length === 0) {
+    if (existing) {
+      console.info(
+        `[billing] relevé ${invoiceType} à jour pour ${profileId} — ${bounds.period}`,
+      );
+    }
+    return { created: false, emailSent: false, lineCount: 0 };
+  }
+
+  const allLines = existing
+    ? await fetchInvoicedLinesForPeriod(invoiceType, bounds, {
+        onlyUnlinked: false,
+        profileId,
+      })
+    : sortSummaryLines(newLines);
+
+  const totalAmount = computeTotalAmount(allLines);
+  const invoiceDate = formatFrenchDate(new Date().toISOString());
+  const isUpdate = Boolean(existing);
+
+  if (dryRun) {
+    const summaryNumber =
+      existing?.invoice_number ??
+      formatMonthlySummaryNumber(
+        invoiceType === "parent" ? "RELEVE-PARENT" : "RELEVE-PROF",
+        bounds.compact,
+        await nextSummarySequence(
+          invoiceType === "parent" ? "RELEVE-PARENT" : "RELEVE-PROF",
+          bounds.compact,
+        ),
+      );
+    console.info(
+      `[billing] [dry-run] relevé ${invoiceType} ${summaryNumber}${isUpdate ? " (mise à jour)" : ""} — ${allLines.length} lignes${isUpdate ? ` (+${newLines.length})` : ""} — ${totalAmount} €`,
+    );
+    return { created: true, emailSent: false, lineCount: allLines.length };
+  }
+
+  let summaryNumber: string;
+  let monthlyInvoiceId: string;
+  let storagePath: string;
+
+  if (existing) {
+    summaryNumber = existing.invoice_number;
+    monthlyInvoiceId = existing.id;
+    storagePath = existing.storage_path;
+    console.info(
+      `[billing] mise à jour relevé ${summaryNumber} — +${newLines.length} ligne(s) → ${allLines.length} total — ${totalAmount} €`,
+    );
+  } else {
+    const numberPrefix =
+      invoiceType === "parent" ? "RELEVE-PARENT" : "RELEVE-PROF";
+    const sequence = await nextSummarySequence(numberPrefix, bounds.compact);
+    summaryNumber = formatMonthlySummaryNumber(
+      numberPrefix,
+      bounds.compact,
+      sequence,
+    );
+
+    const { data: monthlyRow, error: insertError } = await supabaseAdmin
+      .from("monthly_invoices")
+      .insert({
+        invoice_type: invoiceType,
+        billing_period: bounds.start,
+        profile_id: profileId,
+        invoice_number: summaryNumber,
+        amount: totalAmount,
+        line_count: allLines.length,
+        storage_path: "pending",
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !monthlyRow) {
+      throw new Error(
+        insertError?.message ?? "Insertion relevé mensuel échouée",
+      );
+    }
+
+    monthlyInvoiceId = monthlyRow.id as string;
+    storagePath = monthlyInvoiceStoragePath(
+      invoiceType,
+      bounds.compact,
+      monthlyInvoiceId,
+    );
+  }
+
+  const { pdfBuffer, providerUrssafSynthesis } = await buildMonthlySummaryPdf({
+    invoiceType,
+    profileId,
+    summaryNumber,
+    invoiceDate,
+    billingPeriodLabel: bounds.label,
+    lines: allLines,
+    totalAmount,
+  });
 
   await uploadInvoicePdf(storagePath, pdfBuffer);
 
-  const { error: lineError } = await supabaseAdmin
-    .from("monthly_invoice_lines")
-    .insert(
-      lines.map((line) => ({
-        monthly_invoice_id: monthlyInvoiceId,
-        transaction_id: line.transactionId,
-        amount:
-          invoiceType === "parent" ? line.parentAmount : line.studentAmount,
-      })),
-    );
+  if (existing) {
+    const { error: lineError } = await supabaseAdmin
+      .from("monthly_invoice_lines")
+      .insert(
+        newLines.map((line) => ({
+          monthly_invoice_id: monthlyInvoiceId,
+          transaction_id: line.transactionId,
+          amount: line.amount,
+        })),
+      );
 
-  if (lineError) {
-    throw new Error(lineError.message);
-  }
-
-  await supabaseAdmin
-    .from("monthly_invoices")
-    .update({ storage_path: storagePath })
-    .eq("id", monthlyInvoiceId);
-
-  const email = await getProfileEmail(profileId);
-  let emailSent = false;
-
-  if (email) {
-    if (invoiceType === "parent") {
-      const result = await sendMonthlyParentInvoiceEmail({
-        to: email,
-        parentName: personName(person),
-        invoiceNumber,
-        billingPeriodLabel: bounds.label,
-        totalAmount,
-        lineCount: lines.length,
-        pdfBuffer,
-      });
-      emailSent = result.sent;
-    } else {
-      const result = await sendMonthlyStudentInvoiceEmail({
-        to: email,
-        studentName: personName(person),
-        invoiceNumber,
-        billingPeriodLabel: bounds.label,
-        totalAmount,
-        lineCount: lines.length,
-        pdfBuffer,
-      });
-      emailSent = result.sent;
+    if (lineError) {
+      throw new Error(lineError.message);
     }
 
-    if (emailSent) {
-      await supabaseAdmin
-        .from("monthly_invoices")
-        .update({ email_sent_at: new Date().toISOString() })
-        .eq("id", monthlyInvoiceId);
-    }
+    await supabaseAdmin
+      .from("monthly_invoices")
+      .update({
+        amount: totalAmount,
+        line_count: allLines.length,
+        storage_path: storagePath,
+      })
+      .eq("id", monthlyInvoiceId);
   } else {
-    console.warn(
-      `[billing] e-mail introuvable pour ${profileId} — PDF stocké uniquement`,
-    );
+    const { error: lineError } = await supabaseAdmin
+      .from("monthly_invoice_lines")
+      .insert(
+        allLines.map((line) => ({
+          monthly_invoice_id: monthlyInvoiceId,
+          transaction_id: line.transactionId,
+          amount: line.amount,
+        })),
+      );
+
+    if (lineError) {
+      throw new Error(lineError.message);
+    }
+
+    await supabaseAdmin
+      .from("monthly_invoices")
+      .update({ storage_path: storagePath })
+      .eq("id", monthlyInvoiceId);
   }
 
-  return { created: true, emailSent };
-}
-
-async function closeInvoicedTransactions(
-  transactionIds: string[],
-): Promise<number> {
-  if (transactionIds.length === 0) return 0;
-
-  const { data, error } = await supabaseAdmin
-    .from("monthly_invoice_lines")
-    .select(
-      "transaction_id, monthly_invoice:monthly_invoices ( invoice_type )",
-    )
-    .in("transaction_id", transactionIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const typesByTx = new Map<string, Set<string>>();
-  for (const row of data ?? []) {
-    const txId = row.transaction_id as string;
-    const invoiceType = pickOne<{ invoice_type: string }>(
-      row.monthly_invoice,
-    )?.invoice_type;
-    if (!invoiceType) continue;
-    const set = typesByTx.get(txId) ?? new Set<string>();
-    set.add(invoiceType);
-    typesByTx.set(txId, set);
-  }
-
-  const ready = transactionIds.filter((id) => {
-    const types = typesByTx.get(id);
-    return types?.has("parent") && types?.has("student");
+  const emailSent = await sendMonthlySummaryEmail({
+    invoiceType,
+    profileId,
+    lines: allLines,
+    summaryNumber,
+    billingPeriodLabel: bounds.label,
+    totalAmount,
+    pdfBuffer,
+    providerUrssafSynthesis,
   });
 
-  if (ready.length === 0) return 0;
-
-  const { error: updateError } = await supabaseAdmin
-    .from("transactions")
-    .update({ invoice_status: "invoiced" })
-    .in("id", ready);
-
-  if (updateError) {
-    throw new Error(updateError.message);
+  if (emailSent) {
+    await supabaseAdmin
+      .from("monthly_invoices")
+      .update({ email_sent_at: new Date().toISOString() })
+      .eq("id", monthlyInvoiceId);
   }
 
-  return ready.length;
+  return { created: true, emailSent, lineCount: allLines.length };
 }
 
 /**
- * Facturation mensuelle : regroupe les transactions `pending_invoice`
- * du mois civil, génère une facture parent et une note de débours étudiant
- * par bénéficiaire, envoie les e-mails et passe les lignes à `invoiced`.
+ * Relevés mensuels : regroupe les factures par cours déjà émises au paiement,
+ * génère un PDF récapitulatif (sans nouvelle facture légale) et envoie l'e-mail.
+ * Par défaut : mois civil précédent (job le 1er du mois suivant).
  */
 export async function runMonthlyBilling(
   options: RunMonthlyBillingOptions = {},
@@ -468,33 +600,38 @@ export async function runMonthlyBilling(
   const dryRun = options.dryRun ?? false;
 
   console.info(
-    `[billing] facturation mensuelle — période ${bounds.label}${dryRun ? " (dry-run)" : ""}`,
+    `[billing] relevés mensuels — période ${bounds.label}${dryRun ? " (dry-run)" : ""}`,
   );
 
-  const pendingLines = await fetchPendingLines(bounds);
+  const [parentLines, providerLines] = await Promise.all([
+    fetchInvoicedLinesForPeriod("parent", bounds),
+    fetchInvoicedLinesForPeriod("student", bounds),
+  ]);
 
-  if (pendingLines.length === 0) {
-    console.info("[billing] aucune ligne en attente pour cette période.");
+  if (parentLines.length === 0 && providerLines.length === 0) {
+    console.info("[billing] aucune facture par cours pour cette période.");
     return {
       period,
-      parentInvoices: 0,
-      studentInvoices: 0,
-      linesInvoiced: 0,
+      parentSummaries: 0,
+      providerSummaries: 0,
+      linesIncluded: 0,
       emailsSent: 0,
       skippedExisting: 0,
     };
   }
 
-  const parentGroups = groupBy(pendingLines, (line) => line.clientId);
-  const studentGroups = groupBy(pendingLines, (line) => line.providerId);
+  const parentGroups = groupBy(parentLines, (line) => line.profileId);
+  const providerGroups = groupBy(providerLines, (line) => line.profileId);
 
-  let parentInvoices = 0;
-  let studentInvoices = 0;
+  let parentSummaries = 0;
+  let providerSummaries = 0;
   let emailsSent = 0;
   let skippedExisting = 0;
+  let linesIncluded = 0;
 
   for (const [clientId, lines] of parentGroups) {
-    const result = await finalizeMonthlyInvoice({
+    if (!clientId) continue;
+    const result = await finalizeMonthlySummary({
       invoiceType: "parent",
       profileId: clientId,
       bounds,
@@ -502,15 +639,17 @@ export async function runMonthlyBilling(
       dryRun,
     });
     if (result.created) {
-      parentInvoices += 1;
+      parentSummaries += 1;
+      linesIncluded += result.lineCount;
       if (result.emailSent) emailsSent += 1;
     } else if (!dryRun) {
       skippedExisting += 1;
     }
   }
 
-  for (const [providerId, lines] of studentGroups) {
-    const result = await finalizeMonthlyInvoice({
+  for (const [providerId, lines] of providerGroups) {
+    if (!providerId) continue;
+    const result = await finalizeMonthlySummary({
       invoiceType: "student",
       profileId: providerId,
       bounds,
@@ -518,26 +657,19 @@ export async function runMonthlyBilling(
       dryRun,
     });
     if (result.created) {
-      studentInvoices += 1;
+      providerSummaries += 1;
+      linesIncluded += result.lineCount;
       if (result.emailSent) emailsSent += 1;
     } else if (!dryRun) {
       skippedExisting += 1;
     }
   }
 
-  let closedCount = 0;
-  if (!dryRun) {
-    const allTxIds = [...new Set(pendingLines.map((line) => line.transactionId))];
-    closedCount = await closeInvoicedTransactions(allTxIds);
-  } else {
-    closedCount = pendingLines.length;
-  }
-
   return {
     period,
-    parentInvoices,
-    studentInvoices,
-    linesInvoiced: closedCount,
+    parentSummaries,
+    providerSummaries,
+    linesIncluded,
     emailsSent,
     skippedExisting,
   };

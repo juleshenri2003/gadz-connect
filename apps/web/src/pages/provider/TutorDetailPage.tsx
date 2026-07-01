@@ -47,6 +47,9 @@ export function TutorDetailPage() {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [payForOther, setPayForOther] = useState(false);
+  const [payerName, setPayerName] = useState("");
+  const [beneficiaryName, setBeneficiaryName] = useState("");
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(
     null,
@@ -113,9 +116,14 @@ export function TutorDetailPage() {
     if (!selectedSlot || !resolvedSubject) return;
     setBookingError(null);
     try {
+      const trimmedPayer = payerName.trim();
+      const trimmedBeneficiary = beneficiaryName.trim();
       const result = await bookSlot.mutateAsync({
         slotId: selectedSlot,
         subject: resolvedSubject,
+        payerName: payForOther && trimmedPayer ? trimmedPayer : undefined,
+        beneficiaryName:
+          payForOther && trimmedBeneficiary ? trimmedBeneficiary : undefined,
       });
 
       if (
@@ -401,6 +409,46 @@ export function TutorDetailPage() {
               <dd>
                 {estimatedPrice != null ? formatEuro(estimatedPrice) : "—"}
               </dd>
+            </div>
+            <div className="space-y-2 border-t border-line pt-3">
+              <label className="flex items-center gap-2 text-sm text-ink-700">
+                <input
+                  type="checkbox"
+                  checked={payForOther}
+                  onChange={(event) => setPayForOther(event.target.checked)}
+                />
+                Je paie pour quelqu&apos;un d&apos;autre
+              </label>
+              {payForOther ? (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="booking-payer">Nom du payeur (facturé)</Label>
+                    <Input
+                      id="booking-payer"
+                      placeholder="Ex. Marie Dupont"
+                      value={payerName}
+                      onChange={(event) => setPayerName(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="booking-beneficiary">
+                      Nom de l&apos;élève bénéficiaire
+                    </Label>
+                    <Input
+                      id="booking-beneficiary"
+                      placeholder="Ex. Paul Dupont"
+                      value={beneficiaryName}
+                      onChange={(event) =>
+                        setBeneficiaryName(event.target.value)
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-ink-400">
+                    Ces noms apparaîtront sur la facture. Laissez vide pour
+                    facturer à votre nom.
+                  </p>
+                </div>
+              ) : null}
             </div>
             <p className="text-xs text-ink-400">
               {stripeConfig?.configured

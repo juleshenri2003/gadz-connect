@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { finalizeBookingSlot } from "./booking.js";
+import { triggerPaymentInvoicesForCourse } from "./billing/trigger-payment-invoices.js";
 import { notifyPaymentReceived } from "./notification-helpers.js";
 import { supabaseAdmin } from "./supabase.js";
 
@@ -31,6 +32,7 @@ export async function confirmBookingAfterPayment(
   }
 
   if (course.status === "scheduled") {
+    await triggerPaymentInvoicesForCourse(courseId);
     return { ok: true, courseId, status: "scheduled" };
   }
 
@@ -101,6 +103,8 @@ export async function confirmBookingAfterPayment(
       studentName,
     });
   }
+
+  await triggerPaymentInvoicesForCourse(courseId);
 
   return { ok: true, courseId, status: "scheduled" };
 }

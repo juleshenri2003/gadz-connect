@@ -60,3 +60,12 @@ export function formatMonthlyInvoiceNumber(
 ): string {
   return `GC-${prefix}-M-${periodCompact}-${String(sequence).padStart(4, "0")}`;
 }
+
+/** Numéro de relevé mensuel (document comptable, pas une facture légale). */
+export function formatMonthlySummaryNumber(
+  prefix: "RELEVE-PROF" | "RELEVE-PARENT",
+  periodCompact: string,
+  sequence: number,
+): string {
+  return `GC-${prefix}-${periodCompact}-${String(sequence).padStart(4, "0")}`;
+}

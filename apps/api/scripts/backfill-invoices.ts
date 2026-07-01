@@ -1,5 +1,5 @@
 /**
- * Lance la facturation mensuelle (mois précédent par défaut).
+ * Lance les relevés mensuels (mois précédent par défaut).
  * Usage: pnpm --filter @gadz-connect/api backfill-invoices
  *        pnpm --filter @gadz-connect/api backfill-invoices -- --period=2026-05
  */
@@ -18,16 +18,16 @@ async function main() {
   const result = await runMonthlyBilling({ period });
 
   if (
-    result.parentInvoices === 0 &&
-    result.studentInvoices === 0 &&
-    result.linesInvoiced === 0
+    result.parentSummaries === 0 &&
+    result.providerSummaries === 0 &&
+    result.linesIncluded === 0
   ) {
-    console.log("Aucune ligne en attente pour cette période.");
+    console.log("Aucune facture par cours pour cette période.");
     return;
   }
 
   console.log(
-    `Terminé : ${result.parentInvoices} facture(s) parent, ${result.studentInvoices} note(s) étudiant, ${result.linesInvoiced} ligne(s) clôturée(s).`,
+    `Terminé : ${result.parentSummaries} relevé(s) parent, ${result.providerSummaries} relevé(s) prof, ${result.linesIncluded} ligne(s) incluse(s).`,
   );
 }
 

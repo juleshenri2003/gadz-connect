@@ -95,3 +95,16 @@ export function isScheduledInPeriod(
   const end = new Date(bounds.end);
   return date >= start && date <= end;
 }
+
+/**
+ * Rattache une facture à un mois : date du cours si connue, sinon date d'émission
+ * de la facture (paiement).
+ */
+export function isInBillingPeriod(
+  courseScheduledAt: string | null | undefined,
+  invoiceCreatedAt: string | null | undefined,
+  bounds: BillingPeriodBounds,
+): boolean {
+  const anchor = courseScheduledAt ?? invoiceCreatedAt;
+  return isScheduledInPeriod(anchor, bounds);
+}

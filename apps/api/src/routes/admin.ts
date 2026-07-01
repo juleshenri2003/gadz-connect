@@ -27,10 +27,12 @@ import {
   fetchAdminTransactionInvoices,
   parseAdminInvoicesQuery,
   resendParentInvoiceEmail,
+  resendProviderInvoiceEmail,
 } from "../lib/billing/admin-invoices.js";
 import { streamAdminInvoicesZip } from "../lib/billing/export-admin-invoices-zip.js";
 import { runMonthlyBilling } from "../lib/billing/run-monthly-billing.js";
 import {
+  backfillMissingPaymentInvoices,
   regeneratePaymentInvoices,
 } from "../lib/billing/regenerate-payment-invoices.js";
 import {
@@ -743,17 +745,31 @@ adminRouter.get("/invoices", async (req: AdminRequest, res) => {
 
 /**
  * POST /api/admin/invoices/backfill
- * Lance la facturation mensuelle pour le mois précédent (ou ?period=YYYY-MM).
+ * Génère les factures par cours manquantes (paiements sans PDF).
  */
 adminRouter.post("/invoices/backfill", async (req: AdminRequest, res) => {
+  try {
+    const result = await backfillMissingPaymentInvoices();
+    res.json({ data: result });
+  } catch (err) {
+    console.error("[admin] backfill invoices:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de générer les factures manquantes" });
+  }
+});
+
+/**
+ * POST /api/admin/invoices/monthly-summary
+ * Lance les relevés mensuels pour le mois précédent (ou ?period=YYYY-MM).
+ */
+adminRouter.post("/invoices/monthly-summary", async (req: AdminRequest, res) => {
   try {
     const period =
       typeof req.query.period === "string" ? req.query.period : undefined;
     const result = await runMonthlyBilling({ period });
     res.json({ data: result });
   } catch (err) {
-    console.error("[admin] backfill invoices:", (err as Error).message);
-    res.status(500).json({ error: "Impossible de lancer la facturation mensuelle" });
+    console.error("[admin] monthly summary:", (err as Error).message);
+    res.status(500).json({ error: "Impossible de lancer les relevés mensuels" });
   }
 });
 
@@ -958,6 +974,36 @@ adminRouter.post(
 
     try {
       const result = await resendParentInvoiceEmail(invoiceId, scopeCampusId);
+      res.json({ data: result });
+    } catch (err) {
+      const message = (err as Error).message;
+      const status =
+        message.includes("introuvable") || message.includes("impossible")
+          ? 400
+          : 500;
+      res.status(status).json({ error: message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/invoices/:id/resend-provider
+ * Renvoie la facture professeur par e-mail (Resend).
+ */
+adminRouter.post(
+  "/invoices/:id/resend-provider",
+  async (req: AdminRequest, res) => {
+    const invoiceId = String(req.params.id ?? "");
+    if (!invoiceId) {
+      res.status(400).json({ error: "Identifiant facture manquant" });
+      return;
+    }
+
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const scopeCampusId = campusFilter?.campusId;
+
+    try {
+      const result = await resendProviderInvoiceEmail(invoiceId, scopeCampusId);
       res.json({ data: result });
     } catch (err) {
       const message = (err as Error).message;

@@ -2,20 +2,20 @@ import { Button } from "@gadz-connect/ui";
 import { FileText } from "lucide-react";
 import { formatEuro } from "@/features/admin/format";
 import {
-  useOpenTeacherInvoiceUrl,
-  useTeacherInvoices,
+  useOpenStudentInvoiceUrl,
+  useStudentInvoices,
 } from "./useInvoices";
 
-export function TeacherInvoicesList() {
-  const { data: invoices, isLoading, isError } = useTeacherInvoices();
-  const openInvoice = useOpenTeacherInvoiceUrl();
+export function StudentInvoicesList() {
+  const { data: invoices, isLoading, isError } = useStudentInvoices();
+  const openInvoice = useOpenStudentInvoiceUrl();
 
   return (
     <section
       id="factures"
       className="rounded-md border border-line bg-surface p-5 scroll-mt-6"
     >
-      <h3 className="font-semibold text-ink-900">Mes factures URSSAF</h3>
+      <h3 className="font-semibold text-ink-900">Mes factures</h3>
       <p className="mt-1 text-sm text-ink-600">
         Une facture est émise à chaque paiement. Un relevé mensuel récapitulatif
         est envoyé le 1er de chaque mois.
@@ -29,8 +29,8 @@ export function TeacherInvoicesList() {
         </p>
       ) : !invoices?.length ? (
         <p className="mt-4 text-sm text-ink-600">
-          Aucune facture pour l&apos;instant. Elles apparaissent dès qu&apos;un
-          élève règle un cours.
+          Aucune facture pour l&apos;instant. Elles apparaissent dès que vous
+          réglez un cours.
         </p>
       ) : (
         <ul className="mt-4 space-y-3">

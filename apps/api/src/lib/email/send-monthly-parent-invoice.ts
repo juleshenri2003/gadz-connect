@@ -1,13 +1,25 @@
-export interface SendMonthlyParentInvoiceEmailInput {
+import {
+  getPlatformEmailFrom,
+  getResendApiKey,
+  resolveEmailRecipient,
+} from "./resend-config.js";
+
+export interface SendMonthlyParentSummaryEmailInput {
   to: string;
   parentName: string;
-  invoiceNumber: string;
+  summaryNumber: string;
   billingPeriodLabel: string;
   totalAmount: number;
   lineCount: number;
   pdfBuffer: Buffer;
   downloadFilename?: string;
 }
+
+/** @deprecated Utiliser SendMonthlyParentSummaryEmailInput */
+export type SendMonthlyParentInvoiceEmailInput = Omit<
+  SendMonthlyParentSummaryEmailInput,
+  "summaryNumber"
+> & { invoiceNumber: string };
 
 export interface SendMonthlyInvoiceEmailResult {
   sent: boolean;
@@ -22,29 +34,33 @@ function formatEuro(amount: number): string {
   }).format(amount);
 }
 
-export async function sendMonthlyParentInvoiceEmail(
-  input: SendMonthlyParentInvoiceEmailInput,
+export async function sendMonthlyParentSummaryEmail(
+  input: SendMonthlyParentSummaryEmailInput,
 ): Promise<SendMonthlyInvoiceEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.GADZ_BILLING_EMAIL_FROM?.trim() || "facturation@gadzconnect.fr";
+  const apiKey = getResendApiKey();
+  const from = getPlatformEmailFrom();
 
   if (!apiKey) {
     console.warn(
-      "[billing] RESEND_API_KEY absent — facture mensuelle parent non envoyée",
+      "[billing] RESEND_API_KEY absent — relevé mensuel parent non envoyé",
     );
     return { sent: false, skipped: true, reason: "RESEND_API_KEY non configurée" };
   }
 
-  const subject = `Facture mensuelle Gadz'Connect — ${input.billingPeriodLabel}`;
+  const { to, redirected } = resolveEmailRecipient(input.to);
+  const subject = `Relevé mensuel Gadz'Connect — ${input.billingPeriodLabel}`;
   const attachmentName =
     input.downloadFilename?.trim() ||
-    `facture-mensuelle-${input.invoiceNumber.replace(/\s+/g, "-")}.pdf`;
+    `releve-mensuel-${input.summaryNumber.replace(/\s+/g, "-")}.pdf`;
+  const redirectNote = redirected
+    ? `<p><em>[Dev] E-mail redirigé — destinataire prévu : ${input.to}</em></p>`
+    : "";
   const html = `
     <p>Bonjour ${input.parentName},</p>
-    <p>Votre facture mensuelle consolidée pour <strong>${input.billingPeriodLabel}</strong> est disponible.</p>
-    <p>Elle récapitule <strong>${input.lineCount}</strong> cours pour un total de <strong>${formatEuro(input.totalAmount)}</strong> (n° ${input.invoiceNumber}).</p>
-    <p>Vous trouverez le détail en pièce jointe.</p>
+    <p>Votre relevé mensuel pour <strong>${input.billingPeriodLabel}</strong> est disponible.</p>
+    <p>Il récapitule <strong>${input.lineCount}</strong> facture(s) déjà émises à chaque paiement, pour un total de <strong>${formatEuro(input.totalAmount)}</strong> (n° ${input.summaryNumber}).</p>
+    <p>Les factures individuelles restent disponibles dans votre espace Gadz'Connect.</p>
+    ${redirectNote}
     <p>Cordialement,<br/>L'équipe Gadz'Connect</p>
   `.trim();
 
@@ -56,7 +72,7 @@ export async function sendMonthlyParentInvoiceEmail(
     },
     body: JSON.stringify({
       from,
-      to: [input.to],
+      to: [to],
       subject,
       html,
       attachments: [
@@ -70,7 +86,7 @@ export async function sendMonthlyParentInvoiceEmail(
 
   if (!res.ok) {
     const body = await res.text();
-    console.error("[billing] envoi facture mensuelle parent:", res.status, body);
+    console.error("[billing] envoi relevé mensuel parent:", res.status, body);
     return {
       sent: false,
       skipped: false,
@@ -78,5 +94,21 @@ export async function sendMonthlyParentInvoiceEmail(
     };
   }
 
+  if (redirected) {
+    console.info(
+      `[billing] relevé parent ${input.summaryNumber} → ${to} (dev, prévu ${input.to})`,
+    );
+  }
+
   return { sent: true, skipped: false };
+}
+
+/** @deprecated Utiliser sendMonthlyParentSummaryEmail */
+export async function sendMonthlyParentInvoiceEmail(
+  input: SendMonthlyParentInvoiceEmailInput,
+): Promise<SendMonthlyInvoiceEmailResult> {
+  return sendMonthlyParentSummaryEmail({
+    ...input,
+    summaryNumber: input.invoiceNumber,
+  });
 }

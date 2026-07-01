@@ -1,5 +1,5 @@
 /**
- * Facturation mensuelle regroupée — à exécuter le 1er de chaque mois.
+ * Relevés mensuels — à exécuter le 1er de chaque mois.
  * Usage:
  *   pnpm --filter @gadz-connect/api monthly-billing
  *   pnpm --filter @gadz-connect/api monthly-billing -- --period=current
@@ -27,13 +27,13 @@ async function main() {
   const result = await runMonthlyBilling({ period, dryRun });
 
   console.log("");
-  console.log("── Résultat facturation mensuelle ──");
-  console.log(`  Période           : ${result.period}`);
-  console.log(`  Factures parents  : ${result.parentInvoices}`);
-  console.log(`  Notes étudiants   : ${result.studentInvoices}`);
-  console.log(`  Lignes facturées  : ${result.linesInvoiced}`);
-  console.log(`  E-mails envoyés   : ${result.emailsSent}`);
-  console.log(`  Déjà existantes   : ${result.skippedExisting}`);
+  console.log("── Résultat relevés mensuels ──");
+  console.log(`  Période              : ${result.period}`);
+  console.log(`  Relevés parents      : ${result.parentSummaries}`);
+  console.log(`  Relevés professeurs  : ${result.providerSummaries}`);
+  console.log(`  Lignes incluses      : ${result.linesIncluded}`);
+  console.log(`  E-mails envoyés      : ${result.emailsSent}`);
+  console.log(`  Déjà existants       : ${result.skippedExisting}`);
 }
 
 main().catch((err: Error) => {

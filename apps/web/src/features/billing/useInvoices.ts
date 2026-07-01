@@ -12,6 +12,7 @@ export interface AdminInvoiceRow {
   amount: number;
   created_at: string;
   parent_email_sent_at?: string | null;
+  provider_email_sent_at?: string | null;
   transaction_id: string;
   course_id: string;
   parent_name: string;
@@ -23,6 +24,8 @@ export interface AdminInvoiceRow {
   scheduled_at: string | null;
   campus_name: string | null;
   download_filename: string;
+  is_monthly?: boolean;
+  line_count?: number;
 }
 
 /** @deprecated use AdminInvoiceRow */
@@ -35,8 +38,8 @@ export interface AdminInvoicesMeta {
 }
 
 const INVOICE_TYPE_LABELS: Record<InvoiceType, string> = {
-  parent: "Facture parent",
-  student: "Facture étudiant",
+  parent: "Facture client (TTC)",
+  student: "Facture professeur (HT)",
 };
 
 export function invoiceTypeLabel(type: InvoiceType): string {
@@ -157,8 +160,7 @@ export function useAdminInvoicePdfEmbed(invoiceId: string | null) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Erreur HTTP ${res.status}`);
       }
-      const blob = await res.blob();
-      return URL.createObjectURL(blob);
+      return res.blob();
     },
     enabled: Boolean(invoiceId && getAccessToken()),
     staleTime: 60_000,
@@ -235,6 +237,28 @@ export function useResendParentInvoice() {
         queryKey: ["admin-transaction-invoices"],
       });
       void queryClient.invalidateQueries({ queryKey: ["admin-transactions"] });
+    },
+  });
+}
+
+export function useResendProviderInvoice() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{
+        data: { sent: boolean; skipped: boolean; reason?: string };
+      }>(`/api/admin/invoices/${invoiceId}/resend-provider`, {
+        method: "POST",
+        token,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateInvoiceQueries(queryClient);
     },
   });
 }
@@ -338,6 +362,40 @@ export function useOpenTeacherInvoiceUrl() {
       if (!token) throw new Error("Non authentifié");
       const res = await apiFetch<{ data: { url: string } }>(
         `/api/tutors/me/invoices/${invoiceId}/url`,
+        { token },
+      );
+      window.open(res.data.url, "_blank", "noopener,noreferrer");
+    },
+  });
+}
+
+export function useStudentInvoices() {
+  const { getAccessToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["student-invoices"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: AdminInvoiceRow[] }>(
+        "/api/students/me/invoices",
+        { token },
+      );
+      return res.data;
+    },
+    enabled: Boolean(getAccessToken()),
+  });
+}
+
+export function useOpenStudentInvoiceUrl() {
+  const { getAccessToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{ data: { url: string } }>(
+        `/api/students/me/invoices/${invoiceId}/url`,
         { token },
       );
       window.open(res.data.url, "_blank", "noopener,noreferrer");

@@ -5,6 +5,7 @@ import {
   invoiceTypeLabel,
   useOpenAdminInvoicePdf,
   useResendParentInvoice,
+  useResendProviderInvoice,
   useAdminTransactionInvoices,
 } from "./useInvoices";
 
@@ -25,6 +26,7 @@ export function TransactionInvoicesPanel({
     useAdminTransactionInvoices(transactionId);
   const openPdf = useOpenAdminInvoicePdf();
   const resendParent = useResendParentInvoice();
+  const resendProvider = useResendProviderInvoice();
 
   if (stripeStatus !== "succeeded") return null;
 
@@ -71,24 +73,36 @@ export function TransactionInvoicesPanel({
                   {invoice.invoice_type === "parent" ? (
                     <p className="mt-1 text-xs text-ink-500">
                       {invoice.parent_email_sent_at
-                        ? `E-mail envoyé le ${new Date(invoice.parent_email_sent_at).toLocaleString("fr-FR")}`
-                        : "E-mail non envoyé — configurez RESEND_API_KEY ou renvoyez manuellement"}
+                        ? `E-mail client envoyé le ${new Date(invoice.parent_email_sent_at).toLocaleString("fr-FR")}`
+                        : "E-mail client non envoyé — configurez RESEND_API_KEY ou renvoyez manuellement"}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-1 text-xs text-ink-500">
+                      {invoice.provider_email_sent_at
+                        ? `E-mail prof envoyé le ${new Date(invoice.provider_email_sent_at).toLocaleString("fr-FR")}`
+                        : "E-mail prof non envoyé — configurez RESEND_API_KEY ou renvoyez manuellement"}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {invoice.invoice_type === "parent" ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={resendParent.isPending}
-                      onClick={() => resendParent.mutate(invoice.id)}
-                    >
-                      <Mail className="mr-1.5 h-4 w-4" aria-hidden />
-                      Renvoyer
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      invoice.invoice_type === "parent"
+                        ? resendParent.isPending
+                        : resendProvider.isPending
+                    }
+                    onClick={() =>
+                      invoice.invoice_type === "parent"
+                        ? resendParent.mutate(invoice.id)
+                        : resendProvider.mutate(invoice.id)
+                    }
+                  >
+                    <Mail className="mr-1.5 h-4 w-4" aria-hidden />
+                    Renvoyer
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -106,13 +120,13 @@ export function TransactionInvoicesPanel({
         </ul>
       )}
 
-      {resendParent.isError ? (
+      {resendParent.isError || resendProvider.isError ? (
         <p className="text-sm text-danger">
-          {(resendParent.error as Error).message}
+          {((resendParent.error ?? resendProvider.error) as Error).message}
         </p>
       ) : null}
-      {resendParent.isSuccess ? (
-        <p className="text-sm text-success">Facture parent renvoyée.</p>
+      {resendParent.isSuccess || resendProvider.isSuccess ? (
+        <p className="text-sm text-success">Facture renvoyée par e-mail.</p>
       ) : null}
     </div>
   );

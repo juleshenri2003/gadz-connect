@@ -21,6 +21,7 @@ import { ProviderCoursesPage } from "@/pages/provider/ProviderCoursesPage";
 import { ProviderOnboardingPage } from "@/pages/provider/ProviderOnboardingPage";
 import { ProviderPaymentsPage } from "@/pages/provider/ProviderPaymentsPage";
 import { ProviderProfilePage } from "@/pages/provider/ProviderProfilePage";
+import { StudentInvoicesPage } from "@/pages/provider/StudentInvoicesPage";
 import { TutorDetailPage } from "@/pages/provider/TutorDetailPage";
 import { NotificationsPage } from "@/pages/shared/NotificationsPage";
 import { SchedulePage } from "@/pages/provider/SchedulePage";
@@ -97,6 +98,7 @@ export default function App() {
           }
         />
         <Route path="profil" element={<ProviderProfilePage />} />
+        <Route path="factures" element={<StudentInvoicesPage />} />
         </Route>
       </Route>
       <Route
