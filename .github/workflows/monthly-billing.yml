@@ -32,6 +32,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_DEV_INBOX: ${{ vars.RESEND_DEV_INBOX }}
           GADZ_PLATFORM_LEGAL_NAME: ${{ vars.GADZ_PLATFORM_LEGAL_NAME }}
           GADZ_SAP_NUMBER: ${{ vars.GADZ_SAP_NUMBER }}
           GADZ_PLATFORM_ADDRESS: ${{ vars.GADZ_PLATFORM_ADDRESS }}

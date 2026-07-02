@@ -1,4 +1,5 @@
 import {
+  deliverResendEmail,
   getAppBaseUrl,
   getPlatformEmailFrom,
   getResendApiKey,
@@ -24,12 +25,19 @@ export function buildSubject(variant: StripeOnboardingEmailVariant): string {
   return "Gadz'Connect — dernière étape : recevoir vos virements";
 }
 
-function buildHtml(input: SendStripeOnboardingEmailInput): string {
+function buildHtml(
+  input: SendStripeOnboardingEmailInput,
+  ctx: { redirected: boolean; intendedTo: string },
+): string {
   const paymentsUrl = buildPaymentsUrl();
   const greeting = input.firstName.trim() || "Bonjour";
+  const redirectNote = ctx.redirected
+    ? `<p><em>[Dev] E-mail redirigé — destinataire prévu : ${ctx.intendedTo}</em></p>`
+    : "";
 
   if (input.variant === "reminder") {
     return `
+      ${redirectNote}
       <p>Bonjour ${greeting},</p>
       <p>Votre compte professeur est actif, mais la configuration <strong>Stripe Connect</strong> n'est pas encore terminée.</p>
       <p>Sans cette étape (~5–10 min), vous ne pourrez pas recevoir les virements après les cours réservés par les élèves.</p>
@@ -39,6 +47,7 @@ function buildHtml(input: SendStripeOnboardingEmailInput): string {
   }
 
   return `
+    ${redirectNote}
     <p>Bonjour ${greeting},</p>
     <p>Votre profil Gadz'Connect est activé — merci !</p>
     <p>Il reste une étape pour recevoir vos virements après chaque cours : configurez <strong>Stripe Connect</strong> (identité + IBAN, environ 5–10 minutes, à faire une seule fois).</p>
@@ -63,27 +72,24 @@ export async function sendStripeOnboardingEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY non configurée" };
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: getPlatformEmailFrom(),
-      to: [input.to],
-      subject: buildSubject(input.variant),
-      html: buildHtml(input),
-    }),
+  const delivery = await deliverResendEmail({
+    apiKey,
+    intendedTo: input.to,
+    from: getPlatformEmailFrom(),
+    subject: buildSubject(input.variant),
+    buildHtml: (ctx) => buildHtml(input, ctx),
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("[email] Stripe onboarding:", res.status, body);
+  if (!delivery.ok) {
+    console.error(
+      "[email] Stripe onboarding:",
+      delivery.status,
+      delivery.body,
+    );
     return {
       sent: false,
       skipped: false,
-      reason: `Resend HTTP ${res.status}`,
+      reason: `Resend HTTP ${delivery.status}`,
     };
   }
 
