@@ -1,6 +1,6 @@
-/** Guide INPI — aligné sur la doc officielle INPI (vérifié juin 2026). */
+/** Guide INPI — vérifié sur guichet-unique.inpi.fr (juillet 2026). */
 
-export const INPI_URL = "https://procedures.inpi.fr/";
+export const INPI_URL = "https://guichet-unique.inpi.fr/";
 export const INPI_OFFICIAL_GUIDE_URL =
   "https://www.inpi.fr/realiser-demarches/formalites-dentreprises/creer-en-tant-que-micro-entrepreneur";
 export const URSSAF_ACRE_URL =
@@ -9,10 +9,10 @@ export const URSSAF_PORTAL_URL =
   "https://www.autoentrepreneur.urssaf.fr/portail/accueil.html";
 
 export const INPI_GUIDE_META = {
-  lastVerifiedAt: "2026-06-14",
+  lastVerifiedAt: "2026-07-03",
   officialSource: INPI_OFFICIAL_GUIDE_URL,
   disclaimer:
-    "Guide indicatif Gadz'Connect — le Guichet Unique INPI fait foi. En cas de doute, consultez procedures.inpi.fr ou contactez le responsable campus.",
+    "Guide indicatif Gadz'Connect — le Guichet Unique INPI fait foi. En cas de doute, consultez guichet-unique.inpi.fr ou contactez le responsable campus.",
 } as const;
 
 export const PLATFORM_CONTACTS = {
@@ -72,15 +72,14 @@ export const INPI_STEPS = [
   {
     id: "connect",
     title: "Se connecter au Guichet Unique",
-    summary: "Ouvrir procedures.inpi.fr et créer ou utiliser votre compte.",
+    summary: "Ouvrir guichet-unique.inpi.fr et créer ou utiliser votre compte.",
     details: [
-      "Rendez-vous sur le portail e-procédures INPI (lien officiel ci-dessous).",
+      "Rendez-vous sur le Guichet Unique INPI (lien ci-dessous). L'ancienne URL procedures.inpi.fr redirige vers le même portail.",
       "Créez un compte ou connectez-vous (FranceConnect possible).",
       "À la question **« Devenir compte administrateur de mon entreprise »**, répondez **NON** — sauf besoin très spécifique.",
-      "Le « nom de dossier » est un libellé interne : il n'a aucun impact une fois l'inscription terminée.",
     ],
     link: INPI_URL,
-    linkLabel: "Ouvrir procedures.inpi.fr",
+    linkLabel: "Ouvrir le Guichet Unique INPI",
   },
   {
     id: "begin",
@@ -92,56 +91,78 @@ export const INPI_STEPS = [
       "Lisez **« Préparez votre démarche »**, puis **« Continuer »**.",
       "À **« Quelle forme d'entreprise ? »** : choisissez **Entrepreneur individuel**.",
       "Cochez **Oui** à **« Souhaitez-vous opter pour le statut micro-entrepreneur ? »**.",
-      "Donnez un nom à votre brouillon — vous pourrez le retrouver pendant 1 an via **« Accéder à mes brouillons »**.",
+      "Le brouillon est conservé 1 an via **« Accéder à mes brouillons »**.",
     ],
     tip: "Si vous avez déjà une EI et ajoutez une activité, c'est une modification, pas une création.",
   },
   {
     id: "identity",
-    title: "Renseigner identité et établissement",
-    summary: "Compléter toutes les rubriques obligatoires (astérisque *).",
+    title: "Identité de l'entreprise",
+    summary:
+      "Trois sous-sections : Entrepreneur, Entreprise, Contrat d'appui — périodicité et ACRE se renseignent ici.",
     details: [
-      "**Identité de l'entreprise** : vos informations personnelles, date de début d'activité, numéro de sécurité sociale.",
-      "**Composition** et **Insaisissabilité** : en général rien à remplir pour un tutorat en solo — passez si facultatif.",
-      "**Établissements** : adresse (souvent votre domicile), caractéristiques de l'établissement.",
+      "**Entrepreneur** — identité : nom de naissance, genre, date et lieu de naissance, nationalité, situation matrimoniale. Statut ambulant : **Non**.",
+      "**Régime microsocial** : choisissez la **périodicité** (trimestrielle recommandée pour Gadz'Connect — pas « Mensuel » par défaut).",
+      "**Adresse de l'entrepreneur** et **Contact** : domicile, pays, téléphone * et e-mail.",
+      "**Volet social** : n° de sécurité sociale (15 caractères). Activité non salariée antérieure : **Non** (1ʳᵉ création) ou **Oui** si déjà auto-entrepreneur. Organisme d'assurance maladie : votre caisse (souvent CPAM).",
+      "**« Avez-vous déjà formulé une demande d'ACRE auprès de l'Urssaf ? »** : **Non** si pas encore fait — demandez l'ACRE ensuite sur le portail URSSAF.",
+      "Exercice d'une activité simultanée : **Non** (1ʳᵉ AE) ou **Oui** si vous avez déjà une micro-entreprise. Affiliation biologiste : **Non**.",
+      "**Entreprise** — **Nom du brouillon** * (ex. prénom ou « GadzConnect-Tutorat »).",
+      "**Adresse de l'entreprise** : domiciliation à votre domicile. Cochez la case **« J'ai pris connaissance des conséquences… »** (adresse publiée au RNE). Société de domiciliation : **Non**.",
       "Recopiez la **même adresse** dans le formulaire Gadz'Connect ci-dessous (factures URSSAF).",
-      "Remplissez **tous les champs obligatoires** pour passer à l'étape suivante.",
-      "En cas de doute sur une case, contactez le responsable Gadz'Connect avant de valider.",
-    ],
-  },
-  {
-    id: "activity",
-    title: "Catégoriser l'activité (soutien scolaire)",
-    summary: "Chemin exact dans l'arbre INPI pour donner des cours.",
-    details: [
-      "Dans **Établissements → Activité(s)**, suivez exactement ce chemin :",
-    ],
-    copyText: ACTIVITY_PATH_COPY,
-    copyLabels: ACTIVITY_PATH_LABELS,
-  },
-  {
-    id: "fiscal",
-    title: "Options fiscales URSSAF & ACRE",
-    summary: "Périodicité, versement libératoire ; ACRE souvent en NON sur l'INPI.",
-    details: [
-      "Rubrique **« Options fiscales »** : choisissez la **périodicité** (trimestrielle recommandée pour Gadz'Connect).",
-      "Pour le **versement libératoire** : cochez selon votre choix au questionnaire Gadz'Connect.",
-      "Si les démarches URSSAF ne sont pas encore faites, cochez **NON** au dépôt d'ACRE sur l'INPI.",
-      "Vous pourrez demander l'ACRE ensuite sur le portail URSSAF (lien ci-dessous).",
+      "**Contrat d'appui** : **« Un contrat d'appui a-t-il été conclu ? »** → **Non** (dispositif RSA/chômage, pas le tutorat étudiant).",
     ],
     link: URSSAF_ACRE_URL,
     linkLabel: "Demander l'ACRE (URSSAF)",
+  },
+  {
+    id: "composition",
+    title: "Composition et insaisissabilité",
+    summary: "En solo : ne pas ajouter de représentant ; répondre Non à l'insaisissabilité notariée.",
+    details: [
+      "**Composition** : ne cliquez pas sur **« Ajouter un représentant »** — « Aucun pouvoir n'est défini » est normal pour un tuteur seul.",
+      "**Insaisissabilité — Résidence principale** : **« Avez-vous effectué une déclaration devant notaire ? »** → **Non** (protection par défaut).",
+      "**Autres résidences** : ne rien ajouter si vous n'avez pas de résidence secondaire.",
+    ],
+  },
+  {
+    id: "establishments",
+    title: "Établissements et activité",
+    summary: "Établissement principal, puis ajouter l'activité soutien scolaire.",
+    details: [
+      "**Informations générales** : établissement principal → **Oui**. Nom commercial : facultatif.",
+      "**Activités** : cliquez **« Ajouter une activité »**, puis remplissez :",
+      "Activité principale → **Oui**. **Date de début d'activité** * (souvent le jour de la création ou votre 1er cours).",
+      "Exercice → **Permanente**. Ambulant → **Non**. **Description détaillée** * (ex. cours particuliers / soutien scolaire).",
+      "Dans les menus **Catégorisation 1, 2, 3…**, suivez exactement ce chemin :",
+    ],
+    copyText: ACTIVITY_PATH_COPY,
+    copyLabels: ACTIVITY_PATH_LABELS,
+    tip: "Section **Origine** : type d'origine → **Création**. **Nom de domaine internet** : facultatif — laisser vide sans site web.",
+  },
+  {
+    id: "fiscal",
+    title: "Options fiscales",
+    summary: "Versement libératoire uniquement — la périodicité et l'ACRE sont à l'étape Identité.",
+    details: [
+      "Rubrique **« Options fiscales »** : seule question — **« Option pour le versement libératoire ? »**",
+      "Répondez selon votre choix au **questionnaire Gadz'Connect** (Oui ou Non).",
+      "La **périodicité URSSAF** se choisit à l'étape **Identité → Entrepreneur → Régime microsocial**.",
+      "L'**ACRE** se déclare à l'étape **Identité → Volet social** (puis sur URSSAF si besoin).",
+    ],
     tip: "Un oubli de déclaration URSSAF peut entraîner une amende — activez l'app « AutoEntrepreneur URSSAF ».",
   },
   {
     id: "documents",
-    title: "Pièces jointes obligatoires",
-    summary: "CNI, domicile, non-condamnation — format PDF, 10 Mo max.",
+    title: "Pièces jointes",
+    summary: "PDF 10 Mo max — choisir le type de pièce, ignorer mandataire si vous déclarez pour vous-même.",
     details: [
-      "Téléversez les documents demandés au **format PDF** (10 Mo max par fichier).",
-      "**Pièce d'identité** (CNI ou passeport) — voir encadré obligatoire ci-dessous.",
-      "**Justificatif de domicile** : facture, quittance de loyer ou attestation hébergeur récente.",
-      "**Déclaration sur l'honneur de non-condamnation** : formulaire à télécharger et signer.",
+      "Téléversez au **format PDF** (10 Mo max par fichier).",
+      "**Identité de l'entreprise** : sélectionnez le **type de pièce** (CNI ou passeport), puis joignez le scan — voir encadré CNI ci-dessous.",
+      "**Justificatif de domicile** et **déclaration de non-condamnation** : si demandés selon votre dossier, joignez-les au même format.",
+      "**Représentant ou mandataire** : ignorez cette section si vous déclarez **pour vous-même** (pas de procuration).",
+      "**Insaisissabilité** : attestation notariée uniquement si vous avez répondu **Oui** à la déclaration notariée.",
+      "**Pièces supplémentaires** : facultatif — n'ajoutez rien sauf besoin spécifique.",
       "L'INPI ne valide pas la conformité des pièces — les autorités compétentes le font après envoi.",
     ],
     copyText: ID_CONFORMITY_MENTION,
@@ -152,16 +173,18 @@ export const INPI_STEPS = [
   },
   {
     id: "validate",
-    title: "Vérifier, signer et payer",
-    summary: "Valider le dossier, signer, puis régler (souvent 0 € pour tutorat).",
+    title: "Observations, correspondance et validation",
+    summary: "Prospection → Non, puis récapitulatif, signature et paiement.",
     details: [
-      "Rubrique **« Récapitulatif »** : vérifiez chaque section, puis **« Valider le dossier »**.",
-      "Complétez **Correspondance** et **Observations** si demandé.",
-      "Téléchargez la synthèse et vérifiez une dernière fois.",
-      "Cochez **« Je confirme que les informations sont exactes »**, puis **« Signer la demande »**.",
+      "**Observations et correspondance** : commentaire facultatif.",
+      "**Prospection commerciale** * : **Non** — « Je consens à la mise à disposition de mes données à des fins de prospection ».",
+      "Confidentialité Sirène : case facultative selon votre choix.",
+      "**Correspondance** : type de destinataire → **Entrepreneur**. Pays, e-mail et téléphone.",
+      "**Récapitulatif** : vérifiez chaque section repliable, puis **« VALIDER LE DOSSIER »**.",
+      "Si vos coordonnées déclarant sont incorrectes, modifiez-les dans votre compte e-procédures INPI.",
+      "Téléchargez la synthèse, cochez **« Je confirme que les informations sont exactes »**, puis **« Signer la demande »**.",
       "**Attention** : après signature, plus de modification possible.",
-      "Effectuez le **paiement** (carte bancaire) — les tarifs varient selon l'activité ; le soutien scolaire est souvent gratuit ou très faible.",
-      "Conservez le reçu dans **Suivi des formalités → État d'avancement**.",
+      "Effectuez le **paiement** (carte bancaire) — tarif réglementé, souvent gratuit ou très faible pour le soutien scolaire.",
     ],
     alert:
       "« Valider le dossier » ne termine pas la démarche — signature et paiement sont obligatoires.",

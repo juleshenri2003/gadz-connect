@@ -10,7 +10,7 @@ export const onboardingDocsRouter = Router();
 
 onboardingDocsRouter.use(requireAuth);
 
-const INPI_URL = "https://procedures.inpi.fr/";
+const INPI_URL = "https://guichet-unique.inpi.fr/";
 
 async function loadProfile(userId: string) {
   const { data, error } = await supabaseAdmin

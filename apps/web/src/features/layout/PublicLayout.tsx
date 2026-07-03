@@ -1,11 +1,13 @@
 import { PublicCampusSelector } from "@/features/campus/PublicCampusSelector";
 import { AuthModalProvider } from "@/features/auth/AuthModal";
+import { AuthModalFromUrl } from "@/features/auth/authModalFromUrl";
 import { Outlet } from "react-router-dom";
 import { PublicFooter, PublicHeader } from "./PublicHeader";
 
 export function PublicLayout() {
   return (
     <AuthModalProvider>
+      <AuthModalFromUrl />
       <div className="flex min-h-screen flex-col bg-paper">
         <PublicHeader
           campusSelector={<PublicCampusSelector id="public-campus-header" />}

@@ -53,7 +53,7 @@ export function AuthCallbackPage() {
     return (
       <main className="mx-auto max-w-md p-8 text-center">
         <p className="text-danger">{error}</p>
-        <a href="/connexion" className="mt-4 inline-block text-sm underline">
+        <a href="/?auth=login" className="mt-4 inline-block text-sm underline">
           Réessayer la connexion
         </a>
       </main>

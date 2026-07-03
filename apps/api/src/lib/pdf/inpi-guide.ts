@@ -24,7 +24,7 @@ export interface InpiGuideInput {
   statusAcre: boolean;
 }
 
-const INPI_URL = "https://procedures.inpi.fr/";
+const INPI_URL = "https://guichet-unique.inpi.fr/";
 const URSSAF_ACRE_URL =
   "https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/toutes-les-fiches-pratiques/demander-lacre.html";
 const URSSAF_PORTAL_URL =
@@ -72,12 +72,13 @@ function writePersonalizedRecap(
 
   writeInfoBox(doc, "Cases à cocher sur l'INPI", [
     `Activité : ${ACTIVITY_LABELS[input.activity] ?? input.activity}`,
-    "Chemin INPI : Activités de services → Enseignement → Autres enseignements → Soutien scolaire",
+    "Catégorisation : Activités de services → Enseignement → Autres enseignements → Soutien scolaire",
     "Nature juridique : Entrepreneur individuel (micro-entreprise)",
-    `Périodicité URSSAF : ${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}`,
-    `Versement libératoire : ${input.versementLiberatoire ? "OUI — cocher l'option" : "NON — ne pas cocher"}`,
-    `ACRE (1ère année) : ${input.statusAcre ? "À demander (voir section ACRE)" : "Cocher NON au dépôt ACRE sur l'INPI si pas encore fait"}`,
-    "Adresse : votre domicile personnel actuel",
+    `Périodicité URSSAF (Identité → Régime microsocial) : ${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}`,
+    `Versement libératoire (Options fiscales) : ${input.versementLiberatoire ? "OUI" : "NON"}`,
+    `ACRE (Identité → Volet social) : ${input.statusAcre ? "À demander sur URSSAF" : "NON — pas encore demandée à l'Urssaf"}`,
+    "Adresse entreprise : domicile personnel — société de domiciliation : NON",
+    "Contrat d'appui : NON — prospection commerciale : NON",
   ]);
   doc.moveDown(0.3);
 }
@@ -152,19 +153,21 @@ function writeInpiWalkthrough(doc: PdfDoc, input: InpiGuideInput): void {
   writeSectionTitle(doc, "Créer sa micro-entreprise — étapes INPI (2026)");
   writeBody(
     doc,
-    "Procédure officielle sur procedures.inpi.fr — guide indicatif Gadz'Connect.",
+    "Procédure officielle sur guichet-unique.inpi.fr — guide indicatif Gadz'Connect (juillet 2026).",
   );
   doc.moveDown(0.3);
 
   writeNumberedList(doc, [
-    "Se connecter sur procedures.inpi.fr (FranceConnect possible). Répondre NON à « compte administrateur ».",
-    "Créer, modifier ou cesser → Créer une entreprise → Entrepreneur individuel → cocher micro-entrepreneur.",
-    "Renseigner identité, établissement (domicile), date de début d'activité et n° de sécurité sociale.",
-    `Catégoriser l'activité : Activités de services → Enseignement → Autres enseignements → Soutien scolaire.`,
-    `Options fiscales : périodicité ${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}. Versement libératoire : ${input.versementLiberatoire ? "OUI" : "NON"}.`,
-    "Si les démarches URSSAF ne sont pas faites : cocher NON au dépôt d'ACRE sur l'INPI.",
-    "Pièces jointes PDF : CNI (avec mention manuscrite), justificatif de domicile, déclaration de non-condamnation.",
-    "Récapitulatif → Valider le dossier → signer → payer (tarif réglementé, souvent faible ou nul).",
+    "Se connecter sur guichet-unique.inpi.fr (FranceConnect possible). Répondre NON à « compte administrateur ».",
+    "Créer, modifier ou cesser → Créer une entreprise → Entrepreneur individuel → micro-entrepreneur Oui.",
+    "Identité → Entrepreneur : identité, adresse, contact, volet social (n° sécu). Régime microsocial : périodicité " +
+      `${PERIODICITY_LABELS[input.urssafPeriodicity] ?? input.urssafPeriodicity}. ACRE Urssaf : NON si pas encore fait.`,
+    "Identité → Entreprise : nom du brouillon, domicile (case prise de connaissance), domiciliation : NON.",
+    "Identité → Contrat d'appui : NON. Composition : ne pas ajouter de représentant. Insaisissabilité : NON (notaire).",
+    "Établissements → Ajouter une activité : date de début, permanente, ambulant NON, catégorisation Soutien scolaire, origine Création.",
+    `Options fiscales : versement libératoire ${input.versementLiberatoire ? "OUI" : "NON"} uniquement.`,
+    "Pièces jointes PDF (type de pièce, CNI avec mention manuscrite). Ignorer mandataire si déclaration personnelle.",
+    "Observations : prospection NON. Correspondance : Entrepreneur. Récapitulatif → VALIDER LE DOSSIER → signer → payer.",
     "Suivre l'avancement via Suivi des formalités. Saisir le SIRET reçu sur Gadz'Connect.",
   ]);
   doc.moveDown(0.4);
@@ -225,7 +228,7 @@ function writeInpiTipsSection(doc: PdfDoc): void {
   writeSectionTitle(doc, "Récupérer la synthèse de création sur l'INPI");
   writeBulletList(doc, [
     "Utilisez Mozilla Firefox (Safari sur Mac pose souvent problème).",
-    "Connectez-vous sur procedures.inpi.fr avec le compte créé.",
+    "Connectez-vous sur guichet-unique.inpi.fr avec le compte créé.",
     "Acceptez la page d'accueil, puis cherchez « synthèse de création d'entreprise/activité » dans votre espace.",
   ]);
   writeLinkLine(doc, "Espace INPI", `${INPI_URL}?/`);
@@ -299,7 +302,7 @@ export function buildInpiGuidePdf(input: InpiGuideInput): Promise<Buffer> {
       .fontSize(9)
       .fillColor("#94A3B8")
       .text(
-        "Document généré par Gadz'Connect — guide indicatif aligné sur la doc officielle INPI (juin 2026). Gadz'Connect ne crée pas l'entreprise à votre place. Vous restez responsable de votre déclaration sur procedures.inpi.fr.",
+        "Document généré par Gadz'Connect — guide indicatif aligné sur le Guichet Unique INPI (juillet 2026). Gadz'Connect ne crée pas l'entreprise à votre place. Vous restez responsable de votre déclaration sur guichet-unique.inpi.fr.",
         { align: "center" },
       );
 

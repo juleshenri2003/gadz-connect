@@ -11,7 +11,6 @@ const PROFILE_SELECT_BASE = `
   micro_enterprise_address,
   account_status,
   status_acre,
-  acre_start_date,
   versement_liberatoire,
   micro_enterprise_activity,
   urssaf_periodicity,
@@ -27,6 +26,7 @@ const PROFILE_SELECT_BASE = `
 `;
 
 export type ProfileRow = Record<string, unknown> & {
+  acre_start_date?: string | null;
   inpi_declaration_sent_at?: string | null;
   registration_path?: string | null;
   siret_verification_failed?: boolean;
@@ -58,17 +58,47 @@ async function queryProfile(
   return { data: data as ProfileRow | null, error: null };
 }
 
+const PROFILE_OPTIONAL_FIELDS =
+  ", acre_start_date, cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed";
+
+function withProfileDefaults(
+  data: ProfileRow,
+  defaults: Partial<ProfileRow> = {},
+): ProfileRow {
+  return {
+    acre_start_date: null,
+    cv: null,
+    cv_pdf_path: null,
+    avatar_path: null,
+    inpi_declaration_sent_at: null,
+    registration_path: null,
+    siret_verification_failed: false,
+    ...data,
+    ...defaults,
+  };
+}
+
 export async function fetchProfileByUserId(userId: string): Promise<{
   data: ProfileRow | null;
   error: { message: string; code?: string } | null;
 }> {
-  const full = await queryProfile(
-    userId,
-    ", cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed",
-  );
+  const full = await queryProfile(userId, PROFILE_OPTIONAL_FIELDS);
   if (!full.error) return full;
 
   if (full.error.code !== "42703") return full;
+
+  const withoutAcre = await queryProfile(
+    userId,
+    ", cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed",
+  );
+  if (!withoutAcre.error) {
+    return {
+      data: withProfileDefaults(withoutAcre.data as ProfileRow),
+      error: null,
+    };
+  }
+
+  if (withoutAcre.error.code !== "42703") return withoutAcre;
 
   const withInpi = await queryProfile(
     userId,
@@ -76,12 +106,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
   );
   if (!withInpi.error) {
     return {
-      data: {
-        ...(withInpi.data as ProfileRow),
-        avatar_path: null,
-        registration_path: null,
-        siret_verification_failed: false,
-      },
+      data: withProfileDefaults(withInpi.data as ProfileRow),
       error: null,
     };
   }
@@ -91,13 +116,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
   const withCvPdf = await queryProfile(userId, ", cv, cv_pdf_path");
   if (!withCvPdf.error) {
     return {
-      data: {
-        ...(withCvPdf.data as ProfileRow),
-        avatar_path: null,
-        inpi_declaration_sent_at: null,
-        registration_path: null,
-        siret_verification_failed: false,
-      },
+      data: withProfileDefaults(withCvPdf.data as ProfileRow),
       error: null,
     };
   }
@@ -107,14 +126,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
   const withCv = await queryProfile(userId, ", cv");
   if (!withCv.error) {
     return {
-      data: {
-        ...(withCv.data as ProfileRow),
-        cv_pdf_path: null,
-        avatar_path: null,
-        inpi_declaration_sent_at: null,
-        registration_path: null,
-        siret_verification_failed: false,
-      },
+      data: withProfileDefaults(withCv.data as ProfileRow),
       error: null,
     };
   }
@@ -125,15 +137,7 @@ export async function fetchProfileByUserId(userId: string): Promise<{
   if (base.error || !base.data) return base;
 
   return {
-    data: {
-      ...(base.data as ProfileRow),
-      cv: null,
-      cv_pdf_path: null,
-      avatar_path: null,
-      inpi_declaration_sent_at: null,
-      registration_path: null,
-      siret_verification_failed: false,
-    },
+    data: withProfileDefaults(base.data as ProfileRow),
     error: null,
   };
 }

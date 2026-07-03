@@ -31,7 +31,9 @@ export const marketplaceRoutes = {
   },
 
   login(intent?: "teacher"): string {
-    return intent ? `/connexion?intent=teacher` : "/connexion";
+    const params = new URLSearchParams({ auth: "login" });
+    if (intent === "teacher") params.set("intent", "teacher");
+    return `/?${params}`;
   },
 
   /** Vision SEO : /campus/paris/tuteurs */

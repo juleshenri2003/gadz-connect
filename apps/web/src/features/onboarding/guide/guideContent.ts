@@ -48,7 +48,7 @@ const TEACHER_GUIDE_SHARED: Record<string, GuideStepContent> = {
   },
   inpi: {
     why: "L'immatriculation sur le Guichet Unique INPI est obligatoire pour obtenir votre numéro SIRET et exercer légalement.",
-    externalUrl: "https://procedures.inpi.fr/",
+    externalUrl: "https://guichet-unique.inpi.fr/",
     externalLabel: "Ouvrir le Guichet Unique INPI",
     externalBrand: "inpi",
     estimatedDuration: "1 à 15 jours",

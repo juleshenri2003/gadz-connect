@@ -6,7 +6,7 @@ import { AdminLayout } from "@/features/admin/AdminLayout";
 import { ProviderLayout } from "@/features/provider/ProviderLayout";
 import { PublicLayout } from "@/features/layout/PublicLayout";
 import { AuthCallbackPage } from "@/pages/auth/AuthCallbackPage";
-import { LoginPage } from "@/pages/auth/LoginPage";
+import { ConnexionRedirect } from "@/pages/auth/ConnexionRedirect";
 import { StripeReturnPage } from "@/pages/stripe/StripeReturnPage";
 import { RhLoginPage } from "@/pages/rh/RhLoginPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
@@ -48,8 +48,8 @@ export default function App() {
         />
       </Route>
 
-      <Route path="/connexion" element={<LoginPage />} />
-      <Route path="/auth/login" element={<Navigate to="/connexion" replace />} />
+      <Route path="/connexion" element={<ConnexionRedirect />} />
+      <Route path="/auth/login" element={<ConnexionRedirect />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
         path="/onboarding/micro-entreprise"

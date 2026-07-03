@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -14,7 +15,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/connexion" state={{ from: location }} replace />;
+    return (
+      <Navigate
+        to={marketplaceRoutes.login()}
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

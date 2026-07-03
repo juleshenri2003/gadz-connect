@@ -85,7 +85,7 @@ function InpiGuideProgressHead({ currentIndex }: { currentIndex: number }) {
     <div className="space-y-4">
       <GuideExternalButton
         href={INPI_URL}
-        label="Ouvrir procedures.inpi.fr"
+        label="Ouvrir le Guichet Unique INPI"
         brand="inpi"
       />
       <div className="space-y-2">
@@ -185,8 +185,8 @@ export function MicroEnterpriseInpiGuidePanel({
             ) {
               return (
                 <p className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-sm text-warning">
-                  Adresse non renseignée — ouvrez l&apos;étape 3 (« Identité et
-                  établissement ») pour l&apos;enregistrer avant votre premier
+                  Adresse non renseignée — ouvrez l&apos;étape 3 (« Identité de
+                  l&apos;entreprise ») pour l&apos;enregistrer avant votre premier
                   cours payé.
                 </p>
               );

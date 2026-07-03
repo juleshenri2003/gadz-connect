@@ -21,13 +21,13 @@ async function devLogin(
   email: string,
   password: string,
 ) {
-  await page.goto(`${BASE}/connexion`);
-  await page.locator("#email").fill(email);
-  const passwordInput = page.locator("#password");
+  await page.goto(`${BASE}/?auth=login`);
+  await page.getByLabel(/e-mail arts et métiers/i).fill(email);
+  const passwordInput = page.getByLabel(/^mot de passe$/i);
   if (await passwordInput.isVisible()) {
     await passwordInput.fill(password);
   }
-  await page.getByRole("button", { name: /continuer|se connecter/i }).click();
+  await page.getByRole("button", { name: /se connecter|créer/i }).click();
   await page.waitForURL(/\/(app|admin)/, { timeout: 20_000 });
 }
 

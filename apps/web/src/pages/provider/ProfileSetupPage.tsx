@@ -121,6 +121,9 @@ export function ProfileSetupPage() {
     peekAuthIntent() === "teacher" ||
     Boolean(profile?.role && !isStudent(profile.role));
 
+  const defaultAccountType =
+    teacherOnlySetup ? ("teacher_awaiting_siret" as const) : undefined;
+
   const accountOptions = teacherOnlySetup
     ? ACCOUNT_OPTIONS.filter((opt) => opt.value !== "student")
     : ACCOUNT_OPTIONS;
@@ -141,6 +144,7 @@ export function ProfileSetupPage() {
     resolver: zodResolver(setupSchema),
     defaultValues: {
       campusId: getStoredCampusId(),
+      accountType: defaultAccountType,
     },
   });
 
