@@ -27,6 +27,8 @@ export interface ScheduleEvent {
     raterName?: string;
   };
   canRate?: boolean;
+  studentConfirmedAt?: string | null;
+  providerConfirmedAt?: string | null;
 }
 
 export interface ScheduleQueryOptions {

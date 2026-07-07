@@ -1,0 +1,32 @@
+name: Course session jobs
+
+on:
+  schedule:
+    # Toutes les 30 minutes
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  course-session-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run course session jobs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          COURSE_CONFIRMATION_HOURS_BEFORE: ${{ vars.COURSE_CONFIRMATION_HOURS_BEFORE }}
+          COURSE_REPLACEMENT_DEADLINE_HOURS: ${{ vars.COURSE_REPLACEMENT_DEADLINE_HOURS }}
+        run: pnpm --filter @gadz-connect/api course-session-jobs

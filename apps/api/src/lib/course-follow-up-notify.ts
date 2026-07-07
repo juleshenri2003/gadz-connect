@@ -34,7 +34,7 @@ export async function notifyCourseFollowUpPublished(
       })
     : "date à confirmer";
 
-  const message = `${ctx.providerName} a déposé « ${ctx.materialLabel} » pour le cours « ${ctx.subject} » (${scheduledLabel}). Consultez votre suivi des cours.`;
+  const message = `${ctx.providerName} a déposé « ${ctx.materialLabel} » pour le cours « ${ctx.subject} » (${scheduledLabel}). Consultez votre répertoire ou le suivi des cours.`;
 
   const notification = await insertCampusNotification({
     campus_id: ctx.course.campus_id,

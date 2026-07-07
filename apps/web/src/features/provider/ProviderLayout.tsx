@@ -5,8 +5,10 @@ import {
   applyNavBadges,
   computeNavBadgeCounts,
 } from "@/features/dashboard/navBadgeCounts";
+import { computeStudentNavBadgeCounts } from "@/features/dashboard/studentNavBadgeCounts";
 import { useStudentActionTasks } from "@/features/dashboard/useStudentActionTasks";
 import { useTeacherActionTasks } from "@/features/dashboard/useTeacherActionTasks";
+import { useNotifications } from "@/features/notifications/useNotifications";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
 import { GuideModal } from "@/features/onboarding/guide/GuideModal";
 import { OnboardingGuideProvider } from "@/features/onboarding/guide/OnboardingGuideContext";
@@ -20,6 +22,7 @@ export function ProviderLayout() {
   const { profile, progress, isStudentRole } = useProviderProgress();
   const studentTasks = useStudentActionTasks();
   const teacherTasks = useTeacherActionTasks();
+  const notificationsQuery = useNotifications();
 
   async function handleSignOut() {
     await signOut();
@@ -37,10 +40,17 @@ export function ProviderLayout() {
         ? `${progress.completedCount}/${progress.totalCount}`
         : undefined;
     const baseNav = buildStudentNav(studentLabel);
-    const badgeCounts = computeNavBadgeCounts(
+    const taskBadgeCounts = computeNavBadgeCounts(
       studentTasks.tasks,
       baseNav.map((item) => item.to),
     );
+    const notificationBadgeCounts = computeStudentNavBadgeCounts(
+      notificationsQuery.data,
+    );
+    const badgeCounts = { ...taskBadgeCounts };
+    for (const [path, count] of Object.entries(notificationBadgeCounts)) {
+      badgeCounts[path] = Math.max(badgeCounts[path] ?? 0, count);
+    }
     nav = applyNavBadges(baseNav, badgeCounts);
   } else if (profile) {
     const isPendingRh = profile.account_status === "pending_siret";

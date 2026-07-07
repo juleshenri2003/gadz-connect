@@ -8,6 +8,7 @@ import { StudentRecentSummariesBanner } from "@/features/repository/StudentRecen
 import { StudentRepositoryEmptyState } from "@/features/repository/StudentRepositoryEmptyState";
 import { StudentRepositoryFolderCard } from "@/features/repository/StudentRepositoryFolderCard";
 import { formatRepositoryDate } from "@/features/repository/studentRepositoryUtils";
+import { useMarkRepositoryDocumentAlertsRead } from "@/features/repository/useMarkRepositoryDocumentAlertsRead";
 import {
   useRecentSummaries,
   useRepositoryFolders,
@@ -23,20 +24,22 @@ export function StudentRepositoryPage() {
     return <Navigate to="/app" replace />;
   }
 
+  useMarkRepositoryDocumentAlertsRead(true);
+
   const {
     data: folders,
     isLoading,
     isError,
     refetch,
   } = useRepositoryFolders();
-  const { data: recentSummaries } = useRecentSummaries(5);
+  const { data: recentMaterials } = useRecentSummaries(5);
   const [sort, setSort] = useState<FolderSort>("recent");
   const [showEmptyFolders, setShowEmptyFolders] = useState(false);
 
   const visibleFolders = useMemo(() => {
     let list = folders ?? [];
     if (!showEmptyFolders) {
-      list = list.filter((folder) => folder.summaryCount > 0);
+      list = list.filter((folder) => folder.documentCount > 0);
     }
     if (sort === "alpha") {
       list = [...list].sort((a, b) =>
@@ -46,16 +49,16 @@ export function StudentRepositoryPage() {
     return list;
   }, [folders, showEmptyFolders, sort]);
 
-  const totalSummaries = (folders ?? []).reduce(
-    (sum, folder) => sum + folder.summaryCount,
+  const totalDocuments = (folders ?? []).reduce(
+    (sum, folder) => sum + folder.documentCount,
     0,
   );
-  const latestSummaryAt = (folders ?? []).reduce<string | null>(
+  const latestActivityAt = (folders ?? []).reduce<string | null>(
     (latest, folder) => {
-      if (!folder.lastSummaryAt) return latest;
-      if (!latest) return folder.lastSummaryAt;
-      return new Date(folder.lastSummaryAt) > new Date(latest)
-        ? folder.lastSummaryAt
+      if (!folder.lastActivityAt) return latest;
+      if (!latest) return folder.lastActivityAt;
+      return new Date(folder.lastActivityAt) > new Date(latest)
+        ? folder.lastActivityAt
         : latest;
     },
     null,
@@ -63,18 +66,22 @@ export function StudentRepositoryPage() {
 
   const hasAnyFolder = (folders?.length ?? 0) > 0;
   const hasVisibleFolders = visibleFolders.length > 0;
+  const hasEmptyDocumentFolders = (folders ?? []).some(
+    (folder) => folder.documentCount === 0,
+  );
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-ink-900">Comptes-rendus</h2>
+        <h2 className="text-2xl font-bold text-ink-900">Mon répertoire</h2>
         <p className="mt-1 text-sm text-ink-600">
-          Résumés de cours déposés par vos professeurs, classés par matière
+          Comptes-rendus et fiches déposés par vos professeurs, classés par
+          matière
         </p>
-        {totalSummaries > 0 && latestSummaryAt ? (
+        {totalDocuments > 0 && latestActivityAt ? (
           <p className="mt-2 text-sm text-ink-400">
-            {totalSummaries} résumé{totalSummaries !== 1 ? "s" : ""} · dernière
-            publication le {formatRepositoryDate(latestSummaryAt)}
+            {totalDocuments} document{totalDocuments !== 1 ? "s" : ""} · dernier
+            dépôt le {formatRepositoryDate(latestActivityAt)}
           </p>
         ) : null}
       </div>
@@ -83,7 +90,7 @@ export function StudentRepositoryPage() {
         <RepositoryFoldersSkeleton />
       ) : isError ? (
         <div className="rounded-md border border-danger/20 bg-danger-bg px-4 py-3 text-sm text-danger">
-          <p>Impossible de charger vos comptes-rendus.</p>
+          <p>Impossible de charger votre répertoire.</p>
           <Button
             type="button"
             size="sm"
@@ -98,8 +105,8 @@ export function StudentRepositoryPage() {
         <StudentRepositoryEmptyState />
       ) : (
         <>
-          {recentSummaries && recentSummaries.length > 0 ? (
-            <StudentRecentSummariesBanner summaries={recentSummaries} />
+          {recentMaterials && recentMaterials.length > 0 ? (
+            <StudentRecentSummariesBanner materials={recentMaterials} />
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -121,7 +128,7 @@ export function StudentRepositoryPage() {
                 Par matière
               </Button>
             </div>
-            {(folders ?? []).some((f) => f.summaryCount === 0) ? (
+            {hasEmptyDocumentFolders ? (
               <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-600">
                 <input
                   type="checkbox"
@@ -129,7 +136,7 @@ export function StudentRepositoryPage() {
                   checked={showEmptyFolders}
                   onChange={(e) => setShowEmptyFolders(e.target.checked)}
                 />
-                Afficher les matières sans résumé
+                Afficher les matières vides
               </label>
             ) : null}
           </div>
@@ -142,7 +149,7 @@ export function StudentRepositoryPage() {
             </div>
           ) : (
             <p className="text-sm text-ink-400">
-              Aucune matière avec résumé pour le moment.{" "}
+              Aucun document pour le moment.{" "}
               <Link
                 to="/app/cours"
                 className="font-medium text-brand-700 hover:underline"

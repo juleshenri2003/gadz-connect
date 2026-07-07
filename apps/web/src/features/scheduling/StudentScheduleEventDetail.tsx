@@ -10,6 +10,7 @@ import {
   isEventPast,
 } from "@/features/scheduling/calendar-utils";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
+import { ConfirmSessionActions } from "@/features/course-session/ConfirmSessionActions";
 import {
   buildMarketplaceSubjectHref,
   formatNotificationDate,
@@ -31,6 +32,11 @@ export function StudentScheduleEventDetail({
 
   const past = isEventPast(event.startsAt, event.endsAt);
   const canDeclareUnavailable =
+    event.kind === "course" &&
+    event.courseId &&
+    event.status === "scheduled" &&
+    !past;
+  const canConfirmSession =
     event.kind === "course" &&
     event.courseId &&
     event.status === "scheduled" &&
@@ -63,6 +69,13 @@ export function StudentScheduleEventDetail({
           <span className="font-medium text-ink-900">Horaire :</span>{" "}
           {formatEventTime(event.startsAt, event.endsAt)}
         </p>
+        {event.status === "awaiting_replacement" ? (
+          <p className="rounded-md border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-ink-700">
+            Votre professeur a annulé — un remplaçant est recherché sur le
+            campus. Consultez vos alertes pour valider un prof. Remboursement
+            automatique si aucun remplaçant 2 h avant le cours.
+          </p>
+        ) : null}
         {event.status === "cancelled" ? (
           <p className="rounded-md border border-line bg-paper px-3 py-2 text-xs text-ink-600">
             Cette séance a été annulée.{" "}
@@ -73,6 +86,14 @@ export function StudentScheduleEventDetail({
               Trouver un autre tuteur
             </Link>
           </p>
+        ) : null}
+        {canConfirmSession ? (
+          <ConfirmSessionActions
+            courseId={event.courseId!}
+            audience="student"
+            studentConfirmedAt={event.studentConfirmedAt}
+            providerConfirmedAt={event.providerConfirmedAt}
+          />
         ) : null}
         {canDeclareUnavailable ? (
           <DeclareUnavailableButton

@@ -6,6 +6,8 @@ import {
   computeTeacherActionCount,
   enrichNotificationsForUser,
 } from "../lib/notification-enrichment.js";
+import { computeReplacementExpiresAt } from "../lib/course-session-config.js";
+import { notifyReplacementOfferBroadcast } from "../lib/course-session-notify.js";
 import {
   getSiteAdministratorIds,
   insertCampusNotification,
@@ -320,8 +322,13 @@ notificationsRouter.post(
 
     const message =
       kind === "prof_unavailable"
-        ? `${declarantName} a annulé le cours « ${subject} » prévu le ${scheduledLabel} avec ${clientName}. Le créneau est libéré — l'élève peut réserver un autre tuteur sur la marketplace.`
+        ? `${declarantName} a annulé le cours « ${subject} » prévu le ${scheduledLabel} avec ${clientName}. Un remplaçant est recherché sur le campus — vous serez remboursé si aucun prof ne reprend le cours 2 h avant la séance.`
         : `${declarantName} a annulé le cours « ${subject} » prévu le ${scheduledLabel} avec ${providerName}. Le créneau est libéré.`;
+
+    const replacementExpiresAt =
+      kind === "prof_unavailable" && course.scheduled_at
+        ? computeReplacementExpiresAt(course.scheduled_at as string)
+        : null;
 
     const notificationPayload: Record<string, unknown> = {
       campus_id: course.campus_id,
@@ -331,7 +338,8 @@ notificationsRouter.post(
       message,
       scheduled_at: course.scheduled_at,
       declared_by: profile.id,
-      replacement_status: "dismissed",
+      replacement_status:
+        kind === "prof_unavailable" ? "open" : "dismissed",
       reason: parsed.data.reason ?? null,
       original_provider_id: course.provider_id,
       client_id: course.client_id,
@@ -368,6 +376,47 @@ notificationsRouter.post(
     ]);
 
     await insertNotificationRecipients(notification.id, recipientIds);
+
+    if (kind === "prof_unavailable") {
+      await notifyReplacementOfferBroadcast(
+        {
+          id: course.id as string,
+          campus_id: course.campus_id as string,
+          scheduled_at: course.scheduled_at as string | null,
+          subject,
+          title: course.title as string,
+          client_id: course.client_id as string | null,
+          provider_id: course.provider_id as string | null,
+        },
+        declarantName,
+      );
+
+      const { error: awaitError } = await supabaseAdmin
+        .from("courses")
+        .update({
+          status: "awaiting_replacement",
+          replacement_expires_at: replacementExpiresAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", course.id);
+
+      if (awaitError) {
+        res.status(500).json({ error: awaitError.message });
+        return;
+      }
+
+      res.status(201).json({
+        data: {
+          notificationId: notification.id as string,
+          recipientsCount: recipientIds.length,
+          kind,
+          title,
+          awaitingReplacement: true,
+          replacementExpiresAt,
+        },
+      });
+      return;
+    }
 
     const { error: cancelError } = await supabaseAdmin
       .from("courses")

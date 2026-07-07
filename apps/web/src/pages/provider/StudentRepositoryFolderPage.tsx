@@ -9,10 +9,21 @@ import { RepositorySummariesSkeleton } from "@/features/repository/RepositoryPag
 import { StudentRepositoryClarificationCard } from "@/features/repository/StudentRepositoryClarificationCard";
 import { StudentRepositorySummaryCard } from "@/features/repository/StudentRepositorySummaryCard";
 import { useFolderSummaries } from "@/features/repository/useRepository";
+import { useMarkRepositoryDocumentAlertsRead } from "@/features/repository/useMarkRepositoryDocumentAlertsRead";
 
-function parseSummaryHash(hash: string): string | null {
-  const match = hash.match(/^#summary-(.+)$/);
-  return match?.[1] ?? null;
+function parseRepositoryHash(hash: string): {
+  kind: "summary" | "clarification";
+  id: string;
+} | null {
+  const summaryMatch = hash.match(/^#summary-(.+)$/);
+  if (summaryMatch?.[1]) {
+    return { kind: "summary", id: summaryMatch[1] };
+  }
+  const clarificationMatch = hash.match(/^#clarification-(.+)$/);
+  if (clarificationMatch?.[1]) {
+    return { kind: "clarification", id: clarificationMatch[1] };
+  }
+  return null;
 }
 
 export function StudentRepositoryFolderPage() {
@@ -23,6 +34,7 @@ export function StudentRepositoryFolderPage() {
 
   const { getAccessToken } = useAuth();
   const { folderId } = useParams<{ folderId: string }>();
+  useMarkRepositoryDocumentAlertsRead(true);
   const {
     data,
     isLoading,
@@ -55,18 +67,17 @@ export function StudentRepositoryFolderPage() {
   }, [data?.clarifications, search]);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const summaryId = parseSummaryHash(hash);
-    if (!summaryId || !data?.summaries.length) return;
+    const target = parseRepositoryHash(window.location.hash);
+    if (!target) return;
 
-    setHighlightedId(summaryId);
-    const el = document.getElementById(`summary-${summaryId}`);
+    setHighlightedId(target.id);
+    const el = document.getElementById(`${target.kind}-${target.id}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     const timer = window.setTimeout(() => setHighlightedId(null), 3000);
     return () => window.clearTimeout(timer);
-  }, [data?.summaries]);
+  }, [data?.summaries, data?.clarifications]);
 
   async function handleOpenSummaryPdf(summaryId: string) {
     const token = getAccessToken();
@@ -169,6 +180,7 @@ export function StudentRepositoryFolderPage() {
                 <StudentRepositoryClarificationCard
                   key={clarification.id}
                   clarification={clarification}
+                  highlighted={highlightedId === clarification.id}
                   onOpenPdf={
                     clarification.has_pdf
                       ? handleOpenClarificationPdf

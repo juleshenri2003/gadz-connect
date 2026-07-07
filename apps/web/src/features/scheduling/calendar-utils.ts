@@ -93,6 +93,7 @@ export function formatSessionDurationLabel(
 
 export const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
+  awaiting_replacement: "Remplacement en cours",
   completed: "Terminé",
   cancelled: "Annulé",
 };

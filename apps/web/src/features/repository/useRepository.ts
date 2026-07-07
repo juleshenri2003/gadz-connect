@@ -7,8 +7,12 @@ export interface SubjectFolder {
   subject: string;
   created_at: string;
   summaryCount: number;
+  clarificationCount: number;
+  documentCount: number;
   lastSummaryAt: string | null;
+  lastActivityAt: string | null;
   latestTitle: string | null;
+  latestKind: "summary" | "clarification" | null;
 }
 
 export interface CourseSummary {
@@ -38,6 +42,14 @@ export interface RecentCourseSummary extends CourseSummary {
   folder_id: string;
   folder?: { id: string; subject: string } | null;
 }
+
+export type RecentRepositoryMaterial =
+  | (RecentCourseSummary & { kind: "summary" })
+  | (CourseClarification & {
+      kind: "clarification";
+      folder_id: string;
+      folder?: { id: string; subject: string } | null;
+    });
 
 export interface CourseToDocument {
   id: string;
@@ -95,7 +107,7 @@ export function useRecentSummaries(limit = 5) {
     queryFn: async () => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");
-      const res = await apiFetch<{ data: RecentCourseSummary[] }>(
+      const res = await apiFetch<{ data: RecentRepositoryMaterial[] }>(
         `/api/repository/summaries/recent?limit=${limit}`,
         { token },
       );

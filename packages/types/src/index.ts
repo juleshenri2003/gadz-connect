@@ -12,7 +12,8 @@ export type CourseStatus =
   | "scheduled"
   | "payment_pending"
   | "completed"
-  | "cancelled";
+  | "cancelled"
+  | "awaiting_replacement";
 
 export type TransactionStripeStatus =
   | "pending"

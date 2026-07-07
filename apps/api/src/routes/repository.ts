@@ -89,56 +89,123 @@ repositoryRouter.get("/folders", async (req: AuthenticatedRequest, res) => {
   }
 
   const folderIds = (folders ?? []).map((f) => f.id as string);
-  const statsByFolderId = new Map<
-    string,
-    { summaryCount: number; lastSummaryAt: string | null; latestTitle: string | null }
-  >();
+  type FolderStats = {
+    summaryCount: number;
+    clarificationCount: number;
+    lastSummaryAt: string | null;
+    lastActivityAt: string | null;
+    latestTitle: string | null;
+    latestKind: "summary" | "clarification" | null;
+  };
+
+  const statsByFolderId = new Map<string, FolderStats>();
+
+  function ensureFolderStats(folderId: string): FolderStats {
+    const existing = statsByFolderId.get(folderId);
+    if (existing) return existing;
+    const stats: FolderStats = {
+      summaryCount: 0,
+      clarificationCount: 0,
+      lastSummaryAt: null,
+      lastActivityAt: null,
+      latestTitle: null,
+      latestKind: null,
+    };
+    statsByFolderId.set(folderId, stats);
+    return stats;
+  }
+
+  function registerActivity(
+    folderId: string,
+    at: string,
+    title: string,
+    kind: "summary" | "clarification",
+  ) {
+    const stats = ensureFolderStats(folderId);
+    if (
+      !stats.lastActivityAt ||
+      new Date(at).getTime() > new Date(stats.lastActivityAt).getTime()
+    ) {
+      stats.lastActivityAt = at;
+      stats.latestTitle = title;
+      stats.latestKind = kind;
+    }
+  }
 
   if (folderIds.length > 0) {
-    const { data: summaries, error: summariesError } = await supabaseAdmin
-      .from("course_summaries")
-      .select("folder_id, published_at, title")
-      .in("folder_id", folderIds)
-      .order("published_at", { ascending: false });
+    const [summariesResult, clarificationsResult] = await Promise.all([
+      supabaseAdmin
+        .from("course_summaries")
+        .select("folder_id, published_at, title")
+        .in("folder_id", folderIds)
+        .order("published_at", { ascending: false }),
+      supabaseAdmin
+        .from("course_clarifications")
+        .select("folder_id, created_at, title")
+        .in("folder_id", folderIds)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (summariesError) {
-      res.status(500).json({ error: summariesError.message });
+    if (summariesResult.error) {
+      res.status(500).json({ error: summariesResult.error.message });
+      return;
+    }
+    if (clarificationsResult.error) {
+      res.status(500).json({ error: clarificationsResult.error.message });
       return;
     }
 
-    for (const row of summaries ?? []) {
+    for (const row of summariesResult.data ?? []) {
       const folderId = row.folder_id as string;
-      const existing = statsByFolderId.get(folderId);
-      if (!existing) {
-        statsByFolderId.set(folderId, {
-          summaryCount: 1,
-          lastSummaryAt: row.published_at as string,
-          latestTitle: row.title as string,
-        });
-      } else {
-        existing.summaryCount += 1;
+      const stats = ensureFolderStats(folderId);
+      stats.summaryCount += 1;
+      const publishedAt = row.published_at as string;
+      if (
+        !stats.lastSummaryAt ||
+        new Date(publishedAt).getTime() > new Date(stats.lastSummaryAt).getTime()
+      ) {
+        stats.lastSummaryAt = publishedAt;
       }
+      registerActivity(folderId, publishedAt, row.title as string, "summary");
+    }
+
+    for (const row of clarificationsResult.data ?? []) {
+      const folderId = row.folder_id as string;
+      const stats = ensureFolderStats(folderId);
+      stats.clarificationCount += 1;
+      registerActivity(
+        folderId,
+        row.created_at as string,
+        row.title as string,
+        "clarification",
+      );
     }
   }
 
   const enriched = (folders ?? []).map((folder) => {
     const stats = statsByFolderId.get(folder.id as string);
+    const summaryCount = stats?.summaryCount ?? 0;
+    const clarificationCount = stats?.clarificationCount ?? 0;
     return {
       ...folder,
-      summaryCount: stats?.summaryCount ?? 0,
+      summaryCount,
+      clarificationCount,
+      documentCount: summaryCount + clarificationCount,
       lastSummaryAt: stats?.lastSummaryAt ?? null,
+      lastActivityAt: stats?.lastActivityAt ?? null,
       latestTitle: stats?.latestTitle ?? null,
+      latestKind: stats?.latestKind ?? null,
     };
   });
 
   enriched.sort((a, b) => {
-    if (!a.lastSummaryAt && !b.lastSummaryAt) {
+    if (!a.lastActivityAt && !b.lastActivityAt) {
       return a.subject.localeCompare(b.subject, "fr");
     }
-    if (!a.lastSummaryAt) return 1;
-    if (!b.lastSummaryAt) return -1;
+    if (!a.lastActivityAt) return 1;
+    if (!b.lastActivityAt) return -1;
     return (
-      new Date(b.lastSummaryAt).getTime() - new Date(a.lastSummaryAt).getTime()
+      new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()
     );
   });
 
@@ -255,26 +322,96 @@ repositoryRouter.get(
       ? Math.min(Math.max(rawLimit, 1), 20)
       : 5;
 
-    const { data, error } = await supabaseAdmin
-      .from("course_summaries")
-      .select(
-        `
+    const [summariesResult, clarificationsResult] = await Promise.all([
+      supabaseAdmin
+        .from("course_summaries")
+        .select(
+          `
         id, title, content, published_at, course_id, folder_id,
         folder:folder_id ( id, subject ),
         provider:provider_id ( first_name, last_name ),
         course:course_id ( scheduled_at )
       `,
-      )
-      .eq("student_id", profile.id)
-      .order("published_at", { ascending: false })
-      .limit(limit);
+        )
+        .eq("student_id", profile.id)
+        .order("published_at", { ascending: false })
+        .limit(limit),
+      supabaseAdmin
+        .from("course_clarifications")
+        .select(
+          `
+        id, title, content, created_at, course_id, folder_id, pdf_path,
+        folder:folder_id ( id, subject ),
+        provider:provider_id ( first_name, last_name ),
+        course:course_id ( scheduled_at )
+      `,
+        )
+        .eq("student_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(limit),
+    ]);
 
-    if (error) {
-      res.status(500).json({ error: error.message });
+    if (summariesResult.error) {
+      res.status(500).json({ error: summariesResult.error.message });
+      return;
+    }
+    if (clarificationsResult.error) {
+      res.status(500).json({ error: clarificationsResult.error.message });
       return;
     }
 
-    res.json({ data: data ?? [] });
+    type RecentMaterial =
+      | {
+          kind: "summary";
+          id: string;
+          title: string;
+          content: string;
+          published_at: string;
+          course_id: string;
+          folder_id: string;
+          folder: unknown;
+          provider: unknown;
+          course: unknown;
+        }
+      | {
+          kind: "clarification";
+          id: string;
+          title: string;
+          content: string | null;
+          created_at: string;
+          course_id: string;
+          folder_id: string;
+          has_pdf: boolean;
+          folder: unknown;
+          provider: unknown;
+          course: unknown;
+        };
+
+    const materials: RecentMaterial[] = [
+      ...(summariesResult.data ?? []).map((row) => ({
+        kind: "summary" as const,
+        ...row,
+      })),
+      ...(clarificationsResult.data ?? []).map(({ pdf_path, ...row }) => ({
+        kind: "clarification" as const,
+        ...row,
+        has_pdf: Boolean(pdf_path),
+      })),
+    ];
+
+    materials.sort((a, b) => {
+      const aTime =
+        a.kind === "summary"
+          ? new Date(a.published_at).getTime()
+          : new Date(a.created_at).getTime();
+      const bTime =
+        b.kind === "summary"
+          ? new Date(b.published_at).getTime()
+          : new Date(b.created_at).getTime();
+      return bTime - aTime;
+    });
+
+    res.json({ data: materials.slice(0, limit) });
   },
 );
 

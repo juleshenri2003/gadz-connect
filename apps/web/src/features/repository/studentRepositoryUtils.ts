@@ -5,6 +5,13 @@ function pickOne<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+export function clarificationDeepLink(
+  folderId: string,
+  clarificationId: string,
+): string {
+  return `/app/repertoire/${folderId}#clarification-${clarificationId}`;
+}
+
 export function summaryDeepLink(folderId: string, summaryId: string): string {
   return `/app/repertoire/${folderId}#summary-${summaryId}`;
 }

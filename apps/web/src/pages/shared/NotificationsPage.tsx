@@ -10,6 +10,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAdminDashboard } from "@/features/admin/useAdmin";
+import {
+  ConfirmSessionActions,
+} from "@/features/course-session/ConfirmSessionActions";
+import { ReplacementNotificationActions } from "@/features/course-session/ReplacementNotificationActions";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import {
@@ -296,6 +300,17 @@ function NotificationRow({
   const showLongMessage = n.message.length > 160;
   const planningHref = buildPlanningWeekHref(n.scheduled_at, isAdminRoute);
   const marketplaceHref = buildMarketplaceSubjectHref(subject);
+  const showRepositoryCta =
+    student && !isAdminRoute && n.kind === "course_follow_up";
+  const showSuiviCta =
+    student && !isAdminRoute && n.kind === "course_follow_up" && n.course_id;
+  const showConfirmCta =
+    !isAdminRoute &&
+    n.kind === "course_confirmation_reminder" &&
+    Boolean(n.course_id);
+  const showReplacementActions =
+    !isAdminRoute &&
+    (n.kind === "replacement_offer" || n.kind === "replacement_candidate");
   const showMarketplaceCta =
     student &&
     !isAdminRoute &&
@@ -396,7 +411,38 @@ function NotificationRow({
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-3">
-        {n.course_id ? (
+        {showConfirmCta && n.course_id ? (
+          <ConfirmSessionActions
+            courseId={n.course_id}
+            audience={student ? "student" : "teacher"}
+            compact
+          />
+        ) : null}
+        {showReplacementActions ? (
+          <ReplacementNotificationActions
+            kind={n.kind}
+            notificationId={n.id}
+            courseId={n.course_id}
+            audience={student ? "student" : "teacher"}
+          />
+        ) : null}
+        {showRepositoryCta ? (
+          <Link
+            to="/app/repertoire"
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            Voir dans mon répertoire →
+          </Link>
+        ) : null}
+        {showSuiviCta ? (
+          <Link
+            to="/app/suivi-cours"
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            Voir le suivi du cours →
+          </Link>
+        ) : null}
+        {n.course_id && !showRepositoryCta ? (
           <Link
             to={planningHref}
             className="text-xs font-medium text-brand-700 hover:underline"

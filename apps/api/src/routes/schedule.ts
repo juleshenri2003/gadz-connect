@@ -28,6 +28,8 @@ export interface ScheduleEventPayload {
   providerId?: string;
   rating?: { stars: number; createdAt: string };
   canRate?: boolean;
+  studentConfirmedAt?: string | null;
+  providerConfirmedAt?: string | null;
 }
 
 function slotEnd(startsAt: string, endsAt: string): string {
@@ -290,6 +292,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       .select(
         `
         id, title, subject, status, scheduled_at, slot_id, client_id,
+        student_confirmed_at, provider_confirmed_at,
         client:client_id ( first_name, last_name ),
         slot:slot_id ( starts_at, ends_at )
       `,
@@ -343,6 +346,8 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         counterpartName: client
           ? `${client.first_name} ${client.last_name}`.trim()
           : undefined,
+        studentConfirmedAt: course.student_confirmed_at as string | null,
+        providerConfirmedAt: course.provider_confirmed_at as string | null,
       });
     }
 
@@ -367,6 +372,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       .select(
         `
         id, title, subject, status, scheduled_at, slot_id, provider_id,
+        student_confirmed_at, provider_confirmed_at,
         provider:provider_id ( first_name, last_name ),
         slot:slot_id ( starts_at, ends_at )
       `,
@@ -415,6 +421,8 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         counterpartName: provider
           ? `${provider.first_name} ${provider.last_name}`.trim()
           : undefined,
+        studentConfirmedAt: course.student_confirmed_at as string | null,
+        providerConfirmedAt: course.provider_confirmed_at as string | null,
       });
     }
 

@@ -5,6 +5,7 @@ import {
   cancelPendingBooking,
 } from "../../lib/booking.js";
 import { confirmBookingAfterPayment } from "../../lib/booking-payment.js";
+import { syncRefundFromStripePaymentIntent } from "../../lib/stripe-refund.js";
 import { supabaseAdmin } from "../../lib/supabase.js";
 import {
   isStripeWebhookConfigured,
@@ -108,6 +109,17 @@ stripeWebhookRouter.post("/", async (req: Request, res: Response) => {
           event.data.object as Stripe.PaymentIntent,
         );
         break;
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId =
+          typeof charge.payment_intent === "string"
+            ? charge.payment_intent
+            : charge.payment_intent?.id;
+        if (paymentIntentId) {
+          await syncRefundFromStripePaymentIntent(paymentIntentId);
+        }
+        break;
+      }
       default:
         console.info(`[stripe webhook] événement ignoré: ${event.type}`);
     }

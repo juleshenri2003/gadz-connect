@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Input, Label } from "@gadz-connect/ui";
+import { FileText, X } from "lucide-react";
 import { Modal } from "@/components/Modal";
 import {
   CourseRatingForm,
@@ -23,6 +24,80 @@ interface CourseEvaluationDetailModalProps {
   onClose: () => void;
 }
 
+function PdfPickField({
+  file,
+  onFile,
+  onClear,
+  disabled,
+  description = "PDF — max. 5 Mo",
+}: {
+  file: File | null;
+  onFile: (file: File) => void;
+  onClear: () => void;
+  disabled?: boolean;
+  description?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="rounded-md border border-line bg-paper p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-ink-900">Document PDF</p>
+          <p className="mt-0.5 text-xs text-ink-500">{description}</p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="sr-only"
+          disabled={disabled}
+          onChange={(event) => {
+            const picked = event.target.files?.[0];
+            if (picked) onFile(picked);
+            event.target.value = "";
+          }}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          className="shrink-0 gap-1.5"
+          onClick={() => inputRef.current?.click()}
+        >
+          <FileText className="h-4 w-4" aria-hidden />
+          PDF
+        </Button>
+      </div>
+
+      {file ? (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-2">
+          <p className="min-w-0 truncate text-sm font-medium text-ink-900">
+            {file.name}
+          </p>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-8 shrink-0 text-ink-500"
+            aria-label="Retirer le PDF"
+            disabled={disabled}
+            onClick={onClear}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-ink-400">
+          Cliquez sur <span className="font-medium text-ink-600">PDF</span> pour
+          parcourir vos documents.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PdfUploadButton({
   label,
   onFile,
@@ -32,21 +107,34 @@ function PdfUploadButton({
   onFile: (file: File) => void;
   disabled?: boolean;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-brand-700 hover:underline">
+    <>
       <input
+        ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,.pdf"
         className="sr-only"
         disabled={disabled}
         onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onFile(file);
+          const picked = event.target.files?.[0];
+          if (picked) onFile(picked);
           event.target.value = "";
         }}
       />
-      {label}
-    </label>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        className="gap-1.5"
+        onClick={() => inputRef.current?.click()}
+      >
+        <FileText className="h-4 w-4" aria-hidden />
+        {label}
+      </Button>
+    </>
   );
 }
 
@@ -230,7 +318,7 @@ export function CourseEvaluationDetailModal({
                 ) : null}
                 {isTeacher && !data.summary.hasPdf ? (
                   <PdfUploadButton
-                    label="Joindre un PDF au compte-rendu"
+                    label="Joindre un PDF"
                     disabled={uploadSummaryPdf.isPending}
                     onFile={(file) => void handleSummaryPdf(file)}
                   />
@@ -333,29 +421,16 @@ export function CourseEvaluationDetailModal({
                   onChange={(e) => setClarificationContent(e.target.value)}
                   rows={3}
                   className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                  placeholder="Contenu texte (optionnel si PDF)"
+                  placeholder="Contenu texte (optionnel si vous joignez un PDF)"
                 />
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="text-sm text-brand-700">
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="mr-2"
-                      onChange={(e) =>
-                        setClarificationPdf(e.target.files?.[0] ?? null)
-                      }
-                    />
-                    PDF (optionnel)
-                  </label>
-                  {clarificationPdf ? (
-                    <span className="text-xs text-ink-500">
-                      {clarificationPdf.name}
-                    </span>
-                  ) : null}
-                </div>
+                <PdfPickField
+                  file={clarificationPdf}
+                  disabled={postClarification.isPending}
+                  onFile={setClarificationPdf}
+                  onClear={() => setClarificationPdf(null)}
+                />
                 <Button
                   type="button"
-                  size="sm"
                   disabled={postClarification.isPending}
                   onClick={() => void handleSubmitClarification()}
                 >

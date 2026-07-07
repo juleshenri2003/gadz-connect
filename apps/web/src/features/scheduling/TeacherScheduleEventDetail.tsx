@@ -6,6 +6,7 @@ import { StarRatingDisplay } from "@/features/ratings/StarRating";
 import { formatEuro } from "@/features/admin/format";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
+import { ConfirmSessionActions } from "@/features/course-session/ConfirmSessionActions";
 import { useDeleteSlot } from "@/features/marketplace/useTutors";
 import {
   courseStatusLabel,
@@ -135,6 +136,25 @@ export function TeacherScheduleEventDetail({
           </div>
         ) : null}
       </dl>
+
+      {event.status === "awaiting_replacement" ? (
+        <p className="mt-4 rounded-md border border-warning/30 bg-warning-bg px-3 py-2 text-sm text-ink-700">
+          Vous avez déclaré votre indisponibilité — un remplaçant est recherché
+          sur le campus. Le créneau reste réservé jusqu&apos;à validation ou
+          remboursement automatique 2 h avant la séance.
+        </p>
+      ) : null}
+
+      {event.courseId && event.status === "scheduled" ? (
+        <div className="mt-4">
+          <ConfirmSessionActions
+            courseId={event.courseId}
+            audience="teacher"
+            studentConfirmedAt={event.studentConfirmedAt}
+            providerConfirmedAt={event.providerConfirmedAt}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {event.courseId && event.status === "scheduled" ? (

@@ -10,11 +10,13 @@ import {
 
 interface StudentRepositoryClarificationCardProps {
   clarification: CourseClarification;
+  highlighted?: boolean;
   onOpenPdf?: (id: string) => void;
 }
 
 export function StudentRepositoryClarificationCard({
   clarification,
+  highlighted = false,
   onOpenPdf,
 }: StudentRepositoryClarificationCardProps) {
   const [expanded, setExpanded] = useState(false);
@@ -25,7 +27,14 @@ export function StudentRepositoryClarificationCard({
   const showFull = expanded || !truncated;
 
   return (
-    <article className="rounded-md border border-line bg-surface p-6">
+    <article
+      id={`clarification-${clarification.id}`}
+      className={`rounded-md border bg-surface p-6 transition ${
+        highlighted
+          ? "border-brand-100 ring-2 ring-brand-100"
+          : "border-line"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold text-ink-900">{clarification.title}</h3>
         <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">

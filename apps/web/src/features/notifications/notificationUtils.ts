@@ -13,6 +13,12 @@ export const KIND_LABELS: Record<string, string> = {
   course_rated_low: "Note à améliorer",
   course_follow_up: "Document de cours",
   course_exchange_message: "Message cours",
+  course_confirmation_reminder: "Confirmation séance",
+  course_confirmation_escalation: "Confirmation incomplète",
+  replacement_offer: "Cours à reprendre",
+  replacement_candidate: "Remplaçant proposé",
+  replacement_accepted: "Remplacement confirmé",
+  refund_processed: "Remboursement",
 };
 
 export type NotificationFilter = "all" | "student_unavailable";
@@ -81,6 +87,17 @@ export function getKindBadgeClasses(kind: string): string {
       return "bg-brand-50 text-brand-700";
     case "course_exchange_message":
       return "bg-paper text-ink-700";
+    case "course_confirmation_reminder":
+      return "bg-brand-50 text-brand-700";
+    case "course_confirmation_escalation":
+      return "bg-warning-bg text-warning";
+    case "replacement_offer":
+    case "replacement_candidate":
+      return "bg-orange-100 text-orange-900";
+    case "replacement_accepted":
+      return "bg-success-bg text-success";
+    case "refund_processed":
+      return "bg-paper text-ink-700";
     default:
       return "bg-paper text-ink-600";
   }
@@ -145,11 +162,11 @@ export function getPageSubtitle(profile: MyProfile | undefined): string {
   if (!profile?.role) {
     return "Annulations de séances et informations campus";
   }
-  if (isStudent(profile.role)) {
-    return "Séances annulées par vos professeurs — réservez un autre tuteur si besoin";
+  if (profile?.role && isStudent(profile.role)) {
+    return "Séances annulées, documents déposés, confirmations de cours et remplacements.";
   }
   if (profile.role === "teacher") {
-    return "Paiements, annulations et informations sur votre activité";
+    return "Paiements, annulations, remplacements et confirmations de séance";
   }
   if (profile.role === "admin_general" || profile.role === "admin_campus") {
     return "Supervision des annulations et alertes";
@@ -162,7 +179,7 @@ export function getEmptyStateMessage(profile: MyProfile | undefined): string {
     return "Aucune alerte — paiements et annulations apparaîtront ici.";
   }
   if (profile?.role && isStudent(profile.role)) {
-    return "Aucune alerte pour le moment — vous serez notifié en cas d'annulation de séance.";
+    return "Aucune alerte pour le moment — vous serez notifié en cas d'annulation ou de dépôt de document.";
   }
   if (profile?.role === "admin_general" || profile?.role === "admin_campus") {
     return "Aucune alerte sur votre périmètre pour le moment.";
