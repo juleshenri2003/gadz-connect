@@ -1,9 +1,8 @@
 import { Router } from "express";
-import express from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
-import { markPastCoursesCompleted } from "../lib/course-completion.js";
+import { markPastCoursesCompleted, isCourseFollowUpEligible } from "../lib/course-completion.js";
 import {
   notifyCourseExchangeMessage,
   notifyCourseFollowUpPublished,
@@ -123,13 +122,17 @@ evaluationsRouter.post(
       return;
     }
 
+    await markPastCoursesCompleted();
+
     const access = await userCanAccessCourse(
       req.params.courseId as string,
       profile.id as string,
       profile.role as string,
     );
-    if (!access || access.course.status !== "completed") {
-      res.status(404).json({ error: "Cours introuvable ou non terminé" });
+    if (!access || !isCourseFollowUpEligible(access.course)) {
+      res.status(400).json({
+        error: "Ce cours n'est pas encore éligible aux échanges (séance non terminée)",
+      });
       return;
     }
 
@@ -183,11 +186,12 @@ evaluationsRouter.post(
  */
 evaluationsRouter.post(
   "/courses/:courseId/clarifications",
-  express.json({ limit: "8mb" }),
   async (req: AuthenticatedRequest, res) => {
     const parsed = clarificationSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Validation échouée" });
+      res.status(400).json({
+        error: "Texte ou PDF requis pour déposer une fiche",
+      });
       return;
     }
 
@@ -206,6 +210,13 @@ evaluationsRouter.post(
     );
     if (!access || !access.isTeacher || !access.course.client_id) {
       res.status(404).json({ error: "Cours introuvable" });
+      return;
+    }
+
+    if (!isCourseFollowUpEligible(access.course)) {
+      res.status(400).json({
+        error: "Ce cours n'est pas encore éligible au dépôt de fiche",
+      });
       return;
     }
 
@@ -315,7 +326,6 @@ evaluationsRouter.post(
  */
 evaluationsRouter.post(
   "/courses/:courseId/summary/pdf",
-  express.json({ limit: "8mb" }),
   async (req: AuthenticatedRequest, res) => {
     const parsed = pdfOnlySchema.safeParse(req.body);
     if (!parsed.success) {

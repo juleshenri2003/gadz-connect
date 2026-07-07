@@ -71,8 +71,15 @@ export function CourseEvaluationDetailModal({
   const [clarificationContent, setClarificationContent] = useState("");
   const [clarificationPdf, setClarificationPdf] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const isTeacher = data?.viewerRole === "teacher";
+
+  function showSuccess(message: string) {
+    setSuccess(message);
+    setError(null);
+    window.setTimeout(() => setSuccess(null), 4000);
+  }
 
   async function handleOpenPdf(kind: "summary" | "clarification", id: string) {
     const token = getAccessToken();
@@ -89,6 +96,8 @@ export function CourseEvaluationDetailModal({
         body: messageBody.trim(),
       });
       setMessageBody("");
+      await refetch();
+      showSuccess("Message envoyé.");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -106,6 +115,7 @@ export function CourseEvaluationDetailModal({
       setSummaryTitle("");
       setSummaryContent("");
       await refetch();
+      showSuccess("Compte-rendu publié — visible dans le répertoire de l'élève.");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -118,14 +128,21 @@ export function CourseEvaluationDetailModal({
       const pdfBase64 = await fileToPdfBase64(file);
       await uploadSummaryPdf.mutateAsync({ courseId, pdfBase64 });
       await refetch();
+      showSuccess("PDF joint au compte-rendu.");
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
   async function handleSubmitClarification() {
-    if (!courseId || !clarificationTitle.trim()) return;
-    if (!clarificationContent.trim() && !clarificationPdf) return;
+    if (!courseId || !clarificationTitle.trim()) {
+      setError("Indiquez un titre pour la fiche.");
+      return;
+    }
+    if (!clarificationContent.trim() && !clarificationPdf) {
+      setError("Ajoutez un texte ou sélectionnez un PDF.");
+      return;
+    }
     setError(null);
     try {
       let pdfBase64: string | undefined;
@@ -142,6 +159,7 @@ export function CourseEvaluationDetailModal({
       setClarificationContent("");
       setClarificationPdf(null);
       await refetch();
+      showSuccess("Fiche déposée — visible dans le suivi et le répertoire de l'élève.");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -402,6 +420,11 @@ export function CourseEvaluationDetailModal({
             </div>
           </section>
 
+          {success ? (
+            <p className="rounded-md border border-success/20 bg-success-bg px-3 py-2 text-sm text-success">
+              {success}
+            </p>
+          ) : null}
           {error ? <p className="text-sm text-danger">{error}</p> : null}
         </div>
       )}

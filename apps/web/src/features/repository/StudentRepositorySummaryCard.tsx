@@ -13,11 +13,13 @@ import {
 interface StudentRepositorySummaryCardProps {
   summary: CourseSummary;
   highlighted?: boolean;
+  onOpenPdf?: (id: string) => void;
 }
 
 export function StudentRepositorySummaryCard({
   summary,
   highlighted = false,
+  onOpenPdf,
 }: StudentRepositorySummaryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const provider = formatProviderName(summary.provider);
@@ -63,6 +65,18 @@ export function StudentRepositorySummaryCard({
           onClick={() => setExpanded(true)}
         >
           Lire la suite
+        </Button>
+      ) : null}
+
+      {summary.has_pdf && onOpenPdf ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-4"
+          onClick={() => onOpenPdf(summary.id)}
+        >
+          Ouvrir le PDF
         </Button>
       ) : null}
 

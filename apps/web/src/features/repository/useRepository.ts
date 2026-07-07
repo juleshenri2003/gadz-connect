@@ -18,6 +18,18 @@ export interface CourseSummary {
   published_at: string;
   course_id: string;
   folder_id?: string;
+  has_pdf?: boolean;
+  provider?: { first_name: string; last_name: string } | null;
+  course?: { scheduled_at: string | null } | null;
+}
+
+export interface CourseClarification {
+  id: string;
+  title: string;
+  content: string | null;
+  created_at: string;
+  course_id: string;
+  has_pdf: boolean;
   provider?: { first_name: string; last_name: string } | null;
   course?: { scheduled_at: string | null } | null;
 }
@@ -66,6 +78,7 @@ export function useFolderSummaries(folderId: string | null) {
         data: {
           folder: { id: string; subject: string };
           summaries: CourseSummary[];
+          clarifications: CourseClarification[];
         };
       }>(`/api/repository/folders/${folderId}/summaries`, { token });
       return res.data;

@@ -173,27 +173,61 @@ repositoryRouter.get(
       return;
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("course_summaries")
-      .select(
-        `
-        id, title, content, published_at, course_id,
+    const [summariesResult, clarificationsResult] = await Promise.all([
+      supabaseAdmin
+        .from("course_summaries")
+        .select(
+          `
+        id, title, content, published_at, course_id, pdf_path,
         provider:provider_id ( first_name, last_name ),
         course:course_id ( scheduled_at )
       `,
-      )
-      .eq("folder_id", folder.id)
-      .order("published_at", { ascending: false });
+        )
+        .eq("folder_id", folder.id)
+        .order("published_at", { ascending: false }),
+      supabaseAdmin
+        .from("course_clarifications")
+        .select(
+          `
+        id, title, content, pdf_path, created_at, course_id,
+        provider:provider_id ( first_name, last_name ),
+        course:course_id ( scheduled_at )
+      `,
+        )
+        .eq("folder_id", folder.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (error) {
-      res.status(500).json({ error: error.message });
+    if (summariesResult.error) {
+      res.status(500).json({ error: summariesResult.error.message });
       return;
     }
+    if (clarificationsResult.error) {
+      res.status(500).json({ error: clarificationsResult.error.message });
+      return;
+    }
+
+    const summaries = (summariesResult.data ?? []).map(({ pdf_path, ...row }) => ({
+      ...row,
+      has_pdf: Boolean(pdf_path),
+    }));
+
+    const clarifications = (clarificationsResult.data ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      created_at: row.created_at,
+      course_id: row.course_id,
+      has_pdf: Boolean(row.pdf_path),
+      provider: row.provider,
+      course: row.course,
+    }));
 
     res.json({
       data: {
         folder,
-        summaries: data ?? [],
+        summaries,
+        clarifications,
       },
     });
   },

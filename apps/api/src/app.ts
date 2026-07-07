@@ -40,7 +40,10 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "1mb" }));
+app.use((req, res, next) => {
+  const limit = req.path.startsWith("/api/evaluations") ? "8mb" : "1mb";
+  express.json({ limit })(req, res, next);
+});
 
 app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);

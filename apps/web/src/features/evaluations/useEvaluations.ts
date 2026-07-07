@@ -80,6 +80,9 @@ export function usePostCourseMessage() {
         queryKey: ["course-evaluation-detail", vars.courseId],
       });
       void queryClient.invalidateQueries({ queryKey: ["course-evaluations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["repository-folder-summaries"],
+      });
     },
   });
 }
@@ -112,6 +115,9 @@ export function usePostClarification() {
         queryKey: ["course-evaluation-detail", vars.courseId],
       });
       void queryClient.invalidateQueries({ queryKey: ["course-evaluations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["repository-folder-summaries"],
+      });
       void queryClient.invalidateQueries({ queryKey: ["repository-folders"] });
     },
   });
@@ -142,6 +148,9 @@ export function useUploadSummaryPdf() {
         queryKey: ["course-evaluation-detail", vars.courseId],
       });
       void queryClient.invalidateQueries({ queryKey: ["course-evaluations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["repository-folder-summaries"],
+      });
     },
   });
 }
