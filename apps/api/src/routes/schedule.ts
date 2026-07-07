@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import { markPastCoursesCompleted } from "../lib/course-completion.js";
+import { loadRatingsByCourseIds } from "../lib/course-ratings-query.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const scheduleRouter = Router();
@@ -24,6 +26,8 @@ export interface ScheduleEventPayload {
   status?: string;
   counterpartName?: string;
   providerId?: string;
+  rating?: { stars: number; createdAt: string };
+  canRate?: boolean;
 }
 
 function slotEnd(startsAt: string, endsAt: string): string {
@@ -78,6 +82,47 @@ function profileName(
   };
 }
 
+function courseCanBeRated(
+  status: string | undefined,
+  endsAt: string,
+  hasRating: boolean,
+): boolean {
+  if (hasRating || status !== "completed") return false;
+  return new Date(endsAt).getTime() < Date.now();
+}
+
+function attachRatingsToEvents(
+  events: ScheduleEventPayload[],
+  ratingsByCourseId: Map<
+    string,
+    { stars: number; created_at: string; rater_id: string }
+  >,
+  options: { studentId?: string },
+): void {
+  for (const event of events) {
+    if (!event.courseId) continue;
+    const rating = ratingsByCourseId.get(event.courseId);
+    if (rating) {
+      const visibleToStudent =
+        !options.studentId || rating.rater_id === options.studentId;
+      if (visibleToStudent) {
+        event.rating = {
+          stars: Number(rating.stars),
+          createdAt: rating.created_at,
+        };
+      }
+    }
+    if (options.studentId) {
+      const studentHasRated = rating?.rater_id === options.studentId;
+      event.canRate = courseCanBeRated(
+        event.status,
+        event.endsAt,
+        Boolean(studentHasRated),
+      );
+    }
+  }
+}
+
 function pickOne<T>(value: unknown): T | null {
   if (!value) return null;
   return (Array.isArray(value) ? value[0] : value) as T;
@@ -93,6 +138,8 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   const from = parseIsoDate(req.query.from);
   const to = parseIsoDate(req.query.to);
   const includeCancelled = req.query.includeCancelled === "true";
+
+  await markPastCoursesCompleted();
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from("profiles")
@@ -308,6 +355,12 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         event.folderId = summaryMeta.folder_id;
       }
     }
+
+    const teacherCourseIds = events
+      .filter((e) => e.courseId)
+      .map((e) => e.courseId as string);
+    const ratingsByCourseId = await loadRatingsByCourseIds(teacherCourseIds);
+    attachRatingsToEvents(events, ratingsByCourseId, {});
   } else {
     let coursesQuery = supabaseAdmin
       .from("courses")
@@ -364,6 +417,12 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
       });
     }
+
+    const studentCourseIds = events
+      .filter((e) => e.courseId)
+      .map((e) => e.courseId as string);
+    const ratingsByCourseId = await loadRatingsByCourseIds(studentCourseIds);
+    attachRatingsToEvents(events, ratingsByCourseId, { studentId: userId });
   }
 
   events.sort(

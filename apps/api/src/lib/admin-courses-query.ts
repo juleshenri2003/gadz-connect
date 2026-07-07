@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "./supabase.js";
 import { resolveAdminScheduleCampusId } from "./admin-schedule.js";
+import { loadRatingByCourseId } from "./course-ratings-query.js";
+import { mapRatingForAdmin, type CourseRatingRow } from "./course-ratings.js";
+import type { CourseRatingAdminView } from "@gadz-connect/types";
 
 const DEFAULT_SESSION_MS = 60 * 60 * 1000;
 
@@ -66,6 +69,7 @@ export interface AdminCourseDetail extends AdminCourseListRow {
   description: string | null;
   summary_id: string | null;
   transaction_id: string | null;
+  rating: CourseRatingAdminView | null;
 }
 
 const COURSE_LIST_SELECT = `
@@ -470,10 +474,12 @@ export async function fetchAdminCourseDetail(
     return null;
   }
 
-  const [summaryMeta, cancellationMeta, transactionMeta] = await Promise.all([
+  const [summaryMeta, cancellationMeta, transactionMeta, ratingRow] =
+    await Promise.all([
     loadSummaryMetaByCourseId([courseId]),
     loadCancellationNotificationByCourseId([courseId]),
     loadTransactionStatusByCourseId([courseId]),
+    loadRatingByCourseId(courseId),
   ]);
 
   const row = enrichCourseRow(
@@ -489,11 +495,25 @@ export async function fetchAdminCourseDetail(
     .eq("course_id", courseId)
     .maybeSingle();
 
+  let rating: CourseRatingAdminView | null = null;
+  if (ratingRow) {
+    const { data: rater } = await supabaseAdmin
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", ratingRow.rater_id)
+      .maybeSingle();
+    const raterName = rater
+      ? `${rater.first_name} ${rater.last_name}`.trim()
+      : "Élève";
+    rating = mapRatingForAdmin(ratingRow as CourseRatingRow, raterName || "Élève");
+  }
+
   return {
     ...row,
     description: course.description,
     summary_id: summary?.id ?? null,
     transaction_id: (transactions.data?.id as string | undefined) ?? null,
+    rating,
   };
 }
 

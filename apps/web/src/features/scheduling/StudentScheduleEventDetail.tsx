@@ -2,6 +2,10 @@ import { Button } from "@gadz-connect/ui";
 import { Link } from "react-router-dom";
 import { Modal } from "@/components/Modal";
 import {
+  CourseRatingForm,
+  CourseRatingSummary,
+} from "@/features/ratings/CourseRatingForm";
+import {
   formatEventTime,
   isEventPast,
 } from "@/features/scheduling/calendar-utils";
@@ -77,6 +81,28 @@ export function StudentScheduleEventDetail({
             courseStatus={event.status ?? "scheduled"}
             audience="student"
           />
+        ) : null}
+        {event.rating ? (
+          <CourseRatingSummary
+            stars={event.rating.stars}
+            createdAt={event.rating.createdAt}
+          />
+        ) : event.canRate && event.courseId ? (
+          <CourseRatingForm
+            courseId={event.courseId}
+            courseTitle={event.title}
+          />
+        ) : past && event.courseId ? (
+          <p className="text-sm text-ink-600">
+            <Link
+              to="/app/suivi-cours"
+              className="font-medium text-brand-700 underline"
+            >
+              Voir le suivi complet du cours
+            </Link>
+            {" "}
+            (compte-rendu, fiches, échanges).
+          </p>
         ) : null}
       </div>
     </Modal>

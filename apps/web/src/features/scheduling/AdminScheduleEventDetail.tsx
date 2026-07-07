@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button, cn } from "@gadz-connect/ui";
 import { Modal } from "@/components/Modal";
+import { StarRatingDisplay } from "@/features/ratings/StarRating";
 import {
   courseStatusLabel,
   eventKindLabel,
@@ -130,6 +131,33 @@ export function AdminScheduleEventDetail({
               Campus
             </dt>
             <dd className="mt-0.5 text-ink-900">{event.campusName}</dd>
+          </div>
+        ) : null}
+        {event.rating ? (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-400">
+              Avis élève
+            </dt>
+            <dd className="mt-1 space-y-2">
+              <StarRatingDisplay value={event.rating.stars} />
+              {event.rating.raterName ? (
+                <p className="text-xs text-ink-500">{event.rating.raterName}</p>
+              ) : null}
+              {event.rating.comment?.trim() ? (
+                <p className="rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink-700">
+                  {event.rating.comment.trim()}
+                </p>
+              ) : (
+                <p className="text-xs text-ink-400">Aucun commentaire</p>
+              )}
+            </dd>
+          </div>
+        ) : past && event.status !== "cancelled" ? (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-400">
+              Avis élève
+            </dt>
+            <dd className="mt-0.5 text-sm text-ink-500">Pas encore noté</dd>
           </div>
         ) : null}
         <div>

@@ -51,6 +51,15 @@ export function courseRowToScheduleEvent(
     status: course.status,
     providerName: course.provider_name ?? undefined,
     clientName: course.client_name ?? undefined,
+    rating:
+      "rating" in course && course.rating
+        ? {
+            stars: course.rating.stars,
+            createdAt: course.rating.createdAt,
+            comment: course.rating.comment,
+            raterName: course.rating.raterName,
+          }
+        : undefined,
   };
 }
 

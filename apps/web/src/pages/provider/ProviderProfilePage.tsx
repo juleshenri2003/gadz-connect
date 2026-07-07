@@ -20,6 +20,7 @@ import {
 import { StudentProfileAccountCard } from "@/features/profile/StudentProfileAccountCard";
 import { StudentProfileHeader } from "@/features/profile/StudentProfileHeader";
 import { StudentProfileJourneyCard } from "@/features/profile/StudentProfileJourneyCard";
+import { ProfileEvaluationsCard } from "@/features/evaluations/CourseEvaluationsList";
 import { TeacherProfilePhotoSection } from "@/features/profile/TeacherProfilePhotoSection";
 import { TeacherProfileCvSection } from "@/features/profile/TeacherProfileCvSection";
 import { TeacherProfileStudentPreview } from "@/features/profile/TeacherProfileStudentPreview";
@@ -87,6 +88,8 @@ function StudentProfileView({
       <StudentProfileAccountCard profile={profile} email={email} />
 
       {progress ? <StudentProfileJourneyCard progress={progress} /> : null}
+
+      <ProfileEvaluationsCard role="student" />
 
       <WrongProfileLink className="text-center text-ink-400" useModal />
     </div>
@@ -165,6 +168,8 @@ export function ProviderProfilePage() {
       />
 
       <TeacherProfileAccountCard profile={profile} email={user?.email} />
+
+      <ProfileEvaluationsCard role="teacher" />
 
       <TeacherPublicProfileForm profile={profile} variant="standalone" />
 

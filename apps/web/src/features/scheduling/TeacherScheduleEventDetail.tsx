@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@gadz-connect/ui";
 import { useState } from "react";
 import { Modal } from "@/components/Modal";
+import { StarRatingDisplay } from "@/features/ratings/StarRating";
 import { formatEuro } from "@/features/admin/format";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
@@ -123,6 +124,16 @@ export function TeacherScheduleEventDetail({
             <dd className="mt-0.5 text-ink-900">~{formatEuro(estimatedNet)}</dd>
           </div>
         ) : null}
+        {event.rating ? (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-400">
+              Avis élève
+            </dt>
+            <dd className="mt-1">
+              <StarRatingDisplay value={event.rating.stars} />
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -138,7 +149,7 @@ export function TeacherScheduleEventDetail({
         {event.courseId ? (
           <>
             <Button size="sm" variant="outline" asChild>
-              <Link to="/app/repertoire">Mon répertoire</Link>
+              <Link to="/app/suivi-cours">Suivi & évaluations</Link>
             </Button>
             {!event.hasSummary ? (
               <Button size="sm" variant="outline" asChild>

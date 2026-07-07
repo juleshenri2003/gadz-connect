@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { markPastCoursesCompleted } from "../lib/course-completion.js";
+import { notifyCourseFollowUpPublished } from "../lib/course-follow-up-notify.js";
 
 export const repositoryRouter = Router();
 
@@ -16,7 +18,7 @@ const summarySchema = z.object({
 async function getProfile(userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("id, role, campus_id")
+    .select("id, role, campus_id, first_name, last_name")
     .eq("id", userId)
     .maybeSingle();
   return data;
@@ -47,15 +49,6 @@ async function ensureStudentFolder(
   }
 
   return created.id as string;
-}
-
-export async function markPastCoursesCompleted(): Promise<void> {
-  const now = new Date().toISOString();
-  await supabaseAdmin
-    .from("courses")
-    .update({ status: "completed" })
-    .eq("status", "scheduled")
-    .lt("scheduled_at", now);
 }
 
 function courseIsDocumentable(
@@ -387,13 +380,34 @@ repositoryRouter.post(
         title: parsed.data.title,
         content: parsed.data.content,
       })
-      .select("id, title, content, published_at, course_id, folder_id")
+      .select("id, title, content, published_at, course_id, folder_id, pdf_path")
       .single();
 
     if (insertError) {
       res.status(500).json({ error: insertError.message });
       return;
     }
+
+    const providerName =
+      `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() ||
+      "Professeur";
+    const { data: studentProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", course.client_id)
+      .maybeSingle();
+    const studentName = studentProfile
+      ? `${studentProfile.first_name} ${studentProfile.last_name}`.trim()
+      : "Élève";
+
+    await notifyCourseFollowUpPublished({
+      course,
+      declaredBy: profile.id as string,
+      providerName,
+      studentName,
+      subject,
+      materialLabel: parsed.data.title,
+    });
 
     res.status(201).json({ data: created });
   },

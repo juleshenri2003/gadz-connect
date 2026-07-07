@@ -34,6 +34,7 @@ import {
 import { profileLinksSchema } from "../lib/profile-links.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
+import { mapRatingForProvider, type CourseRatingRow } from "../lib/course-ratings.js";
 
 function mapTutorPublic<
   T extends { cv_pdf_path?: string | null; avatar_path?: string | null },
@@ -535,6 +536,89 @@ tutorsRouter.get("/me/financial", async (req: AuthenticatedRequest, res) => {
   );
 
   res.json({ data: summary });
+});
+
+/**
+ * GET /api/tutors/me/ratings
+ * Avis reçus (notes uniquement — pas de commentaire).
+ */
+tutorsRouter.get("/me/ratings", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.id;
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    res.status(404).json({ error: "Profil introuvable" });
+    return;
+  }
+
+  if (profile.role !== "teacher") {
+    res.status(403).json({ error: "Réservé aux enseignants" });
+    return;
+  }
+
+  const { data: rows, error } = await supabaseAdmin
+    .from("course_ratings")
+    .select(
+      `
+      id,
+      course_id,
+      campus_id,
+      rater_id,
+      provider_id,
+      stars,
+      comment,
+      created_at,
+      course:course_id ( subject, title, scheduled_at ),
+      rater:rater_id ( first_name, last_name )
+    `,
+    )
+    .eq("provider_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  const items = (rows ?? []).map((row) => {
+    const course = Array.isArray(row.course) ? row.course[0] : row.course;
+    const rater = Array.isArray(row.rater) ? row.rater[0] : row.rater;
+    const subject =
+      (course?.subject as string | null) ||
+      (course?.title as string | null) ||
+      "Cours";
+    const raterName = rater
+      ? `${rater.first_name} ${rater.last_name}`.trim()
+      : "Élève";
+
+    return mapRatingForProvider(row as CourseRatingRow, {
+        subject,
+        scheduledAt: (course?.scheduled_at as string | null) ?? null,
+        raterName: raterName || "Élève",
+      },
+    );
+  });
+
+  const average =
+    items.length > 0
+      ? Math.round(
+          (items.reduce((sum, item) => sum + item.stars, 0) / items.length) *
+            10,
+        ) / 10
+      : null;
+
+  res.json({
+    data: {
+      average,
+      count: items.length,
+      items,
+    },
+  });
 });
 
 const transactionsLimitSchema = z.object({

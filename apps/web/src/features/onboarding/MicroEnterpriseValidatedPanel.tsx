@@ -4,6 +4,7 @@ import type { MyProfile } from "@/features/auth/useMyProfile";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
 import { formatSiretDisplay } from "@/features/onboarding/microEnterprisePageUtils";
 import { MicroEnterpriseAddressForm } from "@/features/onboarding/MicroEnterpriseAddressForm";
+import { AcreStatusCard } from "@/features/fiscal/AcreStatusCard";
 import { useStripeConnectStatus } from "@/features/stripe/useStripeConnect";
 
 interface MicroEnterpriseValidatedPanelProps {
@@ -48,6 +49,8 @@ export function MicroEnterpriseValidatedPanel({
       <MicroEnterpriseAddressForm
         existingAddress={profile.micro_enterprise_address}
       />
+
+      <AcreStatusCard profile={profile} />
 
       {nextTask ? (
         <div

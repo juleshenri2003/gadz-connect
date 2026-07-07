@@ -297,6 +297,29 @@ export interface TeacherTransactionItem {
   course: TeacherTransactionCourse;
 }
 
+export const COURSE_RATING_MIN = 1;
+export const COURSE_RATING_MAX = 5;
+export const COURSE_RATING_LOW_THRESHOLD = 2.5;
+
+export interface CourseRatingStudentView {
+  stars: number;
+  createdAt: string;
+}
+
+export interface CourseRatingAdminView extends CourseRatingStudentView {
+  comment: string | null;
+  raterName: string;
+}
+
+export interface CourseRatingProviderView {
+  stars: number;
+  createdAt: string;
+  courseId: string;
+  subject: string;
+  scheduledAt: string | null;
+  raterName: string;
+}
+
 export type InvoiceType = "parent" | "student";
 
 export interface PaymentInvoice {

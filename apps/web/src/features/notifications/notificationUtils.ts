@@ -9,6 +9,10 @@ export const KIND_LABELS: Record<string, string> = {
   account_activated: "Compte activé",
   payment_received: "Paiement reçu",
   stripe_connect_email: "Configuration Stripe",
+  course_rated: "Avis élève",
+  course_rated_low: "Note à améliorer",
+  course_follow_up: "Document de cours",
+  course_exchange_message: "Message cours",
 };
 
 export type NotificationFilter = "all" | "student_unavailable";
@@ -69,6 +73,14 @@ export function getKindBadgeClasses(kind: string): string {
       return "bg-brand-50 text-brand-700";
     case "stripe_connect_email":
       return "bg-brand-50 text-brand-700";
+    case "course_rated":
+      return "bg-brand-50 text-brand-700";
+    case "course_rated_low":
+      return "bg-warning-bg text-warning";
+    case "course_follow_up":
+      return "bg-brand-50 text-brand-700";
+    case "course_exchange_message":
+      return "bg-paper text-ink-700";
     default:
       return "bg-paper text-ink-600";
   }

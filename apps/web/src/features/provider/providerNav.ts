@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   Calendar,
+  ClipboardList,
   CreditCard,
   FileText,
   FolderOpen,
@@ -23,6 +24,12 @@ export function buildStudentNav(progressLabel?: string): AppNavItem[] {
     },
     { to: "/app/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
     { to: "/app/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
+    {
+      to: "/app/suivi-cours",
+      label: "Suivi des cours",
+      shortLabel: "Suivi",
+      icon: ClipboardList,
+    },
     { to: "/app/repertoire", label: "Mon répertoire", shortLabel: "Répertoire", icon: FolderOpen },
     { to: "/app/cours", label: "Trouver mon tuteur", shortLabel: "Tuteurs", icon: BookOpen },
     { to: "/app/factures", label: "Mes factures", shortLabel: "Factures", icon: FileText },
@@ -43,6 +50,12 @@ export function buildTutorNav(progressLabel?: string): AppNavItem[] {
     { to: "/app/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
     { to: "/app/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
     { to: "/app/cours", label: "Mes cours", shortLabel: "Cours", icon: BookOpen },
+    {
+      to: "/app/suivi-cours",
+      label: "Suivi des cours",
+      shortLabel: "Suivi",
+      icon: ClipboardList,
+    },
     {
       to: "/app/micro-entreprise",
       label: "Micro-entreprise",

@@ -18,6 +18,7 @@ import { repositoryRouter } from "./routes/repository.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { studentsRouter } from "./routes/students.js";
 import { tutorsRouter } from "./routes/tutors.js";
+import { evaluationsRouter } from "./routes/evaluations.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:5173";
@@ -57,6 +58,7 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/repository", repositoryRouter);
 app.use("/api/tutors", tutorsRouter);
 app.use("/api/students", studentsRouter);
+app.use("/api/evaluations", evaluationsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/stripe", stripeRouter);
 

@@ -1,5 +1,6 @@
 import type {
   AccountStatus,
+  CourseRatingAdminView,
   TransactionStripeStatus,
   TransactionUrssafStatus,
   UserRole,
@@ -107,6 +108,7 @@ export interface AdminCourseDetail extends AdminCourseRow {
   description: string | null;
   summary_id: string | null;
   transaction_id: string | null;
+  rating: CourseRatingAdminView | null;
 }
 
 export interface AdminCoursesMeta {

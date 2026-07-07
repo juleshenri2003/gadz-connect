@@ -30,6 +30,7 @@ import {
   StudentRepositoryPage,
 } from "@/pages/provider/StudentRepositoryPage";
 import { TutorOnlyRoute } from "@/pages/provider/TutorOnlyRoute";
+import { CourseEvaluationsPage } from "@/pages/provider/CourseEvaluationsPage";
 import {
   PublicMarketplacePage,
 } from "@/pages/public/PublicMarketplacePage";
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="cours/:id" element={<TutorDetailPage />} />
         <Route path="repertoire" element={<StudentRepositoryPage />} />
         <Route path="repertoire/:folderId" element={<StudentRepositoryFolderPage />} />
+        <Route path="suivi-cours" element={<CourseEvaluationsPage />} />
         <Route
           path="micro-entreprise"
           element={

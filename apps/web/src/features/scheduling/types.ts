@@ -20,6 +20,13 @@ export interface ScheduleEvent {
   campusId?: string;
   campusName?: string;
   cancellationNotificationId?: string;
+  rating?: {
+    stars: number;
+    createdAt: string;
+    comment?: string | null;
+    raterName?: string;
+  };
+  canRate?: boolean;
 }
 
 export interface ScheduleQueryOptions {

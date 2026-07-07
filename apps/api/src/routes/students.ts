@@ -2,6 +2,10 @@ import { Router } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createInvoiceSignedUrl } from "../lib/billing/invoice-storage.js";
+import { markPastCoursesCompleted } from "../lib/course-completion.js";
+import { notifyCourseRated } from "../lib/course-rating-notify.js";
+import { courseRatingCreateSchema } from "../lib/course-ratings.js";
+import { loadRatingByCourseId } from "../lib/course-ratings-query.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const studentsRouter = Router();
@@ -186,5 +190,132 @@ studentsRouter.get(
         err instanceof Error ? err.message : "Impossible de générer le lien";
       res.status(500).json({ error: message });
     }
+  },
+);
+
+/**
+ * POST /api/students/courses/:courseId/rating
+ * L'élève note un cours terminé (demi-étoiles + commentaire réservé à l'admin).
+ */
+studentsRouter.post(
+  "/courses/:courseId/rating",
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.user!.id;
+    const courseId = req.params.courseId as string;
+
+    const parsed = courseRatingCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+      return;
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id, role, first_name, last_name")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile || profile.role !== "student_provider") {
+      res.status(403).json({ error: "Réservé aux comptes élève" });
+      return;
+    }
+
+    await markPastCoursesCompleted();
+
+    const existing = await loadRatingByCourseId(courseId);
+    if (existing) {
+      res.status(409).json({ error: "Ce cours a déjà été noté" });
+      return;
+    }
+
+    const { data: course, error: courseError } = await supabaseAdmin
+      .from("courses")
+      .select(
+        `
+        id,
+        status,
+        scheduled_at,
+        campus_id,
+        client_id,
+        provider_id,
+        subject,
+        title,
+        provider:provider_id ( first_name, last_name )
+      `,
+      )
+      .eq("id", courseId)
+      .maybeSingle();
+
+    if (courseError || !course) {
+      res.status(404).json({ error: "Cours introuvable" });
+      return;
+    }
+
+    if (course.client_id !== userId) {
+      res.status(403).json({ error: "Vous ne pouvez noter que vos propres cours" });
+      return;
+    }
+
+    if (course.status !== "completed") {
+      res.status(400).json({ error: "Seuls les cours terminés peuvent être notés" });
+      return;
+    }
+
+    if (
+      course.scheduled_at &&
+      new Date(course.scheduled_at).getTime() > Date.now()
+    ) {
+      res.status(400).json({ error: "Ce cours n'est pas encore terminé" });
+      return;
+    }
+
+    const comment = parsed.data.comment?.trim() || null;
+
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from("course_ratings")
+      .insert({
+        course_id: courseId,
+        campus_id: course.campus_id,
+        rater_id: userId,
+        provider_id: course.provider_id,
+        stars: parsed.data.stars,
+        comment,
+      })
+      .select(
+        "id, course_id, campus_id, rater_id, provider_id, stars, comment, created_at",
+      )
+      .single();
+
+    if (insertError || !inserted) {
+      if (insertError?.code === "23505") {
+        res.status(409).json({ error: "Ce cours a déjà été noté" });
+        return;
+      }
+      res.status(500).json({ error: insertError?.message ?? "Erreur serveur" });
+      return;
+    }
+
+    const provider = Array.isArray(course.provider)
+      ? course.provider[0]
+      : course.provider;
+    const providerName = provider
+      ? `${provider.first_name} ${provider.last_name}`.trim()
+      : "Professeur";
+    const raterName =
+      `${profile.first_name} ${profile.last_name}`.trim() || "Élève";
+
+    await notifyCourseRated({
+      course,
+      rating: inserted,
+      raterName,
+      providerName,
+    });
+
+    res.status(201).json({
+      data: {
+        stars: Number(inserted.stars),
+        createdAt: inserted.created_at as string,
+      },
+    });
   },
 );

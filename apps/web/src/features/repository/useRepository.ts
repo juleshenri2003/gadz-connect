@@ -145,6 +145,7 @@ export function useSubmitCourseSummary() {
       void queryClient.invalidateQueries({
         queryKey: ["repository-recent-summaries"],
       });
+      void queryClient.invalidateQueries({ queryKey: ["course-evaluations"] });
     },
   });
 }
