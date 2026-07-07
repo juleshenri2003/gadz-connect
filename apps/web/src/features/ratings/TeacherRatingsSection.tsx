@@ -3,7 +3,13 @@ import { StarRatingDisplay } from "@/features/ratings/StarRating";
 import { useTeacherRatings } from "@/features/ratings/useCourseRating";
 import { formatNotificationDate } from "@/features/notifications/notificationUtils";
 
-export function TeacherRatingsSection() {
+interface TeacherRatingsSectionProps {
+  onOpenCourse?: (courseId: string) => void;
+}
+
+export function TeacherRatingsSection({
+  onOpenCourse,
+}: TeacherRatingsSectionProps) {
   const { data, isLoading, isError } = useTeacherRatings();
 
   if (isLoading) {
@@ -22,7 +28,7 @@ export function TeacherRatingsSection() {
   if (!data || data.count === 0) {
     return (
       <section className="rounded-md border border-line bg-white p-6">
-        <h3 className="text-lg font-semibold text-ink-900">Avis élèves</h3>
+        <h3 className="text-lg font-semibold text-ink-900">Notes & avis élèves</h3>
         <p className="mt-2 text-sm text-ink-600">
           Aucun avis pour le moment. Les notes apparaîtront ici après vos
           cours terminés.
@@ -35,10 +41,11 @@ export function TeacherRatingsSection() {
     <section className="rounded-md border border-line bg-white p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-ink-900">Avis élèves</h3>
+          <h3 className="text-lg font-semibold text-ink-900">Notes & avis élèves</h3>
           <p className="mt-1 text-sm text-ink-600">
             Notes visibles — les commentaires restent réservés à
-            l&apos;administration.
+            l&apos;administration. Cliquez sur un cours pour échanger avec
+            l&apos;élève.
           </p>
         </div>
         {data.average != null ? (
@@ -55,9 +62,9 @@ export function TeacherRatingsSection() {
       </div>
 
       <ul className="mt-4 divide-y divide-line">
-        {data.items.map((item) => (
-          <li key={item.courseId} className="py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+        {data.items.map((item) => {
+          const row = (
+            <>
               <div>
                 <p className="font-medium text-ink-900">{item.subject}</p>
                 <p className="text-xs text-ink-500">
@@ -75,9 +82,27 @@ export function TeacherRatingsSection() {
                   </span>
                 ) : null}
               </div>
-            </div>
-          </li>
-        ))}
+            </>
+          );
+
+          return (
+            <li key={item.courseId} className="py-3 first:pt-0 last:pb-0">
+              {onOpenCourse ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenCourse(item.courseId)}
+                  className="flex w-full flex-wrap items-start justify-between gap-2 rounded-md text-left transition hover:bg-brand-50/40"
+                >
+                  {row}
+                </button>
+              ) : (
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  {row}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

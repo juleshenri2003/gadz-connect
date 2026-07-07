@@ -10,20 +10,58 @@ export function CourseEvaluationsPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const student = profile ? isStudent(profile.role) : false;
 
+  if (student) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h2 className="text-2xl font-bold text-ink-900">Suivi des cours</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            Retrouvez vos notes, les comptes-rendus de vos professeurs, leurs
+            fiches PDF et vos échanges.
+          </p>
+        </header>
+
+        <CourseEvaluationsList onOpenCourse={setSelectedCourseId} />
+
+        <CourseEvaluationDetailModal
+          courseId={selectedCourseId}
+          open={Boolean(selectedCourseId)}
+          onClose={() => setSelectedCourseId(null)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header>
         <h2 className="text-2xl font-bold text-ink-900">Suivi des cours</h2>
         <p className="mt-1 text-sm text-ink-600">
-          {student
-            ? "Retrouvez vos notes, les comptes-rendus de vos professeurs, leurs fiches PDF et vos échanges."
-            : "Consultez les notes reçues, déposez vos synthèses et répondez aux questions de vos élèves."}
+          Notes reçues, comptes-rendus et échanges avec vos élèves — deux
+          espaces complémentaires.
         </p>
       </header>
 
-      {!student ? <TeacherRatingsSection /> : null}
+      <section className="space-y-4">
+        <TeacherRatingsSection onOpenCourse={setSelectedCourseId} />
+      </section>
 
-      <CourseEvaluationsList onOpenCourse={setSelectedCourseId} />
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-ink-900">
+            Comptes-rendus & fiches synthèse
+          </h3>
+          <p className="mt-1 text-sm text-ink-600">
+            Déposez un récapitulatif de séance ou une fiche sur un point
+            précis si l&apos;élève en a besoin. Les documents sont classés
+            dans son répertoire matière.
+          </p>
+        </div>
+        <CourseEvaluationsList
+          variant="teacher-materials"
+          onOpenCourse={setSelectedCourseId}
+        />
+      </section>
 
       <CourseEvaluationDetailModal
         courseId={selectedCourseId}

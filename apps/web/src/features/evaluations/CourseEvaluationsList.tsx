@@ -8,9 +8,11 @@ import type { CourseEvaluationListItem } from "./types";
 function EvaluationRow({
   item,
   onOpen,
+  showRating = true,
 }: {
   item: CourseEvaluationListItem;
   onOpen: (courseId: string) => void;
+  showRating?: boolean;
 }) {
   return (
     <button
@@ -28,13 +30,23 @@ function EvaluationRow({
               : null}
           </p>
         </div>
-        {item.rating ? (
-          <StarRatingDisplay value={item.rating.stars} size="sm" />
-        ) : item.canRate ? (
+        {showRating ? (
+          item.rating ? (
+            <StarRatingDisplay value={item.rating.stars} size="sm" />
+          ) : item.canRate ? (
+            <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+              À noter
+            </span>
+          ) : null
+        ) : !item.hasSummary ? (
           <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
-            À noter
+            CR manquant
           </span>
-        ) : null}
+        ) : (
+          <span className="rounded-full bg-success-bg px-2 py-0.5 text-xs font-medium text-success">
+            CR déposé
+          </span>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-ink-500">
         {item.hasSummary ? (
@@ -63,15 +75,26 @@ interface CourseEvaluationsListProps {
   onOpenCourse: (courseId: string) => void;
   limit?: number;
   embedded?: boolean;
+  variant?: "student" | "teacher-materials";
 }
 
 export function CourseEvaluationsList({
   onOpenCourse,
   limit,
   embedded = false,
+  variant = "student",
 }: CourseEvaluationsListProps) {
   const { data, isLoading, isError } = useMyCourseEvaluations();
-  const items = limit ? (data?.slice(0, limit) ?? []) : (data ?? []);
+  let items = data ?? [];
+  if (variant === "teacher-materials") {
+    items = [...items].sort((a, b) => {
+      if (a.hasSummary !== b.hasSummary) return a.hasSummary ? 1 : -1;
+      const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+      const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }
+  if (limit) items = items.slice(0, limit);
 
   if (isLoading) {
     return (
@@ -91,8 +114,9 @@ export function CourseEvaluationsList({
   if (!items.length) {
     return (
       <p className="text-sm text-ink-500">
-        Vos cours terminés apparaîtront ici avec notes, comptes-rendus et
-        échanges.
+        {variant === "teacher-materials"
+          ? "Vos cours terminés apparaîtront ici pour déposer un compte-rendu ou une fiche synthèse."
+          : "Vos cours terminés apparaîtront ici avec notes, comptes-rendus et échanges."}
       </p>
     );
   }
@@ -100,7 +124,12 @@ export function CourseEvaluationsList({
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <EvaluationRow key={item.courseId} item={item} onOpen={onOpenCourse} />
+        <EvaluationRow
+          key={item.courseId}
+          item={item}
+          onOpen={onOpenCourse}
+          showRating={variant === "student"}
+        />
       ))}
     </div>
   );
