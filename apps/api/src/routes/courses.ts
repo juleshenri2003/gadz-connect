@@ -2,12 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
-import {
-  getSiteAdministratorIds,
-  insertCampusNotification,
-  insertNotificationRecipients,
-  notifyUsers,
-} from "../lib/notification-helpers.js";
+import { notifyUsers } from "../lib/notification-helpers.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const coursesRouter = Router();

@@ -1,5 +1,4 @@
 import {
-  getSiteAdministratorIds,
   insertCampusNotification,
   insertNotificationRecipients,
 } from "./notification-helpers.js";
