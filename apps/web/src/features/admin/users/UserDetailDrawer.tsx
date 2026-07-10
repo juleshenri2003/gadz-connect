@@ -16,7 +16,7 @@ import {
   ROLE_LABELS,
   STRIPE_STATUS_LABELS,
 } from "./adminUserLabels";
-import { UserStatusBadge } from "./UserStatusBadge";
+import { AdminStudentLearningProfileSection } from "@/features/evaluations/TutorStudentLearningCard";
 
 interface UserDetailDrawerProps {
   profileId: string | null;
@@ -262,6 +262,17 @@ export function UserDetailDrawer({
                     value={maskStripeAccountId(profile.stripe_connect_account_id)}
                   />
                 </dl>
+              </div>
+            ) : null}
+
+            {profile.role === "student_provider" ? (
+              <div>
+                <h3 className="text-sm font-semibold text-ink-900">
+                  Profil pédagogique
+                </h3>
+                <div className="mt-3">
+                  <AdminStudentLearningProfileSection studentId={profile.id} />
+                </div>
               </div>
             ) : null}
 

@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import type { Archiver } from "archiver";
 import type { Response } from "express";
 import type { AdminBudgetPeriod } from "../admin-budget.js";
@@ -7,11 +6,16 @@ import {
   fetchAdminInvoices,
 } from "./admin-invoices.js";
 
-const require = createRequire(import.meta.url);
-const archiver = require("archiver") as (
+type ArchiverFactory = (
   format: string,
   options?: { zlib?: { level?: number } },
 ) => Archiver;
+
+async function loadArchiver(): Promise<ArchiverFactory> {
+  const mod = await import("archiver");
+  const factory = ("default" in mod ? mod.default : mod) as ArchiverFactory;
+  return factory;
+}
 
 export async function streamAdminInvoicesZip(
   res: Response,
@@ -42,6 +46,7 @@ export async function streamAdminInvoicesZip(
     `attachment; filename="gadz-connect-factures-${label}.zip"`,
   );
 
+  const archiver = await loadArchiver();
   const archive = archiver("zip", { zlib: { level: 9 } });
   archive.on("error", (err: Error) => {
     throw err;

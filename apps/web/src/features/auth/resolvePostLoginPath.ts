@@ -10,6 +10,7 @@ const PROVIDER_ROLES: UserRole[] = ["teacher", "student_provider"];
 interface ProfileMe {
   role: UserRole;
   profile_setup_complete: boolean;
+  student_onboarding_complete?: boolean;
 }
 
 /** Convertit une URL publique en route app connectée. */
@@ -51,6 +52,14 @@ export async function resolvePostLoginPath(
         !profile.profile_setup_complete
       ) {
         return "/app/setup";
+      }
+
+      if (
+        profile.role === "student_provider" &&
+        profile.profile_setup_complete &&
+        profile.student_onboarding_complete === false
+      ) {
+        return "/app/onboarding";
       }
     } catch {
       // ignore

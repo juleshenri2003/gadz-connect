@@ -4,13 +4,21 @@ import {
   resolveStripePaymentStrategy as resolveStripePaymentStrategyImpl,
   type StripePaymentStrategy,
 } from "./stripe-test-connect.js";
+import {
+  isTrialEligible,
+  isTrialSlotDurationValid,
+  slotDurationHours,
+} from "./student-learning-profile.js";
 import { supabaseAdmin } from "./supabase.js";
 import { isTeacherVisibleInMarketplace } from "./tutor-visibility.js";
+
+export type CourseSessionType = "standard" | "trial";
 
 export interface BookingInput {
   slotId: string;
   subject?: string;
   clientUserId: string;
+  sessionType?: CourseSessionType;
 }
 
 export interface BookingFiscal {
@@ -39,6 +47,8 @@ export interface PreparedBooking {
   };
   subject: string;
   fiscal: BookingFiscal;
+  sessionType: CourseSessionType;
+  isTrial: boolean;
 }
 
 export async function prepareBooking(
@@ -126,36 +136,95 @@ export async function prepareBooking(
     };
   }
 
-  if (!tutor.hourly_rate) {
+  if (client.role !== "student_provider") {
     return {
       ok: false,
-      status: 400,
-      error: "Ce tuteur n'a pas défini de tarif horaire",
+      status: 403,
+      error: "Seuls les élèves peuvent réserver un cours",
     };
   }
 
-  const durationHours =
-    (new Date(slot.ends_at).getTime() - new Date(slot.starts_at).getTime()) /
-    (1000 * 60 * 60);
-  const amountGross = Math.round(tutor.hourly_rate * durationHours * 100) / 100;
+  const sessionType: CourseSessionType =
+    input.sessionType === "trial" ? "trial" : "standard";
+  const isTrial = sessionType === "trial";
 
-  // ACRE effective à la date du cours : le taux réduit ne s'applique que dans
-  // la fenêtre de 12 mois. Un cours au-delà repasse au taux plein.
-  const effectiveAcre = resolveEffectiveAcre({
-    statusAcre: tutor.status_acre,
-    acreStartDate: (tutor.acre_start_date as string | null) ?? null,
-    referenceDate: new Date(slot.starts_at),
-  });
+  if (isTrial) {
+    const trialCheck = await isTrialEligible(client.id, slot.provider_id);
+    if (!trialCheck.eligible) {
+      return {
+        ok: false,
+        status: 400,
+        error: trialCheck.reason ?? "Séance d'essai non disponible",
+      };
+    }
 
-  const fiscalResult = calculateFiscalBreakdown({
-    amountGross,
-    statusAcre: effectiveAcre,
-    versementLiberatoire: tutor.versement_liberatoire,
-  });
+    if (!isTrialSlotDurationValid(slot.starts_at, slot.ends_at)) {
+      return {
+        ok: false,
+        status: 400,
+        error: "La séance d'essai est limitée à 1 heure maximum",
+      };
+    }
+  }
+
+  const durationHours = slotDurationHours(slot.starts_at, slot.ends_at);
+
+  if (!isTrial && durationHours <= 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Durée de créneau invalide",
+    };
+  }
+
+  let fiscal: BookingFiscal;
+
+  if (isTrial) {
+    fiscal = {
+      amountGross: 0,
+      commissionSasu: 0,
+      taxesUrssaf: 0,
+      netPayout: 0,
+    };
+  } else {
+    if (!tutor.hourly_rate) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Ce tuteur n'a pas défini de tarif horaire",
+      };
+    }
+
+    const amountGross =
+      Math.round(tutor.hourly_rate * durationHours * 100) / 100;
+
+    // ACRE effective à la date du cours : le taux réduit ne s'applique que dans
+    // la fenêtre de 12 mois. Un cours au-delà repasse au taux plein.
+    const effectiveAcre = resolveEffectiveAcre({
+      statusAcre: tutor.status_acre,
+      acreStartDate: (tutor.acre_start_date as string | null) ?? null,
+      referenceDate: new Date(slot.starts_at),
+    });
+
+    const fiscalResult = calculateFiscalBreakdown({
+      amountGross,
+      statusAcre: effectiveAcre,
+      versementLiberatoire: tutor.versement_liberatoire,
+    });
+
+    fiscal = {
+      amountGross: fiscalResult.amountGross,
+      commissionSasu: fiscalResult.commissionSasu,
+      taxesUrssaf: fiscalResult.taxesUrssaf + fiscalResult.taxesLiberatoire,
+      netPayout: fiscalResult.netPayout,
+    };
+  }
 
   const subject =
     input.subject ??
-    `Tutorat avec ${tutor.first_name} ${tutor.last_name}`.trim();
+    (isTrial
+      ? `Séance d'essai avec ${tutor.first_name} ${tutor.last_name}`.trim()
+      : `Tutorat avec ${tutor.first_name} ${tutor.last_name}`.trim());
 
   return {
     ok: true,
@@ -171,12 +240,9 @@ export async function prepareBooking(
           | null,
       },
       subject,
-      fiscal: {
-        amountGross: fiscalResult.amountGross,
-        commissionSasu: fiscalResult.commissionSasu,
-        taxesUrssaf: fiscalResult.taxesUrssaf + fiscalResult.taxesLiberatoire,
-        netPayout: fiscalResult.netPayout,
-      },
+      fiscal,
+      sessionType,
+      isTrial,
     },
   };
 }

@@ -224,19 +224,7 @@ export function ProfileSetupPage() {
       await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
 
       if (values.accountType === "student") {
-        const token = getAccessToken();
-        if (token) {
-          const path = await resolvePostLoginPath(token);
-          navigate(path, { replace: true });
-        } else {
-          const stored = sessionStorage.getItem(AUTH_REDIRECT_KEY);
-          if (stored) {
-            sessionStorage.removeItem(AUTH_REDIRECT_KEY);
-            navigate(normalizeAuthRedirect(stored), { replace: true });
-          } else {
-            navigate("/app", { replace: true });
-          }
-        }
+        navigate("/app/onboarding", { replace: true });
         return;
       }
 

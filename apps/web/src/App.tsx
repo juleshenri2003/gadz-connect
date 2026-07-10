@@ -16,6 +16,7 @@ import { AdminBudgetsPage } from "@/pages/admin/AdminBudgetsPage";
 import { AdminCoursesPage } from "@/pages/admin/AdminCoursesPage";
 import { AdminSchedulePage } from "@/pages/admin/AdminSchedulePage";
 import { ProfileSetupPage } from "@/pages/provider/ProfileSetupPage";
+import { StudentOnboardingPage } from "@/pages/provider/StudentOnboardingPage";
 import { ProviderOverviewPage } from "@/pages/provider/ProviderOverviewPage";
 import { ProviderCoursesPage } from "@/pages/provider/ProviderCoursesPage";
 import { ProviderOnboardingPage } from "@/pages/provider/ProviderOnboardingPage";
@@ -75,6 +76,7 @@ export default function App() {
       <Route path="/app" element={<ProviderRoute />}>
         <Route element={<ProviderLayout />}>
         <Route path="setup" element={<ProfileSetupPage />} />
+        <Route path="onboarding" element={<StudentOnboardingPage />} />
         <Route index element={<ProviderOverviewPage />} />
         <Route path="planning" element={<SchedulePage />} />
         <Route path="alertes" element={<NotificationsPage />} />

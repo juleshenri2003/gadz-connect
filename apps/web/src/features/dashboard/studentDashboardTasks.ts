@@ -2,7 +2,11 @@ import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
 
-export type StudentTaskId = "profile" | "find_tutor" | "follow_courses";
+export type StudentTaskId =
+  | "profile"
+  | "learning_profile"
+  | "find_tutor"
+  | "follow_courses";
 
 const TUTOR_PROFILE_VIEWED_KEY = "gadz_tutor_profile_viewed";
 
@@ -30,16 +34,22 @@ const TASK_DEFINITIONS: Omit<DashboardTask, "status">[] = [
     href: "/app/profil",
   },
   {
+    id: "learning_profile",
+    title: "Mon profil d'apprentissage",
+    description: "Forces, difficultés et objectifs de tutorat",
+    href: "/app/profil",
+  },
+  {
     id: "find_tutor",
     title: "Trouver un tuteur",
-    description: "Parcourir les profils et réserver un cours",
+    description: "Parcourir les profils et réserver une séance d'essai ou un cours",
     href: "/app/cours",
   },
   {
     id: "follow_courses",
-    title: "Suivre mes cours",
-    description: "Emploi du temps et répertoire de cours",
-    href: "/app/planning",
+    title: "Suivi & entraide",
+    description: "Emploi du temps, comptes-rendus et échanges",
+    href: "/app/suivi-cours",
   },
 ];
 
@@ -57,6 +67,8 @@ function isTaskDone(
   switch (id) {
     case "profile":
       return profile.profile_setup_complete;
+    case "learning_profile":
+      return profile.student_onboarding_complete === true;
     case "find_tutor":
       return hasBookedCourse(events) || hasViewedTutorProfile();
     case "follow_courses":

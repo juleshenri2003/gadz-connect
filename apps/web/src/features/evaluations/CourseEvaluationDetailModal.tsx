@@ -16,6 +16,7 @@ import {
   usePostCourseMessage,
   useUploadSummaryPdf,
 } from "./useEvaluations";
+import { TutorStudentLearningCard } from "@/features/evaluations/TutorStudentLearningCard";
 import { useAuth } from "@/features/auth/AuthProvider";
 
 interface CourseEvaluationDetailModalProps {
@@ -273,6 +274,13 @@ export function CourseEvaluationDetailModal({
         <p className="text-sm text-ink-500">Chargement…</p>
       ) : (
         <div className="space-y-6">
+          {isTeacher && data.counterpart.id ? (
+            <TutorStudentLearningCard
+              studentId={data.counterpart.id}
+              studentFirstName={data.counterpart.name.split(" ")[0]}
+            />
+          ) : null}
+
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-400">
               Note de l&apos;élève

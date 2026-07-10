@@ -17,11 +17,46 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 11. `migrations/011_registration_path.sql`
 12. `migrations/012_cancel_awaiting_replacement.sql` (normalise cours `awaiting_replacement` → `cancelled`)
 13. `migrations/013_stripe_payments.sql` (paiement carte + `payment_pending`)
-14. `migrations/014_payment_notifications.sql` (notification paiement élève)
+14. `migrations/014_payment_notifications.sql` (notifications paiement / activation)
+15. `migrations/015_billing_invoices.sql` (facturation SAP + `payment_invoices`)
+16. `migrations/016_tripartite_revenue.sql` (ventilation parent / plateforme / prof)
+17. `migrations/017_monthly_billing.sql` (facturation mensuelle regroupée)
+18. `migrations/018_monthly_invoice_lines_unique.sql` (contrainte lignes facture mensuelle)
+19. `migrations/019_profile_photo.sql` (photo profil + bucket `profile-photos`)
+20. `migrations/020_profile_links.sql` (liens publics prof : LinkedIn, site, etc.)
+21. `migrations/021_provider_invoice_email.sql` (suivi e-mail facture prof)
+22. `migrations/022_course_payer.sql` (payeur / bénéficiaire distincts sur un cours)
+23. `migrations/023_acre_start_date.sql` (date début ACRE + décompte)
+24. `migrations/024_course_ratings.sql` (avis élèves sur les cours)
+25. `migrations/025_course_evaluations_hub.sql` (fiches de clarification + échanges par cours)
+26. `migrations/026_course_session_workflow.sql` (confirmations 24 h, remplacement, remboursements)
 
 Guide détaillé Stripe : [`docs/STRIPE_SETUP.md`](../docs/STRIPE_SETUP.md)
 
 Indisponibilité prof/élève : annulation simple + créneau libéré ; l'élève rebook via la marketplace.
+
+### Vérifier l'état des migrations (015–026)
+
+Avec `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` dans `apps/api/.env` :
+
+```bash
+pnpm --filter @gadz-connect/api check-migrations
+```
+
+Pour appliquer automatiquement les migrations manquantes (nécessite aussi `DATABASE_URL` — connection string Postgres depuis Supabase → Settings → Database) :
+
+```bash
+pnpm --filter @gadz-connect/api check-migrations -- --apply
+```
+
+Ou manuellement, migration par migration :
+
+```bash
+pnpm --filter @gadz-connect/api apply-migration-024
+# … etc.
+```
+
+Sans `DATABASE_URL`, chaque script `apply-migration-XXX` affiche le SQL à coller dans le SQL Editor.
 
 Or en local (avec `DATABASE_URL` dans `apps/api/.env`) :
 
@@ -55,14 +90,16 @@ Copier les clés depuis **Project Settings → API** :
 
 - `anon` → `VITE_SUPABASE_ANON_KEY` (web) et `SUPABASE_ANON_KEY` (api)
 - `service_role` → `SUPABASE_SERVICE_ROLE_KEY` (api uniquement, jamais côté client)
+- `DATABASE_URL` → connection string Postgres (optionnel, pour `check-migrations --apply` et scripts `apply-migration-*`)
 
 ## 4. Stripe Connect (dashboard Stripe)
 
 1. Activer **Connect** → type **Express**
-2. Webhook endpoint : `https://votre-api.run.app/api/webhooks/stripe`
+2. Webhook endpoint : `https://votre-api.example.com/api/webhooks/stripe`
 3. Événements à écouter :
    - `account.updated`
    - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
 4. Copier `STRIPE_SECRET_KEY` et `STRIPE_WEBHOOK_SECRET` dans `apps/api/.env`
 
 En local avec Stripe CLI :

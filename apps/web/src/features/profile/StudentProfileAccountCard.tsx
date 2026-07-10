@@ -4,6 +4,7 @@ import { ROLE_LABELS, STATUS_LABELS } from "@/features/admin/format";
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import { campusDisplayName } from "@/features/campus/campusLabels";
 import { ProviderProfileIdentityForm } from "@/features/profile/ProviderProfileIdentityForm";
+import { StudentLearningProfileEditor } from "@/features/profile/StudentLearningProfileEditor";
 
 interface FieldRowProps {
   label: string;
@@ -72,6 +73,8 @@ export function StudentProfileAccountCard({
             ) : null}
           </dl>
         </section>
+
+        <StudentLearningProfileEditor />
       </CardContent>
     </Card>
   );

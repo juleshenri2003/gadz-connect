@@ -1,7 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
-import express from "express";
-import helmet from "helmet";
+import express, { type RequestHandler } from "express";
+import helmetPkg from "helmet";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createRateLimiter } from "./middleware/rate-limit.js";
 import { publicTutorsRouter } from "./routes/public/tutors.js";
@@ -11,6 +11,7 @@ import { campusRouter } from "./routes/campus.js";
 import { fiscalRouter } from "./routes/fiscal.js";
 import { onboardingDocsRouter } from "./routes/onboarding-docs.js";
 import { profileRouter } from "./routes/profile.js";
+import { studentLearningProfileRouter } from "./routes/student-learning-profile.js";
 import { healthRouter } from "./routes/health.js";
 import { stripeRouter } from "./routes/stripe.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -27,7 +28,7 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:5173";
 
 const app = express();
 
-app.use(helmet());
+app.use((helmetPkg as unknown as () => RequestHandler)());
 
 // Webhook Stripe : corps brut obligatoire (avant express.json)
 app.use(
@@ -56,6 +57,7 @@ app.use(
   publicTutorsRouter,
 );
 app.use("/api/profile", profileRouter);
+app.use("/api/profile", studentLearningProfileRouter);
 app.use("/api/onboarding/documents", onboardingDocsRouter);
 app.use("/api/fiscal", fiscalRouter);
 app.use("/api/schedule", scheduleRouter);

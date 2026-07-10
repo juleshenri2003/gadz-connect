@@ -6,6 +6,11 @@ import { markPastCoursesCompleted } from "../lib/course-completion.js";
 import { notifyCourseRated } from "../lib/course-rating-notify.js";
 import { courseRatingCreateSchema } from "../lib/course-ratings.js";
 import { loadRatingByCourseId } from "../lib/course-ratings-query.js";
+import {
+  canAccessStudentLearningProfile,
+  fetchStudentLearningProfile,
+  mapStudentLearningProfile,
+} from "../lib/student-learning-profile.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const studentsRouter = Router();
@@ -317,5 +322,52 @@ studentsRouter.post(
         createdAt: inserted.created_at as string,
       },
     });
+  },
+);
+
+/**
+ * GET /api/students/:studentId/learning-profile
+ * Tuteur (après réservation) ou admin_general uniquement.
+ */
+studentsRouter.get(
+  "/:studentId/learning-profile",
+  async (req: AuthenticatedRequest, res) => {
+    const viewerId = req.user!.id;
+    const studentId = String(req.params.studentId);
+
+    const { data: viewer } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", viewerId)
+      .maybeSingle();
+
+    if (!viewer) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    const allowed = await canAccessStudentLearningProfile(
+      viewerId,
+      viewer.role as string,
+      studentId,
+    );
+
+    if (!allowed) {
+      res.status(403).json({ error: "Accès non autorisé à cette fiche" });
+      return;
+    }
+
+    const result = await fetchStudentLearningProfile(studentId);
+    if (!result.ok) {
+      res.status(500).json({ error: result.error });
+      return;
+    }
+
+    if (!result.data || !result.data.onboarding_complete) {
+      res.status(404).json({ error: "Fiche pédagogique introuvable" });
+      return;
+    }
+
+    res.json({ data: mapStudentLearningProfile(result.data) });
   },
 );

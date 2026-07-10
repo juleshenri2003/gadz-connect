@@ -35,6 +35,7 @@ import { profileLinksSchema } from "../lib/profile-links.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
 import { mapRatingForProvider, type CourseRatingRow } from "../lib/course-ratings.js";
+import { isTrialEligible } from "../lib/student-learning-profile.js";
 
 function mapTutorPublic<
   T extends { cv_pdf_path?: string | null; avatar_path?: string | null },
@@ -72,6 +73,7 @@ const bookingSchema = z.object({
   subject: z.string().min(1).max(120).optional(),
   payerName: z.string().trim().min(1).max(120).optional(),
   beneficiaryName: z.string().trim().min(1).max(120).optional(),
+  sessionType: z.enum(["standard", "trial"]).optional(),
 });
 
 async function getCallerProfile(userId: string) {
@@ -997,6 +999,38 @@ tutorsRouter.get("/:id", async (req: AuthenticatedRequest, res) => {
 /**
  * GET /api/tutors/:id/slots
  */
+tutorsRouter.get("/:id/trial-eligibility", async (req: AuthenticatedRequest, res) => {
+  const caller = await getCallerProfile(req.user!.id);
+  if (!caller) {
+    res.status(404).json({ error: "Profil introuvable" });
+    return;
+  }
+
+  if (caller.role !== "student_provider") {
+    res.status(403).json({ error: "Réservé aux comptes élève" });
+    return;
+  }
+
+  const tutorId = String(req.params.id);
+  const { data: tutor, error: tutorError } = await fetchCampusTutorById(
+    caller.campus_id as string,
+    tutorId,
+  );
+
+  if (tutorError) {
+    res.status(500).json({ error: tutorError.message });
+    return;
+  }
+
+  if (!tutor) {
+    res.status(404).json({ error: "Tuteur introuvable" });
+    return;
+  }
+
+  const eligibility = await isTrialEligible(caller.id as string, tutorId);
+  res.json({ data: eligibility });
+});
+
 tutorsRouter.get("/:id/slots", async (req: AuthenticatedRequest, res) => {
   const caller = await getCallerProfile(req.user!.id);
   if (!caller) {
@@ -1052,6 +1086,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     slotId: parsed.data.slotId,
     subject: parsed.data.subject,
     clientUserId: req.user!.id,
+    sessionType: parsed.data.sessionType,
   });
 
   if (!prepared.ok) {
@@ -1059,9 +1094,77 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { slot, client, tutor, subject, fiscal } = prepared.data;
+  const { slot, client, tutor, subject, fiscal, isTrial } = prepared.data;
   const payerName = parsed.data.payerName?.trim() || null;
   const beneficiaryName = parsed.data.beneficiaryName?.trim() || null;
+
+  if (isTrial) {
+    const { data: course, error: courseError } = await supabaseAdmin
+      .from("courses")
+      .insert({
+        title: subject,
+        description: "Séance d'essai gratuite Gadz'Connect",
+        campus_id: client.campus_id,
+        provider_id: tutor.id,
+        client_id: client.id,
+        subject,
+        scheduled_at: slot.starts_at,
+        slot_id: slot.id,
+        status: "scheduled",
+        session_type: "trial",
+        payer_name: payerName,
+        beneficiary_name: beneficiaryName,
+      })
+      .select("id")
+      .single();
+
+    if (courseError || !course) {
+      res.status(500).json({ error: courseError?.message ?? "Erreur réservation" });
+      return;
+    }
+
+    const slotResult = await finalizeBookingSlot(slot.id, client.id);
+    if (!slotResult.ok) {
+      await supabaseAdmin.from("courses").delete().eq("id", course.id);
+      res.status(500).json({ error: "Créneau déjà réservé" });
+      return;
+    }
+
+    const { error: trialError } = await supabaseAdmin
+      .from("student_tutor_trials")
+      .insert({
+        student_id: client.id,
+        provider_id: tutor.id,
+        course_id: course.id,
+      });
+
+    if (trialError) {
+      await supabaseAdmin.from("courses").delete().eq("id", course.id);
+      await supabaseAdmin
+        .from("tutor_slots")
+        .update({ booked: false, booked_by: null })
+        .eq("id", slot.id);
+      res.status(400).json({
+        error: "Séance d'essai déjà utilisée avec ce tuteur",
+      });
+      return;
+    }
+
+    res.status(201).json({
+      data: {
+        requiresPayment: false,
+        courseId: course.id,
+        amountGross: 0,
+        netPayout: 0,
+        subject,
+        scheduledAt: slot.starts_at,
+        endsAt: slot.ends_at,
+        sessionType: "trial",
+      },
+    });
+    return;
+  }
+
   const paymentStrategy = await resolveStripePaymentStrategy(
     tutor.stripe_connect_account_id,
   );
@@ -1092,6 +1195,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       status: courseStatus,
       payer_name: payerName,
       beneficiary_name: beneficiaryName,
+      session_type: "standard",
     })
     .select("id")
     .single();

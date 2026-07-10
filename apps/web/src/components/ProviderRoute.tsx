@@ -2,6 +2,7 @@ import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@gadz-connect/ui";
 import type { UserRole } from "@gadz-connect/types";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { isStudent } from "@/features/auth/roles";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SuspendedAccountPage } from "@/pages/provider/SuspendedAccountPage";
 import { marketplaceRoutes } from "@/features/marketplace/marketplaceRoutes";
@@ -49,6 +50,15 @@ function ProviderGate() {
     location.pathname !== "/app/setup"
   ) {
     return <Navigate to="/app/setup" replace />;
+  }
+
+  if (
+    isStudent(profile.role) &&
+    profile.profile_setup_complete &&
+    profile.student_onboarding_complete === false &&
+    location.pathname !== "/app/onboarding"
+  ) {
+    return <Navigate to="/app/onboarding" replace />;
   }
 
   return <Outlet />;

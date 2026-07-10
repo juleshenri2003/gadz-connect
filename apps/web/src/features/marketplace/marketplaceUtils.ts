@@ -27,6 +27,16 @@ export function formatSlotRange(starts: string, ends: string): string {
   return `${start.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · ${start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} – ${end.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+export function slotDurationHours(starts: string, ends: string): number {
+  return (
+    (new Date(ends).getTime() - new Date(starts).getTime()) / (1000 * 60 * 60)
+  );
+}
+
+export function isTrialSlotDuration(starts: string, ends: string): boolean {
+  return slotDurationHours(starts, ends) <= 1.001;
+}
+
 export function formatSlotDuration(starts: string, ends: string): string {
   const minutes =
     (new Date(ends).getTime() - new Date(starts).getTime()) / (1000 * 60);

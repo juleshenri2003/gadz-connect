@@ -42,6 +42,7 @@ async function main() {
     urssaf_periodicity: null,
     versement_liberatoire: false,
     profile_setup_complete: true,
+    student_onboarding_complete: true,
   };
 
   const { data: existingProfile } = await admin
@@ -68,6 +69,31 @@ async function main() {
     }
     console.log("Profil élève créé");
   }
+
+  const learningProfile = {
+    student_id: userId,
+    class_year: "GI2",
+    study_program: "Génie industriel",
+    strong_points:
+      "À l'aise en maths et en mécanique. Bonne capacité à expliquer à ses camarades.",
+    difficulties:
+      "Stress avant les partiels, difficulté à structurer les révisions sur plusieurs matières.",
+    learning_flags: ["hpi"],
+    learning_flags_other: null,
+    tutoring_goals:
+      "Gagner en méthode de travail et consolider les bases avant la promo suivante.",
+    onboarding_complete: true,
+  };
+
+  const { error: learningError } = await admin
+    .from("student_learning_profiles")
+    .upsert(learningProfile, { onConflict: "student_id" });
+
+  if (learningError) {
+    console.error("learning profile:", learningError.message);
+    process.exit(1);
+  }
+  console.log("Profil pédagogique élève prêt");
 
   console.log("");
   console.log("── Élève fictif prêt ──");

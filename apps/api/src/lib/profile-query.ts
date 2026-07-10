@@ -17,6 +17,7 @@ const PROFILE_SELECT_BASE = `
   stripe_connect_account_id,
   stripe_connect_onboarding_complete,
   profile_setup_complete,
+  student_onboarding_complete,
   bio,
   hourly_rate,
   subjects,
@@ -59,7 +60,7 @@ async function queryProfile(
 }
 
 const PROFILE_OPTIONAL_FIELDS =
-  ", acre_start_date, cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed";
+  ", acre_start_date, cv, cv_pdf_path, avatar_path, inpi_declaration_sent_at, registration_path, siret_verification_failed, student_onboarding_complete";
 
 function withProfileDefaults(
   data: ProfileRow,
@@ -73,6 +74,7 @@ function withProfileDefaults(
     inpi_declaration_sent_at: null,
     registration_path: null,
     siret_verification_failed: false,
+    student_onboarding_complete: false,
     ...data,
     ...defaults,
   };

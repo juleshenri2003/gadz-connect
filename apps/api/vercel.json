@@ -1,5 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "pnpm run build"
+  "installCommand": "cd ../.. && NODE_ENV=development pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @gadz-connect/api... build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }

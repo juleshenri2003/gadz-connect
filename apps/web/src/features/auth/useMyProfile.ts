@@ -23,6 +23,7 @@ export interface MyProfile {
   urssaf_periodicity: string | null;
   versement_liberatoire: boolean;
   profile_setup_complete: boolean;
+  student_onboarding_complete?: boolean;
   inpi_declaration_sent_at: string | null;
   stripe_connect_onboarding_complete: boolean;
   bio: string | null;

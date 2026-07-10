@@ -109,8 +109,14 @@ const STUDENT_GUIDE_CONTENT: Record<string, GuideStepContent> = {
     destination: { icon: "profile", label: "Mon profil" },
     estimatedDuration: "3 min",
   },
+  learning_profile: {
+    why: "Décrivez votre parcours, vos forces et vos objectifs pour que vos tuteurs vous accompagnent avec une vraie vision d'entraide — pas seulement des cours.",
+    ctaLabel: "Compléter mon profil",
+    destination: { icon: "profile", label: "Profil pédagogique" },
+    estimatedDuration: "5 min",
+  },
   find_tutor: {
-    why: "Découvrez les professeurs de votre campus, consultez leurs profils et réservez un créneau.",
+    why: "Découvrez les professeurs de votre campus. Votre première séance avec chaque tuteur est offerte pour faire connaissance.",
     ctaLabel: "Voir les tuteurs",
     destination: { icon: "tutors", label: "Trouver mon tuteur" },
     estimatedDuration: "10 min",
@@ -120,9 +126,9 @@ const STUDENT_GUIDE_CONTENT: Record<string, GuideStepContent> = {
     blockedHrefLabel: "Voir Trouver mon tuteur",
   },
   follow_courses: {
-    why: "Consultez vos sessions planifiées, votre emploi du temps et les résumés de cours publiés par vos tuteurs.",
-    ctaLabel: "Voir mon emploi du temps",
-    destination: { icon: "calendar", label: "Emploi du temps et répertoire" },
+    why: "Consultez vos sessions, les comptes-rendus de vos tuteurs et vos échanges — un suivi continu pour progresser ensemble.",
+    ctaLabel: "Voir mon suivi",
+    destination: { icon: "calendar", label: "Suivi & entraide" },
     estimatedDuration: "5 min",
     prerequisites: ["Au moins un cours réservé"],
   },

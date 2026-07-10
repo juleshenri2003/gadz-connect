@@ -228,6 +228,7 @@ export interface BookingResult {
   subject: string;
   scheduledAt: string;
   endsAt: string;
+  sessionType?: "standard" | "trial";
 }
 
 export function useBookSlot() {
@@ -240,6 +241,7 @@ export function useBookSlot() {
       subject?: string;
       payerName?: string;
       beneficiaryName?: string;
+      sessionType?: "standard" | "trial";
     }) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");

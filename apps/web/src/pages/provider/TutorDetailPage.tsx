@@ -10,7 +10,9 @@ import {
   computeSlotPrice,
   formatSlotDuration,
   formatSlotRange,
+  isTrialSlotDuration,
 } from "@/features/marketplace/marketplaceUtils";
+import { useTutorTrialEligibility } from "@/features/onboarding/useStudentLearningProfile";
 import { TutorCvSection } from "@/features/marketplace/tutor-detail/TutorCvSection";
 import { TutorPresentationSection } from "@/features/marketplace/tutor-detail/TutorPresentationSection";
 import { TutorProfileLinks } from "@/features/profile/TutorProfileLinks";
@@ -28,6 +30,8 @@ import { useStripeConfig } from "@/features/stripe/useStripeConfig";
 
 const SUBJECT_OTHER = "__other__";
 
+type BookingMode = "standard" | "trial";
+
 export function TutorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -39,10 +43,12 @@ export function TutorDetailPage() {
 
   const { data: tutor, isLoading } = useTutor(id ?? "");
   const { data: slots } = useTutorSlots(id ?? "");
+  const { data: trialEligibility } = useTutorTrialEligibility(id);
   const { data: cvPdfUrl } = useTutorCvPdfUrl(id ?? "", Boolean(tutor?.has_cv_pdf));
   const bookSlot = useBookSlot();
   const confirmPayment = useConfirmBookingPayment();
   const { data: stripeConfig } = useStripeConfig();
+  const [bookingMode, setBookingMode] = useState<BookingMode>("standard");
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
@@ -71,19 +77,30 @@ export function TutorDetailPage() {
     tutorName: string;
   } | null>(null);
 
+  const visibleSlots = useMemo(() => {
+    if (!slots) return [];
+    if (bookingMode === "trial") {
+      return slots.filter((slot) =>
+        isTrialSlotDuration(slot.starts_at, slot.ends_at),
+      );
+    }
+    return slots;
+  }, [slots, bookingMode]);
+
   const selectedSlotData = useMemo(
-    () => slots?.find((slot) => slot.id === selectedSlot),
-    [slots, selectedSlot],
+    () => visibleSlots.find((slot) => slot.id === selectedSlot),
+    [visibleSlots, selectedSlot],
   );
 
   const estimatedPrice = useMemo(() => {
+    if (bookingMode === "trial") return 0;
     if (!tutor?.hourly_rate || !selectedSlotData) return null;
     return computeSlotPrice(
       tutor.hourly_rate,
       selectedSlotData.starts_at,
       selectedSlotData.ends_at,
     );
-  }, [tutor?.hourly_rate, selectedSlotData]);
+  }, [bookingMode, tutor?.hourly_rate, selectedSlotData]);
 
   const resolvedSubject = useMemo(() => {
     if (selectedSubject === SUBJECT_OTHER) {
@@ -94,8 +111,17 @@ export function TutorDetailPage() {
 
   const canConfirmBooking =
     Boolean(selectedSlot) &&
-    Boolean(tutor?.hourly_rate) &&
+    (bookingMode === "trial" || Boolean(tutor?.hourly_rate)) &&
     resolvedSubject.length > 0;
+
+  useEffect(() => {
+    if (
+      selectedSlot &&
+      !visibleSlots.some((slot) => slot.id === selectedSlot)
+    ) {
+      setSelectedSlot(null);
+    }
+  }, [selectedSlot, visibleSlots]);
 
   useEffect(() => {
     if (tutor?.subjects.length) {
@@ -124,6 +150,7 @@ export function TutorDetailPage() {
         payerName: payForOther && trimmedPayer ? trimmedPayer : undefined,
         beneficiaryName:
           payForOther && trimmedBeneficiary ? trimmedBeneficiary : undefined,
+        sessionType: bookingMode,
       });
 
       if (
@@ -230,7 +257,10 @@ export function TutorDetailPage() {
               : ""}
           </p>
           <p className="mt-2 text-sm text-success">
-            Montant : {formatEuro(booked.amountGross)}
+            Montant :{" "}
+            {booked.amountGross > 0
+              ? formatEuro(booked.amountGross)
+              : "Séance d'essai gratuite"}
           </p>
           <p className="mt-2 text-sm text-success">
             Votre cours apparaît dans votre emploi du temps.
@@ -277,11 +307,12 @@ export function TutorDetailPage() {
           <p className="mt-2 text-sm text-warning">
             Ce tuteur n&apos;a pas encore défini de tarif.
           </p>
-        ) : !slots?.length ? (
+        ) : !visibleSlots.length ? (
           <div className="mt-3 space-y-3">
             <p className="text-sm text-ink-600">
-              Aucun créneau ouvert pour l&apos;instant. Revenez plus tard ou
-              consultez un autre professeur.
+              {bookingMode === "trial"
+                ? "Aucun créneau d'une heure ou moins pour une séance d'essai. Choisissez un cours payant ou un autre professeur."
+                : "Aucun créneau ouvert pour l'instant. Revenez plus tard ou consultez un autre professeur."}
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link to={marketplaceRoutes.list("app")}>
@@ -291,6 +322,41 @@ export function TutorDetailPage() {
           </div>
         ) : (
           <>
+            {trialEligibility?.eligible ? (
+              <div className="mt-4 space-y-3 rounded-lg border border-brand-100 bg-brand-50/50 p-4">
+                <p className="text-sm font-medium text-ink-900">
+                  Première séance offerte avec ce tuteur
+                </p>
+                <p className="text-xs text-ink-600">
+                  Réservez une séance d&apos;essai gratuite (1 h max) pour faire
+                  connaissance, sans engagement.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bookingMode === "trial" ? "default" : "outline"}
+                    onClick={() => setBookingMode("trial")}
+                  >
+                    Séance d&apos;essai gratuite
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bookingMode === "standard" ? "default" : "outline"}
+                    onClick={() => setBookingMode("standard")}
+                  >
+                    Cours payant
+                  </Button>
+                </div>
+              </div>
+            ) : trialEligibility && !trialEligibility.eligible ? (
+              <p className="mt-4 text-xs text-ink-500">
+                Séance d&apos;essai déjà utilisée avec ce tuteur — réservation au
+                tarif habituel.
+              </p>
+            ) : null}
+
             <div className="mt-4 space-y-2">
               <Label htmlFor="booking-subject">Matière ou objet du cours</Label>
               {tutor.subjects.length > 0 ? (
@@ -325,13 +391,14 @@ export function TutorDetailPage() {
             </div>
 
             <ul className="mt-4 space-y-2">
-              {slots.map((slot) => (
+              {visibleSlots.map((slot) => (
                 <SlotOption
                   key={slot.id}
                   slot={slot}
                   hourlyRate={tutor.hourly_rate!}
                   selected={selectedSlot === slot.id}
                   onSelect={() => setSelectedSlot(slot.id)}
+                  isTrial={bookingMode === "trial"}
                 />
               ))}
             </ul>
@@ -344,7 +411,7 @@ export function TutorDetailPage() {
         ) : bookingError ? (
           <p className="mt-3 text-sm text-danger">{bookingError}</p>
         ) : null}
-        {slots?.length ? (
+        {visibleSlots.length ? (
           <Button
             className="mt-4"
             disabled={!canConfirmBooking || bookSlot.isPending}
@@ -355,9 +422,11 @@ export function TutorDetailPage() {
           >
             {bookSlot.isPending
               ? "Réservation…"
-              : estimatedPrice != null
-                ? `Réserver — ${formatEuro(estimatedPrice)}`
-                : "Réserver ce créneau"}
+              : bookingMode === "trial"
+                ? "Réserver la séance d'essai gratuite"
+                : estimatedPrice != null
+                  ? `Réserver — ${formatEuro(estimatedPrice)}`
+                  : "Réserver ce créneau"}
           </Button>
         ) : null}
       </section>
@@ -407,54 +476,67 @@ export function TutorDetailPage() {
             <div>
               <dt className="font-medium text-ink-900">Montant estimé</dt>
               <dd>
-                {estimatedPrice != null ? formatEuro(estimatedPrice) : "—"}
+                {bookingMode === "trial"
+                  ? "Gratuit (séance d'essai)"
+                  : estimatedPrice != null
+                    ? formatEuro(estimatedPrice)
+                    : "—"}
               </dd>
             </div>
-            <div className="space-y-2 border-t border-line pt-3">
-              <label className="flex items-center gap-2 text-sm text-ink-700">
-                <input
-                  type="checkbox"
-                  checked={payForOther}
-                  onChange={(event) => setPayForOther(event.target.checked)}
-                />
-                Je paie pour quelqu&apos;un d&apos;autre
-              </label>
-              {payForOther ? (
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="booking-payer">Nom du payeur (facturé)</Label>
-                    <Input
-                      id="booking-payer"
-                      placeholder="Ex. Marie Dupont"
-                      value={payerName}
-                      onChange={(event) => setPayerName(event.target.value)}
-                    />
+            {bookingMode === "standard" ? (
+              <div className="space-y-2 border-t border-line pt-3">
+                <label className="flex items-center gap-2 text-sm text-ink-700">
+                  <input
+                    type="checkbox"
+                    checked={payForOther}
+                    onChange={(event) => setPayForOther(event.target.checked)}
+                  />
+                  Je paie pour quelqu&apos;un d&apos;autre
+                </label>
+                {payForOther ? (
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="booking-payer">Nom du payeur (facturé)</Label>
+                      <Input
+                        id="booking-payer"
+                        placeholder="Ex. Marie Dupont"
+                        value={payerName}
+                        onChange={(event) => setPayerName(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="booking-beneficiary">
+                        Nom de l&apos;élève bénéficiaire
+                      </Label>
+                      <Input
+                        id="booking-beneficiary"
+                        placeholder="Ex. Paul Dupont"
+                        value={beneficiaryName}
+                        onChange={(event) =>
+                          setBeneficiaryName(event.target.value)
+                        }
+                      />
+                    </div>
+                    <p className="text-xs text-ink-400">
+                      Ces noms apparaîtront sur la facture. Laissez vide pour
+                      facturer à votre nom.
+                    </p>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="booking-beneficiary">
-                      Nom de l&apos;élève bénéficiaire
-                    </Label>
-                    <Input
-                      id="booking-beneficiary"
-                      placeholder="Ex. Paul Dupont"
-                      value={beneficiaryName}
-                      onChange={(event) =>
-                        setBeneficiaryName(event.target.value)
-                      }
-                    />
-                  </div>
-                  <p className="text-xs text-ink-400">
-                    Ces noms apparaîtront sur la facture. Laissez vide pour
-                    facturer à votre nom.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-            <p className="text-xs text-ink-400">
-              {stripeConfig?.configured
-                ? "Le paiement par carte sera demandé à la confirmation."
-                : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
-            </p>
+                ) : null}
+              </div>
+            ) : null}
+            {bookingMode === "standard" ? (
+              <p className="text-xs text-ink-400">
+                {stripeConfig?.configured
+                  ? "Le paiement par carte sera demandé à la confirmation."
+                  : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
+              </p>
+            ) : (
+              <p className="text-xs text-ink-400">
+                Séance d&apos;essai sans paiement — pour faire connaissance avec
+                votre tuteur.
+              </p>
+            )}
             {bookingError ? (
               <p className="text-sm text-danger">{bookingError}</p>
             ) : null}
@@ -496,10 +578,19 @@ interface SlotOptionProps {
   hourlyRate: number;
   selected: boolean;
   onSelect: () => void;
+  isTrial?: boolean;
 }
 
-function SlotOption({ slot, hourlyRate, selected, onSelect }: SlotOptionProps) {
-  const price = computeSlotPrice(hourlyRate, slot.starts_at, slot.ends_at);
+function SlotOption({
+  slot,
+  hourlyRate,
+  selected,
+  onSelect,
+  isTrial,
+}: SlotOptionProps) {
+  const price = isTrial
+    ? 0
+    : computeSlotPrice(hourlyRate, slot.starts_at, slot.ends_at);
 
   return (
     <li>
@@ -517,7 +608,7 @@ function SlotOption({ slot, hourlyRate, selected, onSelect }: SlotOptionProps) {
           </span>
         </div>
         <span className="text-sm font-medium text-ink-600">
-          {formatEuro(price)}
+          {isTrial ? "Gratuit" : formatEuro(price)}
         </span>
       </label>
     </li>

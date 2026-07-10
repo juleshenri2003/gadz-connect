@@ -29,6 +29,24 @@ export interface Campus {
   created_at: string;
 }
 
+export type CourseSessionType = "standard" | "trial";
+
+export type LearningFlag = "dyslexie" | "hpi" | "tdah" | "autre";
+
+export interface StudentLearningProfile {
+  studentId: string;
+  classYear: string;
+  studyProgram: string | null;
+  strongPoints: string;
+  difficulties: string;
+  learningFlags: LearningFlag[];
+  learningFlagsOther: string | null;
+  tutoringGoals: string;
+  onboardingComplete: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Profile {
   id: string;
   first_name: string;
@@ -48,6 +66,7 @@ export interface Profile {
   acre_start_date: string | null;
   stripe_connect_account_id: string | null;
   stripe_connect_onboarding_complete: boolean;
+  student_onboarding_complete?: boolean;
   created_at: string;
   updated_at: string;
 }
