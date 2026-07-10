@@ -16,6 +16,7 @@ import {
   ROLE_LABELS,
   STRIPE_STATUS_LABELS,
 } from "./adminUserLabels";
+import { UserStatusBadge } from "./UserStatusBadge";
 import { AdminStudentLearningProfileSection } from "@/features/evaluations/TutorStudentLearningCard";
 
 interface UserDetailDrawerProps {

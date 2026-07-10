@@ -1,7 +1,7 @@
 import type { OnboardingProgress } from "./teacherOnboardingTasks";
 
 interface OnboardingProgressBarProps {
-  progress: OnboardingProgress;
+  progress: Pick<OnboardingProgress, "completedCount" | "totalCount" | "percent">;
 }
 
 export function OnboardingProgressBar({ progress }: OnboardingProgressBarProps) {
