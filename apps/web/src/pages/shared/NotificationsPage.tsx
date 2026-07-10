@@ -16,6 +16,7 @@ import {
 import { ReplacementNotificationActions } from "@/features/course-session/ReplacementNotificationActions";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
+import { formatEuro } from "@/features/admin/format";
 import {
   buildMarketplaceSubjectHref,
   buildPlanningWeekHref,
@@ -393,6 +394,18 @@ function NotificationRow({
       ) : (
         <p className="mt-2 text-ink-600">{n.message}</p>
       )}
+
+      {n.kind === "refund_processed" && n.refundAmount != null ? (
+        <div className="mt-3 rounded-md border border-line bg-paper px-3 py-2">
+          <p className="text-sm font-semibold text-ink-900">
+            Montant remboursé : {formatEuro(n.refundAmount)}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-500">
+            Sur la carte utilisée lors du paiement — délai habituel 5 à 10 jours
+            ouvrés
+          </p>
+        </div>
+      ) : null}
 
       {messageExpanded && showLongMessage ? (
         <button

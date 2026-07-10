@@ -217,6 +217,13 @@ export async function notifyReplacementAccepted(
   await insertNotificationRecipients(notification.id, recipientIds);
 }
 
+function formatRefundAmount(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amount);
+}
+
 export async function notifyRefundProcessed(
   course: CourseNotifyContext,
   reason: string,
@@ -229,12 +236,26 @@ export async function notifyRefundProcessed(
     ...admins,
   ]);
 
+  const { data: transaction } = await supabaseAdmin
+    .from("transactions")
+    .select("amount_gross, total_paid_parent")
+    .eq("course_id", course.id)
+    .maybeSingle();
+
+  const refundAmount =
+    (transaction?.total_paid_parent as number | null) ??
+    (transaction?.amount_gross as number | null);
+  const amountSentence =
+    refundAmount != null && Number.isFinite(refundAmount)
+      ? ` Remboursement de ${formatRefundAmount(refundAmount)} en cours sur la carte utilisée lors du paiement.`
+      : " Le remboursement est en cours sur la carte utilisée lors du paiement.";
+
   const notification = await insertCampusNotification({
     campus_id: course.campus_id,
     course_id: course.id,
     kind: "refund_processed",
     title: `Remboursement — ${subject}`,
-    message: `Aucun remplaçant n'a été validé pour le cours du ${when}. ${reason} Le remboursement aux parents est en cours (5 à 10 jours ouvrés).`,
+    message: `Aucun remplaçant n'a été validé pour le cours du ${when}. ${reason}${amountSentence} Délai habituel : 5 à 10 jours ouvrés.`,
     scheduled_at: course.scheduled_at,
     declared_by: course.provider_id,
     replacement_status: "dismissed",

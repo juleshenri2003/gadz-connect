@@ -18,6 +18,7 @@ export interface CampusNotificationItem {
     course_id: string | null;
     studentConfirmedAt?: string | null;
     providerConfirmedAt?: string | null;
+    refundAmount?: number | null;
     declared_by?: string;
     subject?: string | null;
     client_id?: string | null;
