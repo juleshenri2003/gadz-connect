@@ -16,6 +16,8 @@ export interface CampusNotificationItem {
     reason: string | null;
     created_at: string;
     course_id: string | null;
+    studentConfirmedAt?: string | null;
+    providerConfirmedAt?: string | null;
     declared_by?: string;
     subject?: string | null;
     client_id?: string | null;

@@ -54,6 +54,8 @@ const NOTIFICATIONS_SELECT_WITH_CLIENT = `
     course:course_id (
       subject,
       client_id,
+      student_confirmed_at,
+      provider_confirmed_at,
       client:client_id ( first_name, last_name )
     )
   )
@@ -76,7 +78,7 @@ const NOTIFICATIONS_SELECT_BASE = `
     course_id,
     campus:campus_id ( name ),
     declarant:declared_by ( first_name, last_name, role ),
-    course:course_id ( subject, client_id )
+    course:course_id ( subject, client_id, student_confirmed_at, provider_confirmed_at )
   )
 `;
 
@@ -139,6 +141,8 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       | {
           subject?: string | null;
           client_id?: string | null;
+          student_confirmed_at?: string | null;
+          provider_confirmed_at?: string | null;
           client?:
             | { first_name?: string | null; last_name?: string | null }
             | { first_name?: string | null; last_name?: string | null }[]
@@ -167,6 +171,8 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
           null,
         client:
           clientRow?.first_name || clientRow?.last_name ? clientRow : null,
+        studentConfirmedAt: courseRow?.student_confirmed_at ?? null,
+        providerConfirmedAt: courseRow?.provider_confirmed_at ?? null,
       },
     };
   });

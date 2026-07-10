@@ -415,6 +415,8 @@ function NotificationRow({
           <ConfirmSessionActions
             courseId={n.course_id}
             audience={student ? "student" : "teacher"}
+            studentConfirmedAt={n.studentConfirmedAt}
+            providerConfirmedAt={n.providerConfirmedAt}
             compact
           />
         ) : null}

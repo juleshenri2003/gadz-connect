@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@gadz-connect/ui";
 import {
   useConfirmSession,
@@ -15,12 +16,21 @@ interface ConfirmSessionActionsProps {
 export function ConfirmSessionActions({
   courseId,
   audience,
-  studentConfirmedAt,
-  providerConfirmedAt,
+  studentConfirmedAt: studentConfirmedAtProp,
+  providerConfirmedAt: providerConfirmedAtProp,
   compact = false,
 }: ConfirmSessionActionsProps) {
   const confirm = useConfirmSession();
   const ping = usePingSession();
+  const [confirmedAt, setConfirmedAt] = useState<{
+    student: string | null;
+    provider: string | null;
+  } | null>(null);
+
+  const studentConfirmedAt =
+    confirmedAt?.student ?? studentConfirmedAtProp ?? null;
+  const providerConfirmedAt =
+    confirmedAt?.provider ?? providerConfirmedAtProp ?? null;
 
   const selfConfirmed =
     audience === "student"
@@ -61,7 +71,14 @@ export function ConfirmSessionActions({
           type="button"
           size="sm"
           disabled={confirm.isPending}
-          onClick={() => void confirm.mutateAsync(courseId)}
+          onClick={() =>
+            void confirm.mutateAsync(courseId).then((data) => {
+              setConfirmedAt({
+                student: data.student_confirmed_at,
+                provider: data.provider_confirmed_at,
+              });
+            })
+          }
         >
           {confirm.isPending ? "Confirmation…" : "Je confirme ma présence"}
         </Button>
