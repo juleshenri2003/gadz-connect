@@ -85,29 +85,67 @@ export function TeacherMarketplaceVisibility({
   const completed = checkValues.filter(Boolean).length;
   const percent = Math.round((completed / checkValues.length) * 100);
 
-  if (marketplace.visible) {
-    return (
-      <section
-        className={cn(
-          "rounded-md border border-success/20 bg-success-bg px-4 py-3 text-sm text-success",
-          compact && "py-2",
-        )}
-        role="status"
-      >
-        <p className="font-medium">Visible sur le campus</p>
-        {!compact ? (
-          <p className="mt-1 text-success/90">
-            Les élèves peuvent vous trouver et réserver un créneau.
-          </p>
-        ) : null}
-        <BookabilityGauge percent={100} />
-      </section>
-    );
+  if (marketplace.visible || percent === 100) {
+    return null;
+  }
+
+  const pendingItems = [
+    {
+      ok: checks.rate,
+      label: "Tarif horaire renseigné",
+      action: onFixRate ? (
+        <Button size="sm" variant="outline" onClick={onFixRate}>
+          Tarif →
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" asChild>
+          <Link to={coursesTabHref("profile")}>Tarif →</Link>
+        </Button>
+      ),
+    },
+    {
+      ok: checks.futureSlots,
+      label: "Au moins un créneau à venir",
+      action: onFixSlots ? (
+        <Button size="sm" variant="outline" onClick={onFixSlots}>
+          Créneaux →
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" asChild>
+          <Link to={coursesTabHref("slots")}>Créneaux →</Link>
+        </Button>
+      ),
+    },
+    {
+      ok: checks.stripe,
+      label: "Paiements Stripe configurés",
+      action: (
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/app/paiements">Stripe →</Link>
+        </Button>
+      ),
+    },
+    {
+      ok: checks.profileSetup,
+      label: "Profil complété",
+      action: (
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/app/setup">Profil →</Link>
+        </Button>
+      ),
+    },
+  ].filter((item) => !item.ok);
+
+  if (pendingItems.length === 0) {
+    return null;
   }
 
   return (
     <section
-      className="rounded-md border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning"
+      className={cn(
+        "rounded-md border border-warning/20 bg-warning-bg px-4 py-3 text-sm text-warning",
+        compact && "py-2",
+      )}
       role="status"
     >
       <p className="font-medium text-warning">Apparaître aux élèves</p>
@@ -116,54 +154,14 @@ export function TeacherMarketplaceVisibility({
       </p>
       <BookabilityGauge percent={percent} />
       <ul className="mt-3 space-y-2">
-        <CheckItem
-          ok={checks.rate}
-          label="Tarif horaire renseigné"
-          action={
-            onFixRate ? (
-              <Button size="sm" variant="outline" onClick={onFixRate}>
-                Tarif →
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" asChild>
-                <Link to={coursesTabHref("profile")}>Tarif →</Link>
-              </Button>
-            )
-          }
-        />
-        <CheckItem
-          ok={checks.futureSlots}
-          label="Au moins un créneau à venir"
-          action={
-            onFixSlots ? (
-              <Button size="sm" variant="outline" onClick={onFixSlots}>
-                Créneaux →
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" asChild>
-                <Link to={coursesTabHref("slots")}>Créneaux →</Link>
-              </Button>
-            )
-          }
-        />
-        <CheckItem
-          ok={checks.stripe}
-          label="Paiements Stripe configurés"
-          action={
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/app/paiements">Stripe →</Link>
-            </Button>
-          }
-        />
-        <CheckItem
-          ok={checks.profileSetup}
-          label="Profil complété"
-          action={
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/app/setup">Profil →</Link>
-            </Button>
-          }
-        />
+        {pendingItems.map((item) => (
+          <CheckItem
+            key={item.label}
+            ok={item.ok}
+            label={item.label}
+            action={item.action}
+          />
+        ))}
       </ul>
     </section>
   );

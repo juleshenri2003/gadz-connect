@@ -15,10 +15,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { AUTH_REDIRECT_KEY, peekAuthIntent } from "@/features/auth/authStorage";
+import { peekAuthIntent } from "@/features/auth/authStorage";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
-import { normalizeAuthRedirect, resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
 import {
   campusDisplayName,
   getStoredCampusId,
