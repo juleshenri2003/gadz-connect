@@ -32,6 +32,7 @@
     "apply-migration-023": "tsx scripts/apply-migration-023.ts",
     "apply-migration-024": "tsx scripts/apply-migration-024.ts",
     "apply-migration-025": "tsx scripts/apply-migration-025.ts",
+    "apply-migration-008": "tsx scripts/apply-migration-008.ts",
     "apply-migration-026": "tsx scripts/apply-migration-026.ts",
     "check-migrations": "tsx scripts/check-migrations.ts",
     "monthly-billing": "tsx scripts/run-monthly-billing.ts",

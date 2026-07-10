@@ -1,5 +1,5 @@
 /**
- * Vérifie que les migrations Supabase 015–026 sont appliquées sur le projet configuré.
+ * Vérifie que les migrations Supabase 008 et 015–026 sont appliquées sur le projet configuré.
  * Applique automatiquement les migrations manquantes si DATABASE_URL est défini.
  *
  * Usage:
@@ -50,6 +50,13 @@ async function columnExists(
 
 function buildProbes(sb: ReturnType<typeof createClient>): Probe[] {
   return [
+    {
+      id: "008",
+      label: "Workflow remplacement (replacement_proposals)",
+      run: async () =>
+        (await tableExists(sb, "replacement_proposals")) &&
+        (await columnExists(sb, "campus_notifications", "original_provider_id")),
+    },
     {
       id: "015",
       label: "Facturation SAP (payment_invoices)",
@@ -137,7 +144,7 @@ async function main() {
   const probes = buildProbes(sb);
   const missing: Probe[] = [];
 
-  console.log("\n=== Vérification migrations Supabase (015–026) ===\n");
+  console.log("\n=== Vérification migrations Supabase (008, 015–026) ===\n");
 
   for (const probe of probes) {
     const ok = await probe.run();
@@ -146,7 +153,7 @@ async function main() {
   }
 
   if (missing.length === 0) {
-    console.log("\nToutes les migrations 015–026 sont appliquées.\n");
+    console.log("\nToutes les migrations 008 et 015–026 sont appliquées.\n");
     return;
   }
 
