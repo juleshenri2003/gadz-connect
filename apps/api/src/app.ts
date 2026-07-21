@@ -21,6 +21,7 @@ import { repositoryRouter } from "./routes/repository.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { studentsRouter } from "./routes/students.js";
 import { tutorsRouter } from "./routes/tutors.js";
+import { urssafRouter } from "./routes/urssaf.js";
 import { evaluationsRouter } from "./routes/evaluations.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 
@@ -66,6 +67,7 @@ app.use("/api/courses", coursesRouter);
 app.use("/api/replacement", replacementRouter);
 app.use("/api/repository", repositoryRouter);
 app.use("/api/tutors", tutorsRouter);
+app.use("/api/urssaf", urssafRouter);
 app.use("/api/students", studentsRouter);
 app.use("/api/evaluations", evaluationsRouter);
 app.use("/api/admin", adminRouter);

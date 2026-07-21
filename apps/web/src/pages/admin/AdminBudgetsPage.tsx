@@ -9,6 +9,7 @@ import {
   useAdminTransactions,
 } from "@/features/admin/useAdmin";
 import { AdminInvoicesHub } from "@/features/billing/AdminInvoicesHub";
+import { AdminUrssafReconciliationHub } from "@/features/billing/AdminUrssafReconciliationHub";
 import { AdminBudgetCampusBreakdown } from "@/features/admin/budgets/AdminBudgetCampusBreakdown";
 import { AdminBudgetFilters } from "@/features/admin/budgets/AdminBudgetFilters";
 import { AdminBudgetHeader } from "@/features/admin/budgets/AdminBudgetHeader";
@@ -147,6 +148,8 @@ export function AdminBudgetsPage() {
       <AdminBudgetKpiStrip budget={budget} />
 
       <AdminInvoicesHub filters={filters} transactions={transactions} />
+
+      <AdminUrssafReconciliationHub />
 
       <AdminBudgetFilters
         filters={filters}

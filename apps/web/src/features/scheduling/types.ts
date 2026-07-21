@@ -29,6 +29,10 @@ export interface ScheduleEvent {
   canRate?: boolean;
   studentConfirmedAt?: string | null;
   providerConfirmedAt?: string | null;
+  studentSessionConfirmedAt?: string | null;
+  providerSessionConfirmedAt?: string | null;
+  sessionConfirmationCompletedAt?: string | null;
+  sessionDisputeStatus?: string | null;
 }
 
 export interface ScheduleQueryOptions {

@@ -102,6 +102,12 @@ export function toTransactionInsertRow(
     status_stripe?: string;
     status_urssaf?: string;
     stripe_payment_intent_id?: string | null;
+    payment_channel?: "stripe" | "urssaf";
+    prof_payout_status?:
+      | "pending_session_confirmation"
+      | "pending_urssaf"
+      | "paid"
+      | "paid_at_booking";
   },
 ) {
   return {
@@ -115,6 +121,10 @@ export function toTransactionInsertRow(
     teacher_gross_revenue: record.teacherGrossRevenue,
     status_stripe: extras.status_stripe ?? "pending",
     status_urssaf: extras.status_urssaf ?? "pending",
+    ...(extras.payment_channel ? { payment_channel: extras.payment_channel } : {}),
+    ...(extras.prof_payout_status
+      ? { prof_payout_status: extras.prof_payout_status }
+      : {}),
     ...(extras.stripe_payment_intent_id
       ? { stripe_payment_intent_id: extras.stripe_payment_intent_id }
       : {}),

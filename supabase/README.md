@@ -30,6 +30,10 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 24. `migrations/024_course_ratings.sql` (avis élèves sur les cours)
 25. `migrations/025_course_evaluations_hub.sql` (fiches de clarification + échanges par cours)
 26. `migrations/026_course_session_workflow.sql` (confirmations 24 h, remplacement, remboursements)
+27. `migrations/027_student_learning_profile.sql` (profil pédagogique élève)
+28. `migrations/028_urssaf_avance_immediate.sql` (avance immédiate URSSAF — clients, états paiement)
+29. `migrations/029_urssaf_notifications.sql` (kinds notification : actif / rejet / reversement bloqué)
+30. `migrations/030_post_session_confirmation.sql` (double confirmation post-séance avant paiement prof)
 
 Guide détaillé Stripe : [`docs/STRIPE_SETUP.md`](../docs/STRIPE_SETUP.md)
 

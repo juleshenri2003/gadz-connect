@@ -229,6 +229,8 @@ export interface BookingResult {
   scheduledAt: string;
   endsAt: string;
   sessionType?: "standard" | "trial";
+  paymentMethod?: "stripe" | "urssaf";
+  parentChargeEstimate?: number;
 }
 
 export function useBookSlot() {
@@ -242,6 +244,7 @@ export function useBookSlot() {
       payerName?: string;
       beneficiaryName?: string;
       sessionType?: "standard" | "trial";
+      isHomeVisit?: boolean;
     }) => {
       const token = getAccessToken();
       if (!token) throw new Error("Non authentifié");

@@ -30,6 +30,10 @@ export interface ScheduleEventPayload {
   canRate?: boolean;
   studentConfirmedAt?: string | null;
   providerConfirmedAt?: string | null;
+  studentSessionConfirmedAt?: string | null;
+  providerSessionConfirmedAt?: string | null;
+  sessionConfirmationCompletedAt?: string | null;
+  sessionDisputeStatus?: string | null;
 }
 
 function slotEnd(startsAt: string, endsAt: string): string {
@@ -293,6 +297,8 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         `
         id, title, subject, status, scheduled_at, slot_id, client_id,
         student_confirmed_at, provider_confirmed_at,
+        student_session_confirmed_at, provider_session_confirmed_at,
+        session_confirmation_completed_at, session_dispute_status,
         client:client_id ( first_name, last_name ),
         slot:slot_id ( starts_at, ends_at )
       `,
@@ -348,6 +354,14 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
+        studentSessionConfirmedAt:
+          course.student_session_confirmed_at as string | null,
+        providerSessionConfirmedAt:
+          course.provider_session_confirmed_at as string | null,
+        sessionConfirmationCompletedAt:
+          course.session_confirmation_completed_at as string | null,
+        sessionDisputeStatus:
+          course.session_dispute_status as string | null,
       });
     }
 
@@ -373,6 +387,8 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         `
         id, title, subject, status, scheduled_at, slot_id, provider_id,
         student_confirmed_at, provider_confirmed_at,
+        student_session_confirmed_at, provider_session_confirmed_at,
+        session_confirmation_completed_at, session_dispute_status,
         provider:provider_id ( first_name, last_name ),
         slot:slot_id ( starts_at, ends_at )
       `,
@@ -423,6 +439,14 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
+        studentSessionConfirmedAt:
+          course.student_session_confirmed_at as string | null,
+        providerSessionConfirmedAt:
+          course.provider_session_confirmed_at as string | null,
+        sessionConfirmationCompletedAt:
+          course.session_confirmation_completed_at as string | null,
+        sessionDisputeStatus:
+          course.session_dispute_status as string | null,
       });
     }
 

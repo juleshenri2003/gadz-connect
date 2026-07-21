@@ -1,5 +1,5 @@
 /**
- * Vérifie que les migrations Supabase 008 et 015–026 sont appliquées sur le projet configuré.
+ * Vérifie que les migrations Supabase 008 et 015–028 sont appliquées sur le projet configuré.
  * Applique automatiquement les migrations manquantes si DATABASE_URL est défini.
  *
  * Usage:
@@ -132,6 +132,21 @@ function buildProbes(sb: ReturnType<typeof createClient>): Probe[] {
         (await columnExists(sb, "courses", "confirmation_reminder_sent_at")) &&
         (await columnExists(sb, "courses", "replacement_expires_at")),
     },
+    {
+      id: "028",
+      label: "Avance immédiate URSSAF (urssaf_clients)",
+      run: async () =>
+        (await tableExists(sb, "urssaf_clients")) &&
+        (await columnExists(sb, "transactions", "payment_channel")) &&
+        (await columnExists(sb, "courses", "is_home_visit")),
+    },
+    {
+      id: "030",
+      label: "Confirmation post-séance avant paiement",
+      run: async () =>
+        (await columnExists(sb, "courses", "student_session_confirmed_at")) &&
+        (await columnExists(sb, "courses", "session_dispute_status")),
+    },
   ];
 }
 
@@ -144,7 +159,7 @@ async function main() {
   const probes = buildProbes(sb);
   const missing: Probe[] = [];
 
-  console.log("\n=== Vérification migrations Supabase (008, 015–026) ===\n");
+  console.log("\n=== Vérification migrations Supabase (008, 015–028, 030) ===\n");
 
   for (const probe of probes) {
     const ok = await probe.run();
@@ -153,7 +168,7 @@ async function main() {
   }
 
   if (missing.length === 0) {
-    console.log("\nToutes les migrations 008 et 015–026 sont appliquées.\n");
+    console.log("\nToutes les migrations 008, 015–028 et 030 sont appliquées.\n");
     return;
   }
 

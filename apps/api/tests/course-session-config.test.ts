@@ -5,8 +5,11 @@ import {
   confirmationReminderWindow,
   getConfirmationHoursBefore,
   getReplacementDeadlineHours,
+  getSessionConfirmationDisputeDays,
   isPastConfirmationEscalation,
   isPastReplacementDeadline,
+  isPastSessionConfirmationDispute,
+  shouldSendPostSessionReminder,
 } from "../src/lib/course-session-config.js";
 
 describe("course-session-config", () => {
@@ -16,6 +19,10 @@ describe("course-session-config", () => {
 
   it("uses default replacement deadline of 2h", () => {
     assert.equal(getReplacementDeadlineHours(), 2);
+  });
+
+  it("uses default session dispute window of 7 days", () => {
+    assert.equal(getSessionConfirmationDisputeDays(), 7);
   });
 
   it("computes replacement expiry 2h before course", () => {
@@ -66,6 +73,60 @@ describe("course-session-config", () => {
     );
     assert.equal(
       isPastReplacementDeadline(expires, new Date("2026-07-10T12:00:00.000Z")),
+      true,
+    );
+  });
+
+  it("schedules post-session reminders at J+1 and J+3", () => {
+    const scheduledAt = "2026-07-10T14:00:00.000Z";
+    assert.equal(
+      shouldSendPostSessionReminder(
+        scheduledAt,
+        0,
+        new Date("2026-07-10T20:00:00.000Z"),
+      ),
+      false,
+    );
+    assert.equal(
+      shouldSendPostSessionReminder(
+        scheduledAt,
+        0,
+        new Date("2026-07-11T14:00:00.000Z"),
+      ),
+      true,
+    );
+    assert.equal(
+      shouldSendPostSessionReminder(
+        scheduledAt,
+        1,
+        new Date("2026-07-12T14:00:00.000Z"),
+      ),
+      false,
+    );
+    assert.equal(
+      shouldSendPostSessionReminder(
+        scheduledAt,
+        1,
+        new Date("2026-07-13T14:00:00.000Z"),
+      ),
+      true,
+    );
+  });
+
+  it("opens dispute after 7 days", () => {
+    const scheduledAt = "2026-07-10T14:00:00.000Z";
+    assert.equal(
+      isPastSessionConfirmationDispute(
+        scheduledAt,
+        new Date("2026-07-17T13:59:00.000Z"),
+      ),
+      false,
+    );
+    assert.equal(
+      isPastSessionConfirmationDispute(
+        scheduledAt,
+        new Date("2026-07-17T14:00:00.000Z"),
+      ),
       true,
     );
   });

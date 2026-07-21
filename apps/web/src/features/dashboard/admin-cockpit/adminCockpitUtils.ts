@@ -29,8 +29,11 @@ export function formatAdminEventMeta(event: ScheduleEvent): string {
 
 const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
+  payment_pending: "Paiement en attente",
+  awaiting_session_confirmation: "À confirmer (post-séance)",
   completed: "Terminé",
   cancelled: "Annulé",
+  awaiting_replacement: "Remplacement",
 };
 
 export function courseStatusLabel(status: string): string {

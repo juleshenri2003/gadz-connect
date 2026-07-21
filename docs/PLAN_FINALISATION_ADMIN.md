@@ -3,7 +3,7 @@
 **Contexte** : le code MVP est quasiment prêt. Les retouches produit se font **plus tard**. Priorité = tout ce qui est **juridique / fiscal / conformité / partenariats**, sans quoi tu ne peux pas encaisser légalement ni lancer un campus pilote.
 
 **Décision actuelle** : lancer en **auto-entrepreneur** (pas de SASU pour l’instant).  
-→ Guide opérationnel : [`GUIDE_LANCEMENT_AE.md`](GUIDE_LANCEMENT_AE.md)
+→ Guide opérationnel : `[GUIDE_LANCEMENT_AE.md](GUIDE_LANCEMENT_AE.md)`
 
 **Structure cible long terme** : SASU **Gadz'Connect** (quand le pilote est validé) — APE type formation / soutien scolaire  
 **Modèle** : marketplace, commission sur les cours (campus gratuits)

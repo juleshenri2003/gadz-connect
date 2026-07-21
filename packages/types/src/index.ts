@@ -11,9 +11,17 @@ export type RegistrationPath = "existing_siret" | "new_micro";
 export type CourseStatus =
   | "scheduled"
   | "payment_pending"
+  | "awaiting_session_confirmation"
   | "completed"
   | "cancelled"
   | "awaiting_replacement";
+
+/** Litige confirmation post-séance (paiement bloqué). */
+export type SessionDisputeStatus =
+  | "none"
+  | "open"
+  | "resolved_paid"
+  | "resolved_refunded";
 
 export type TransactionStripeStatus =
   | "pending"
@@ -22,6 +30,58 @@ export type TransactionStripeStatus =
   | "refunded";
 
 export type TransactionUrssafStatus = "pending" | "declared";
+
+/** Statut inscription parent auprès de l'URSSAF (avance immédiate). */
+export type UrssafClientStatus =
+  | "inscription_envoyee"
+  | "rattachement_en_attente"
+  | "actif"
+  | "refuse"
+  | "expire";
+
+/** Canal de paiement d'une transaction cours. */
+export type PaymentChannel = "stripe" | "urssaf";
+
+/** Statut demande de paiement URSSAF (avance immédiate). */
+export type UrssafPaymentStatus =
+  | "recue"
+  | "en_attente_validation"
+  | "validee"
+  | "virement_effectue"
+  | "paye"
+  | "rejetee";
+
+/** Statut reversement au professeur. */
+export type ProfPayoutStatus =
+  | "pending_session_confirmation"
+  | "pending_urssaf"
+  | "paid"
+  | "paid_at_booking";
+
+/** Méthode de paiement figée à la réservation. */
+export type CoursePaymentMethod = "stripe" | "urssaf";
+
+export interface UrssafClient {
+  id: string;
+  profile_id: string;
+  birth_date: string;
+  birth_place: string;
+  fiscal_address: string;
+  urssaf_client_id: string | null;
+  status: UrssafClientStatus;
+  last_polled_at: string | null;
+  activated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UrssafEnrollmentInput {
+  birthDate: string;
+  birthPlace: string;
+  fiscalAddress: string;
+  iban: string;
+  nir?: string;
+}
 
 export interface Campus {
   id: string;

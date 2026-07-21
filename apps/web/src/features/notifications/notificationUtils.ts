@@ -19,6 +19,12 @@ export const KIND_LABELS: Record<string, string> = {
   replacement_candidate: "Remplaçant proposé",
   replacement_accepted: "Remplacement confirmé",
   refund_processed: "Remboursement",
+  urssaf_client_actif: "Avance immédiate",
+  urssaf_payment_rejected: "URSSAF refusée",
+  urssaf_payout_pending: "Reversement URSSAF",
+  session_confirm_reminder: "Confirmer le cours",
+  session_both_confirmed: "Séance validée",
+  session_dispute: "Litige séance",
 };
 
 export type NotificationFilter = "all" | "student_unavailable";
@@ -98,6 +104,18 @@ export function getKindBadgeClasses(kind: string): string {
       return "bg-success-bg text-success";
     case "refund_processed":
       return "bg-paper text-ink-700";
+    case "urssaf_client_actif":
+      return "bg-success-bg text-success";
+    case "urssaf_payment_rejected":
+      return "bg-warning-bg text-warning";
+    case "urssaf_payout_pending":
+      return "bg-orange-100 text-orange-900";
+    case "session_confirm_reminder":
+      return "bg-brand-50 text-brand-700";
+    case "session_both_confirmed":
+      return "bg-success-bg text-success";
+    case "session_dispute":
+      return "bg-warning-bg text-warning";
     default:
       return "bg-paper text-ink-600";
   }

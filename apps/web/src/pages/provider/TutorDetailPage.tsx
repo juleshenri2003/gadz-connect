@@ -27,6 +27,7 @@ import {
 } from "@/features/marketplace/useTutors";
 import { BookingPaymentForm } from "@/features/stripe/BookingPaymentForm";
 import { useStripeConfig } from "@/features/stripe/useStripeConfig";
+import { useUrssafStatus } from "@/features/urssaf/useUrssaf";
 
 const SUBJECT_OTHER = "__other__";
 
@@ -48,7 +49,9 @@ export function TutorDetailPage() {
   const bookSlot = useBookSlot();
   const confirmPayment = useConfirmBookingPayment();
   const { data: stripeConfig } = useStripeConfig();
+  const { data: urssafStatus } = useUrssafStatus();
   const [bookingMode, setBookingMode] = useState<BookingMode>("standard");
+  const [isHomeVisit, setIsHomeVisit] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
@@ -75,6 +78,8 @@ export function TutorDetailPage() {
     scheduledAt: string;
     endsAt: string;
     tutorName: string;
+    paymentMethod?: "stripe" | "urssaf";
+    parentChargeEstimate?: number;
   } | null>(null);
 
   const visibleSlots = useMemo(() => {
@@ -138,6 +143,12 @@ export function TutorDetailPage() {
     }
   }, [initialSlotId, slots]);
 
+  const canUseUrssaf =
+    bookingMode === "standard" &&
+    isHomeVisit &&
+    urssafStatus?.status === "actif" &&
+    urssafStatus.operational;
+
   async function handleBook() {
     if (!selectedSlot || !resolvedSubject) return;
     setBookingError(null);
@@ -151,6 +162,7 @@ export function TutorDetailPage() {
         beneficiaryName:
           payForOther && trimmedBeneficiary ? trimmedBeneficiary : undefined,
         sessionType: bookingMode,
+        isHomeVisit: bookingMode === "standard" ? isHomeVisit : false,
       });
 
       if (
@@ -188,6 +200,8 @@ export function TutorDetailPage() {
     netPayout: number;
     scheduledAt: string;
     endsAt: string;
+    paymentMethod?: "stripe" | "urssaf";
+    parentChargeEstimate?: number;
   }) {
     const name = tutor
       ? `${tutor.first_name} ${tutor.last_name}`.trim()
@@ -199,6 +213,8 @@ export function TutorDetailPage() {
       scheduledAt: result.scheduledAt,
       endsAt: result.endsAt,
       tutorName: name,
+      paymentMethod: result.paymentMethod,
+      parentChargeEstimate: result.parentChargeEstimate,
     });
     setConfirmOpen(false);
     setPaymentClientSecret(null);
@@ -259,9 +275,17 @@ export function TutorDetailPage() {
           <p className="mt-2 text-sm text-success">
             Montant :{" "}
             {booked.amountGross > 0
-              ? formatEuro(booked.amountGross)
+              ? booked.paymentMethod === "urssaf" && booked.parentChargeEstimate != null
+                ? `${formatEuro(booked.parentChargeEstimate)} après le cours (avance immédiate 50 %)`
+                : formatEuro(booked.amountGross)
               : "Séance d'essai gratuite"}
           </p>
+          {booked.paymentMethod === "urssaf" ? (
+            <p className="mt-2 text-sm text-success">
+              Paiement différé : l&apos;URSSAF prélèvera environ 50 % après la
+              réalisation du cours au domicile.
+            </p>
+          ) : null}
           <p className="mt-2 text-sm text-success">
             Votre cours apparaît dans votre emploi du temps.
           </p>
@@ -488,6 +512,25 @@ export function TutorDetailPage() {
                 <label className="flex items-center gap-2 text-sm text-ink-700">
                   <input
                     type="checkbox"
+                    checked={isHomeVisit}
+                    onChange={(event) => setIsHomeVisit(event.target.checked)}
+                  />
+                  Cours en présentiel au domicile de l&apos;élève
+                </label>
+                {isHomeVisit && urssafStatus?.status === "actif" ? (
+                  <p className="text-xs text-success">
+                    Avance immédiate active — vous ne paierez qu&apos;environ 50 %
+                    après le cours (prélèvement URSSAF).
+                  </p>
+                ) : isHomeVisit && urssafStatus?.operational ? (
+                  <p className="text-xs text-ink-500">
+                    Activez l&apos;avance immédiate dans Mes factures pour payer
+                    50 % au lieu de 100 % maintenant.
+                  </p>
+                ) : null}
+                <label className="flex items-center gap-2 text-sm text-ink-700">
+                  <input
+                    type="checkbox"
                     checked={payForOther}
                     onChange={(event) => setPayForOther(event.target.checked)}
                   />
@@ -527,9 +570,11 @@ export function TutorDetailPage() {
             ) : null}
             {bookingMode === "standard" ? (
               <p className="text-xs text-ink-400">
-                {stripeConfig?.configured
-                  ? "Le paiement par carte sera demandé à la confirmation."
-                  : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
+                {canUseUrssaf
+                  ? "Pas de paiement maintenant — l'URSSAF prélèvera votre part après le cours."
+                  : stripeConfig?.configured
+                    ? "Le paiement par carte sera demandé à la confirmation."
+                    : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
               </p>
             ) : (
               <p className="text-xs text-ink-400">

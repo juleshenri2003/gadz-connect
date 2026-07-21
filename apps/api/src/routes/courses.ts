@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
+import { payoutAfterSessionConfirmation } from "../lib/billing/session-payout.js";
 import { notifyUsers } from "../lib/notification-helpers.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
@@ -22,7 +23,7 @@ async function loadCourseForParticipant(courseId: string, userId: string) {
   const { data: course, error } = await supabaseAdmin
     .from("courses")
     .select(
-      "id, status, scheduled_at, campus_id, client_id, provider_id, subject, title, student_confirmed_at, provider_confirmed_at",
+      "id, status, scheduled_at, campus_id, client_id, provider_id, subject, title, student_confirmed_at, provider_confirmed_at, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status",
     )
     .eq("id", courseId)
     .maybeSingle();
@@ -34,8 +35,14 @@ async function loadCourseForParticipant(courseId: string, userId: string) {
   return { course, isClient, isProvider };
 }
 
+function isPastScheduled(scheduledAt: string | null): boolean {
+  if (!scheduledAt) return false;
+  return new Date(scheduledAt).getTime() < Date.now();
+}
+
 /**
  * POST /api/courses/:courseId/confirm-session
+ * Confirmation de présence ~24 h avant (pré-cours).
  */
 coursesRouter.post(
   "/:courseId/confirm-session",
@@ -77,6 +84,113 @@ coursesRouter.post(
     }
 
     res.json({ data: updated });
+  },
+);
+
+/**
+ * POST /api/courses/:courseId/confirm-attendance
+ * Confirmation post-séance : le cours a bien eu lieu (élève + prof).
+ * Quand les deux ont confirmé → déclenche le payout professeur.
+ */
+coursesRouter.post(
+  "/:courseId/confirm-attendance",
+  async (req: AuthenticatedRequest, res) => {
+    const access = await loadCourseForParticipant(
+      req.params.courseId as string,
+      req.user!.id,
+    );
+    if (!access) {
+      res.status(404).json({ error: "Cours introuvable" });
+      return;
+    }
+
+    const { course, isClient, isProvider } = access;
+    const eligibleStatus =
+      course.status === "awaiting_session_confirmation" ||
+      (course.status === "scheduled" &&
+        isPastScheduled(course.scheduled_at as string | null)) ||
+      course.status === "completed";
+
+    if (!eligibleStatus) {
+      res.status(400).json({
+        error:
+          "La confirmation de présence post-séance n'est possible qu'après l'horaire du cours",
+      });
+      return;
+    }
+
+    if (course.session_confirmation_completed_at) {
+      res.json({
+        data: {
+          id: course.id,
+          student_session_confirmed_at: course.student_session_confirmed_at,
+          provider_session_confirmed_at: course.provider_session_confirmed_at,
+          session_confirmation_completed_at:
+            course.session_confirmation_completed_at,
+          payout: { alreadyCompleted: true },
+        },
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const update: Record<string, unknown> = {};
+    if (isClient) {
+      if (course.student_session_confirmed_at) {
+        res.status(400).json({ error: "Vous avez déjà confirmé cette séance" });
+        return;
+      }
+      update.student_session_confirmed_at = now;
+    }
+    if (isProvider) {
+      if (course.provider_session_confirmed_at) {
+        res.status(400).json({ error: "Vous avez déjà confirmé cette séance" });
+        return;
+      }
+      update.provider_session_confirmed_at = now;
+    }
+
+    if (course.status === "scheduled") {
+      update.status = "awaiting_session_confirmation";
+    }
+
+    const studentAt = isClient
+      ? now
+      : (course.student_session_confirmed_at as string | null);
+    const providerAt = isProvider
+      ? now
+      : (course.provider_session_confirmed_at as string | null);
+    const bothConfirmed = Boolean(studentAt && providerAt);
+
+    if (bothConfirmed) {
+      update.session_confirmation_completed_at = now;
+      update.status = "completed";
+      update.session_dispute_status = "none";
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from("courses")
+      .update(update)
+      .eq("id", course.id)
+      .select(
+        "id, status, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status",
+      )
+      .single();
+
+    if (error || !updated) {
+      res.status(500).json({ error: error?.message ?? "Erreur serveur" });
+      return;
+    }
+
+    let payout: { ok: boolean; error?: string; channel?: string } | null = null;
+    if (bothConfirmed) {
+      const result = await payoutAfterSessionConfirmation(course.id as string);
+      payout = result.ok
+        ? { ok: true, channel: result.channel }
+        : { ok: false, error: result.error };
+    }
+
+    res.json({ data: { ...updated, payout } });
   },
 );
 

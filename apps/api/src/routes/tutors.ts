@@ -36,6 +36,7 @@ import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
 import { mapRatingForProvider, type CourseRatingRow } from "../lib/course-ratings.js";
 import { isTrialEligible } from "../lib/student-learning-profile.js";
+import { checkUrssafBookingEligibility } from "../lib/urssaf/booking.js";
 
 function mapTutorPublic<
   T extends { cv_pdf_path?: string | null; avatar_path?: string | null },
@@ -74,6 +75,7 @@ const bookingSchema = z.object({
   payerName: z.string().trim().min(1).max(120).optional(),
   beneficiaryName: z.string().trim().min(1).max(120).optional(),
   sessionType: z.enum(["standard", "trial"]).optional(),
+  isHomeVisit: z.boolean().optional(),
 });
 
 async function getCallerProfile(userId: string) {
@@ -1097,6 +1099,7 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   const { slot, client, tutor, subject, fiscal, isTrial } = prepared.data;
   const payerName = parsed.data.payerName?.trim() || null;
   const beneficiaryName = parsed.data.beneficiaryName?.trim() || null;
+  const isHomeVisit = parsed.data.isHomeVisit === true;
 
   if (isTrial) {
     const { data: course, error: courseError } = await supabaseAdmin
@@ -1169,10 +1172,82 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     tutor.stripe_connect_account_id,
   );
 
-  if (paymentStrategy === "blocked") {
+  const urssafEligibility = await checkUrssafBookingEligibility({
+    payerProfileId: client.id,
+    isHomeVisit,
+  });
+  const useUrssaf = urssafEligibility.eligible;
+
+  if (paymentStrategy === "blocked" && !useUrssaf) {
     res.status(400).json({
       error:
         "Ce professeur n'a pas encore finalisé la configuration de ses paiements. Choisissez un autre professeur ou réessayez plus tard.",
+    });
+    return;
+  }
+
+  if (useUrssaf) {
+    const { data: course, error: courseError } = await supabaseAdmin
+      .from("courses")
+      .insert({
+        title: subject,
+        description: "Réservation marketplace Gadz'Connect (avance immédiate)",
+        campus_id: client.campus_id,
+        provider_id: tutor.id,
+        client_id: client.id,
+        subject,
+        scheduled_at: slot.starts_at,
+        slot_id: slot.id,
+        status: "scheduled",
+        payer_name: payerName,
+        beneficiary_name: beneficiaryName,
+        session_type: "standard",
+        payment_method: "urssaf",
+        is_home_visit: true,
+      })
+      .select("id")
+      .single();
+
+    if (courseError || !course) {
+      res.status(500).json({ error: courseError?.message ?? "Erreur réservation" });
+      return;
+    }
+
+    const revenue = buildTransactionRevenueFromBooking(fiscal);
+    const { error: txError } = await supabaseAdmin.from("transactions").insert(
+      toTransactionInsertRow(revenue, {
+        course_id: course.id,
+        payment_channel: "urssaf",
+        prof_payout_status: "pending_session_confirmation",
+        status_stripe: "pending",
+      }),
+    );
+
+    if (txError) {
+      await supabaseAdmin.from("courses").delete().eq("id", course.id);
+      res.status(500).json({ error: txError.message });
+      return;
+    }
+
+    const slotResult = await finalizeBookingSlot(slot.id, client.id);
+    if (!slotResult.ok) {
+      await supabaseAdmin.from("courses").delete().eq("id", course.id);
+      res.status(500).json({ error: "Créneau déjà réservé" });
+      return;
+    }
+
+    res.status(201).json({
+      data: {
+        requiresPayment: false,
+        paymentMethod: "urssaf",
+        courseId: course.id,
+        amountGross: fiscal.amountGross,
+        parentChargeEstimate: Math.round(fiscal.amountGross * 50) / 100,
+        netPayout: fiscal.netPayout,
+        subject,
+        scheduledAt: slot.starts_at,
+        endsAt: slot.ends_at,
+      },
     });
     return;
   }
@@ -1196,6 +1271,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       payer_name: payerName,
       beneficiary_name: beneficiaryName,
       session_type: "standard",
+      payment_method: "stripe",
+      is_home_visit: isHomeVisit,
     })
     .select("id")
     .single();
@@ -1219,18 +1296,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
           automatic_payment_methods: { enabled: true },
         };
 
-      if (
-        paymentStrategy === "connect" &&
-        tutor.stripe_connect_account_id
-      ) {
-        paymentIntentParams.application_fee_amount = Math.round(
-          fiscal.commissionSasu * 100,
-        );
-        paymentIntentParams.transfer_data = {
-          destination: tutor.stripe_connect_account_id,
-        };
-      }
-
+      // Encaissement plateforme : le Transfer vers le prof a lieu après
+      // double confirmation post-séance (élève + prof).
       const paymentIntent = await stripe.paymentIntents.create(
         paymentIntentParams,
       );
@@ -1242,6 +1309,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
           toTransactionInsertRow(revenue, {
             course_id: course.id,
             stripe_payment_intent_id: paymentIntent.id,
+            payment_channel: "stripe",
+            prof_payout_status: "pending_session_confirmation",
           }),
         );
 
@@ -1284,6 +1353,8 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
         course_id: course.id,
         status_stripe: "succeeded",
         status_urssaf: "pending",
+        payment_channel: "stripe",
+        prof_payout_status: "pending_session_confirmation",
       }),
     );
 

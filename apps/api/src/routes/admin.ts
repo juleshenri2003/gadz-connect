@@ -36,10 +36,18 @@ import {
   regeneratePaymentInvoices,
 } from "../lib/billing/regenerate-payment-invoices.js";
 import {
+  adminForceSessionConfirmation,
+} from "../lib/billing/session-payout.js";
+import { refundCoursePayment } from "../lib/stripe-refund.js";
+import { supabaseAdmin } from "../lib/supabase.js";
+import {
   buildDemoParentInvoicePdf,
   buildDemoStudentInvoicePdf,
 } from "../lib/billing/demo-invoice-data.js";
-import { supabaseAdmin } from "../lib/supabase.js";
+import {
+  fetchUrssafReconciliation,
+  exportUrssafReconciliationCsv,
+} from "../lib/urssaf/admin-reconciliation.js";
 import {
   fetchAdminProfileDetail,
   listAdminProfiles,
@@ -703,6 +711,63 @@ adminRouter.get("/budgets", async (req: AdminRequest, res) => {
 });
 
 /**
+ * GET /api/admin/urssaf/reconciliation
+ * File d'anomalies avance immédiate (virements groupés / reversements bloqués).
+ */
+adminRouter.get("/urssaf/reconciliation", async (req: AdminRequest, res) => {
+  const campusFilter = adminCampusFilter(req.adminProfile!);
+  const scopeCampusId = campusFilter?.campusId;
+  const anomaliesOnly = req.query.anomaliesOnly === "true";
+
+  try {
+    const data = await fetchUrssafReconciliation(scopeCampusId);
+    res.json({
+      data: {
+        summary: data.summary,
+        rows: anomaliesOnly ? data.anomalies : data.rows,
+        anomaliesCount: data.anomalies.length,
+      },
+    });
+  } catch (err) {
+    console.error("[admin] urssaf reconciliation:", (err as Error).message);
+    res.status(500).json({
+      error: "Impossible de charger le rapprochement URSSAF",
+    });
+  }
+});
+
+/**
+ * GET /api/admin/urssaf/reconciliation/export
+ * Export CSV du rapprochement URSSAF.
+ */
+adminRouter.get(
+  "/urssaf/reconciliation/export",
+  async (req: AdminRequest, res) => {
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const scopeCampusId = campusFilter?.campusId;
+    const anomaliesOnly = req.query.anomaliesOnly !== "false";
+
+    try {
+      const data = await fetchUrssafReconciliation(scopeCampusId);
+      const rows = anomaliesOnly ? data.anomalies : data.rows;
+      const csv = exportUrssafReconciliationCsv(rows);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="urssaf-rapprochement-${new Date().toISOString().slice(0, 10)}.csv"`,
+      );
+      res.send(csv);
+    } catch (err) {
+      console.error(
+        "[admin] urssaf reconciliation export:",
+        (err as Error).message,
+      );
+      res.status(500).json({ error: "Export CSV impossible" });
+    }
+  },
+);
+
+/**
  * GET /api/admin/transactions
  * Liste paginée des transactions avec jointures cours / prof / campus.
  */
@@ -1195,6 +1260,85 @@ adminRouter.get("/courses/:id", async (req: AdminRequest, res) => {
     res.status(500).json({ error: "Impossible de charger le cours" });
   }
 });
+
+/**
+ * POST /api/admin/courses/:id/force-session-confirmation
+ * Force la double confirmation et déclenche le payout professeur.
+ */
+adminRouter.post(
+  "/courses/:id/force-session-confirmation",
+  async (req: AdminRequest, res) => {
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const courseId = req.params.id as string;
+
+    try {
+      const detail = await fetchAdminCourseDetail(
+        courseId,
+        campusFilter?.campusId,
+      );
+      if (!detail) {
+        res.status(404).json({ error: "Cours introuvable ou hors périmètre" });
+        return;
+      }
+
+      const result = await adminForceSessionConfirmation(courseId);
+      if (!result.ok) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+
+      res.json({ data: { ok: true, channel: result.channel, transferId: result.transferId } });
+    } catch (err) {
+      console.error("[admin] force session confirmation:", (err as Error).message);
+      res.status(500).json({ error: "Impossible de forcer la confirmation" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/courses/:id/refund-session
+ * Rembourse le paiement Stripe et clôture le litige post-séance.
+ */
+adminRouter.post(
+  "/courses/:id/refund-session",
+  async (req: AdminRequest, res) => {
+    const campusFilter = adminCampusFilter(req.adminProfile!);
+    const courseId = req.params.id as string;
+
+    try {
+      const detail = await fetchAdminCourseDetail(
+        courseId,
+        campusFilter?.campusId,
+      );
+      if (!detail) {
+        res.status(404).json({ error: "Cours introuvable ou hors périmètre" });
+        return;
+      }
+
+      const result = await refundCoursePayment(
+        courseId,
+        "Remboursement admin — litige confirmation de séance",
+      );
+      if (!result.ok) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+
+      await supabaseAdmin
+        .from("courses")
+        .update({
+          session_dispute_status: "resolved_refunded",
+          status: "cancelled",
+        })
+        .eq("id", courseId);
+
+      res.json({ data: { ok: true } });
+    } catch (err) {
+      console.error("[admin] refund session:", (err as Error).message);
+      res.status(500).json({ error: "Impossible de rembourser la séance" });
+    }
+  },
+);
 
 /**
  * GET /api/admin/me

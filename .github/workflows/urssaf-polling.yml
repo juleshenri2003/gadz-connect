@@ -1,0 +1,34 @@
+name: URSSAF polling
+
+on:
+  schedule:
+    # 2×/jour — 8h et 20h UTC
+    - cron: "0 8,20 * * *"
+  workflow_dispatch:
+
+jobs:
+  urssaf-polling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run URSSAF polling
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          URSSAF_API_ENABLED: ${{ vars.URSSAF_API_ENABLED }}
+          URSSAF_API_MOCK: ${{ vars.URSSAF_API_MOCK }}
+          URSSAF_API_BASE_URL: ${{ vars.URSSAF_API_BASE_URL }}
+          URSSAF_ENCRYPTION_KEY: ${{ secrets.URSSAF_ENCRYPTION_KEY }}
+        run: pnpm --filter @gadz-connect/api urssaf-polling

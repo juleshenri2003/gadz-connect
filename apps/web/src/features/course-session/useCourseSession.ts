@@ -29,6 +29,37 @@ export function useConfirmSession() {
   });
 }
 
+export function useConfirmAttendance() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (courseId: string) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{
+        data: {
+          id: string;
+          student_session_confirmed_at: string | null;
+          provider_session_confirmed_at: string | null;
+          session_confirmation_completed_at: string | null;
+          session_dispute_status?: string | null;
+          payout?: { ok?: boolean; error?: string; alreadyCompleted?: boolean } | null;
+        };
+      }>(`/api/courses/${courseId}/confirm-attendance`, {
+        method: "POST",
+        token,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["tutors-me-transactions"] });
+    },
+  });
+}
+
 export function usePingSession() {
   const { getAccessToken } = useAuth();
 

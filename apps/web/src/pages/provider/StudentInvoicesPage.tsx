@@ -1,4 +1,5 @@
 import { StudentInvoicesList } from "@/features/billing/StudentInvoicesList";
+import { UrssafEnrollmentSection } from "@/features/urssaf/UrssafEnrollmentSection";
 
 export function StudentInvoicesPage() {
   return (
@@ -9,6 +10,7 @@ export function StudentInvoicesPage() {
           Retrouvez ici toutes vos factures de cours et vos relevés mensuels.
         </p>
       </div>
+      <UrssafEnrollmentSection />
       <StudentInvoicesList />
     </div>
   );

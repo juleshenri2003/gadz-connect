@@ -7,6 +7,7 @@ import { formatEuro } from "@/features/admin/format";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
 import { ConfirmSessionActions } from "@/features/course-session/ConfirmSessionActions";
+import { ConfirmAttendanceActions } from "@/features/course-session/ConfirmAttendanceActions";
 import { useDeleteSlot } from "@/features/marketplace/useTutors";
 import {
   courseStatusLabel,
@@ -152,6 +153,25 @@ export function TeacherScheduleEventDetail({
             audience="teacher"
             studentConfirmedAt={event.studentConfirmedAt}
             providerConfirmedAt={event.providerConfirmedAt}
+          />
+        </div>
+      ) : null}
+
+      {event.courseId &&
+      (event.status === "awaiting_session_confirmation" ||
+        event.status === "completed" ||
+        (event.status === "scheduled" &&
+          new Date(event.startsAt).getTime() < Date.now())) ? (
+        <div className="mt-4">
+          <ConfirmAttendanceActions
+            courseId={event.courseId}
+            audience="teacher"
+            studentSessionConfirmedAt={event.studentSessionConfirmedAt}
+            providerSessionConfirmedAt={event.providerSessionConfirmedAt}
+            sessionConfirmationCompletedAt={
+              event.sessionConfirmationCompletedAt
+            }
+            sessionDisputeStatus={event.sessionDisputeStatus}
           />
         </div>
       ) : null}

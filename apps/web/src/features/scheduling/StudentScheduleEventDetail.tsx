@@ -11,6 +11,7 @@ import {
 } from "@/features/scheduling/calendar-utils";
 import { DeclareUnavailableButton } from "@/features/notifications/DeclareUnavailableButton";
 import { ConfirmSessionActions } from "@/features/course-session/ConfirmSessionActions";
+import { ConfirmAttendanceActions } from "@/features/course-session/ConfirmAttendanceActions";
 import {
   buildMarketplaceSubjectHref,
   formatNotificationDate,
@@ -41,6 +42,12 @@ export function StudentScheduleEventDetail({
     event.courseId &&
     event.status === "scheduled" &&
     !past;
+  const canConfirmAttendance =
+    event.kind === "course" &&
+    Boolean(event.courseId) &&
+    (event.status === "awaiting_session_confirmation" ||
+      (past &&
+        (event.status === "scheduled" || event.status === "completed")));
 
   return (
     <Modal
@@ -93,6 +100,18 @@ export function StudentScheduleEventDetail({
             audience="student"
             studentConfirmedAt={event.studentConfirmedAt}
             providerConfirmedAt={event.providerConfirmedAt}
+          />
+        ) : null}
+        {canConfirmAttendance ? (
+          <ConfirmAttendanceActions
+            courseId={event.courseId!}
+            audience="student"
+            studentSessionConfirmedAt={event.studentSessionConfirmedAt}
+            providerSessionConfirmedAt={event.providerSessionConfirmedAt}
+            sessionConfirmationCompletedAt={
+              event.sessionConfirmationCompletedAt
+            }
+            sessionDisputeStatus={event.sessionDisputeStatus}
           />
         ) : null}
         {canDeclareUnavailable ? (

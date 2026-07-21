@@ -240,3 +240,128 @@ export async function notifyTeacherValidatedByAdmin(
     declaredBy: userId,
   });
 }
+
+/** Parent : rattachement URSSAF actif → avance immédiate 50 %. */
+export async function notifyUrssafClientActif(
+  userId: string,
+  campusId: string,
+): Promise<void> {
+  await notifyUsers([userId], {
+    campusId,
+    kind: "urssaf_client_actif",
+    title: "Avance immédiate activée",
+    message:
+      "Votre compte URSSAF est actif. Pour les cours en présentiel au domicile, vous ne paierez plus que 50 % après chaque séance.",
+    declaredBy: userId,
+  });
+}
+
+/** Parent : demande de paiement URSSAF rejetée → repli Stripe. */
+export async function notifyUrssafPaymentRejected(params: {
+  clientId: string;
+  campusId: string;
+  courseId: string;
+  subject: string;
+  amountGross: number;
+}): Promise<void> {
+  await notifyUsers([params.clientId], {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "urssaf_payment_rejected",
+    title: "Paiement avance immédiate refusé",
+    message: `La demande URSSAF pour « ${params.subject} » (${params.amountGross.toFixed(2).replace(".", ",")} €) a été refusée. Un paiement classique à 100 % a été préparé — réglez-le depuis vos factures ou contactez le support.`,
+    declaredBy: params.clientId,
+  });
+}
+
+/** Admins : virement URSSAF reçu mais reversement prof bloqué. */
+export async function notifyUrssafPayoutPending(params: {
+  campusId: string;
+  courseId: string;
+  providerId: string;
+  subject: string;
+  amountGross: number;
+  declaredBy: string;
+}): Promise<void> {
+  const adminIds = await getSiteAdministratorIds(
+    params.campusId,
+    params.declaredBy,
+  );
+  if (adminIds.length === 0) return;
+
+  await notifyUsers(adminIds, {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "urssaf_payout_pending",
+    title: "Reversement prof en attente (URSSAF)",
+    message: `Virement URSSAF reçu pour « ${params.subject} » (${params.amountGross.toFixed(2).replace(".", ",")} €) mais le reversement au professeur n'a pas pu être déclenché (Stripe Connect incomplet ?). À vérifier dans Budgets → Rapprochement URSSAF.`,
+    declaredBy: params.declaredBy,
+  });
+}
+
+/** Élève + prof : rappel de confirmer que le cours a eu lieu. */
+export async function notifySessionConfirmReminder(params: {
+  campusId: string;
+  courseId: string;
+  clientId: string;
+  providerId: string;
+  subject: string;
+  declaredBy: string;
+}): Promise<void> {
+  await notifyUsers([params.clientId, params.providerId], {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "session_confirm_reminder",
+    title: "Confirmez que le cours a eu lieu",
+    message: `Pour « ${params.subject} », élève et professeur doivent confirmer la séance afin de débloquer le paiement au professeur.`,
+    declaredBy: params.declaredBy,
+  });
+}
+
+/** Double confirmation OK — paiement en cours. */
+export async function notifySessionBothConfirmed(params: {
+  campusId: string;
+  courseId: string;
+  clientId: string;
+  providerId: string;
+  subject: string;
+  declaredBy: string;
+}): Promise<void> {
+  await notifyUsers([params.clientId, params.providerId], {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "session_both_confirmed",
+    title: "Séance confirmée par les deux parties",
+    message: `« ${params.subject} » est validée. Le reversement au professeur est en cours de traitement.`,
+    declaredBy: params.declaredBy,
+  });
+}
+
+/** Litige : confirmations manquantes après délai — alerte admin + parties. */
+export async function notifySessionDispute(params: {
+  campusId: string;
+  courseId: string;
+  clientId: string;
+  providerId: string;
+  subject: string;
+  declaredBy: string;
+}): Promise<void> {
+  const adminIds = await getSiteAdministratorIds(
+    params.campusId,
+    params.declaredBy,
+  );
+  const recipients = uniqueRecipientIds([
+    params.clientId,
+    params.providerId,
+    ...adminIds,
+  ]);
+
+  await notifyUsers(recipients, {
+    campusId: params.campusId,
+    courseId: params.courseId,
+    kind: "session_dispute",
+    title: "Litige confirmation de séance",
+    message: `« ${params.subject} » n'a pas été confirmée par les deux parties sous 7 jours. Le paiement est bloqué — un administrateur doit trancher (valider ou rembourser).`,
+    declaredBy: params.declaredBy,
+  });
+}
