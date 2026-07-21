@@ -36,6 +36,99 @@ export interface ScheduleEventPayload {
   sessionDisputeStatus?: string | null;
 }
 
+function isMissingColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("does not exist") ||
+    message.includes("Could not find the") ||
+    message.includes("schema cache")
+  );
+}
+
+const TEACHER_COURSE_SELECT_WITH_SESSION = `
+        id, title, subject, status, scheduled_at, slot_id, client_id,
+        student_confirmed_at, provider_confirmed_at,
+        student_session_confirmed_at, provider_session_confirmed_at,
+        session_confirmation_completed_at, session_dispute_status,
+        client:client_id ( first_name, last_name ),
+        slot:slot_id ( starts_at, ends_at )
+      `;
+
+const TEACHER_COURSE_SELECT_LEGACY = `
+        id, title, subject, status, scheduled_at, slot_id, client_id,
+        student_confirmed_at, provider_confirmed_at,
+        client:client_id ( first_name, last_name ),
+        slot:slot_id ( starts_at, ends_at )
+      `;
+
+const STUDENT_COURSE_SELECT_WITH_SESSION = `
+        id, title, subject, status, scheduled_at, slot_id, provider_id,
+        student_confirmed_at, provider_confirmed_at,
+        student_session_confirmed_at, provider_session_confirmed_at,
+        session_confirmation_completed_at, session_dispute_status,
+        provider:provider_id ( first_name, last_name ),
+        slot:slot_id ( starts_at, ends_at )
+      `;
+
+const STUDENT_COURSE_SELECT_LEGACY = `
+        id, title, subject, status, scheduled_at, slot_id, provider_id,
+        student_confirmed_at, provider_confirmed_at,
+        provider:provider_id ( first_name, last_name ),
+        slot:slot_id ( starts_at, ends_at )
+      `;
+
+async function queryCoursesWithSessionFallback(input: {
+  selectWithSession: string;
+  selectLegacy: string;
+  roleField: "provider_id" | "client_id";
+  userId: string;
+  from?: string;
+  to?: string;
+  includeCancelled?: boolean;
+  excludePaymentPending?: boolean;
+}) {
+  const build = (select: string) => {
+    let q = supabaseAdmin
+      .from("courses")
+      .select(select)
+      .eq(input.roleField, input.userId)
+      .not("scheduled_at", "is", null)
+      .order("scheduled_at");
+    if (input.from) q = q.gte("scheduled_at", input.from);
+    if (input.to) q = q.lte("scheduled_at", input.to);
+    if (!input.includeCancelled) q = q.neq("status", "cancelled");
+    if (input.excludePaymentPending) q = q.neq("status", "payment_pending");
+    return q;
+  };
+
+  const first = await build(input.selectWithSession);
+  if (!first.error) return first;
+
+  if (isMissingColumnError(first.error.message)) {
+    console.warn(
+      "[schedule] colonnes post-séance absentes — fallback legacy (appliquez migration 030)",
+    );
+    return build(input.selectLegacy);
+  }
+
+  return first;
+}
+
+function sessionFieldsFromCourse(course: Record<string, unknown>) {
+  return {
+    studentSessionConfirmedAt:
+      (course.student_session_confirmed_at as string | null | undefined) ?? null,
+    providerSessionConfirmedAt:
+      (course.provider_session_confirmed_at as string | null | undefined) ??
+      null,
+    sessionConfirmationCompletedAt:
+      (course.session_confirmation_completed_at as string | null | undefined) ??
+      null,
+    sessionDisputeStatus:
+      (course.session_dispute_status as string | null | undefined) ?? null,
+  };
+}
+
 function slotEnd(startsAt: string, endsAt: string): string {
   return endsAt || startsAt;
 }
@@ -291,29 +384,16 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    let coursesQuery = supabaseAdmin
-      .from("courses")
-      .select(
-        `
-        id, title, subject, status, scheduled_at, slot_id, client_id,
-        student_confirmed_at, provider_confirmed_at,
-        student_session_confirmed_at, provider_session_confirmed_at,
-        session_confirmation_completed_at, session_dispute_status,
-        client:client_id ( first_name, last_name ),
-        slot:slot_id ( starts_at, ends_at )
-      `,
-      )
-      .eq("provider_id", userId)
-      .not("scheduled_at", "is", null)
-      .order("scheduled_at");
-
-    if (from) coursesQuery = coursesQuery.gte("scheduled_at", from);
-    if (to) coursesQuery = coursesQuery.lte("scheduled_at", to);
-    if (!includeCancelled) {
-      coursesQuery = coursesQuery.neq("status", "cancelled");
-    }
-
-    const { data: courses, error: coursesError } = await coursesQuery;
+    const { data: courses, error: coursesError } =
+      await queryCoursesWithSessionFallback({
+        selectWithSession: TEACHER_COURSE_SELECT_WITH_SESSION,
+        selectLegacy: TEACHER_COURSE_SELECT_LEGACY,
+        roleField: "provider_id",
+        userId,
+        from,
+        to,
+        includeCancelled,
+      });
 
     if (coursesError) {
       res.status(500).json({ error: coursesError.message });
@@ -326,6 +406,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     const slotIds = new Set((slots ?? []).map((s) => s.id as string));
     for (const course of courses ?? []) {
       if (course.slot_id && slotIds.has(course.slot_id as string)) continue;
+      const row = course as Record<string, unknown>;
       const client = profileName(course.client);
       const slot = pickOne<{ starts_at: string; ends_at: string }>(course.slot);
       const scheduledAt = course.scheduled_at as string;
@@ -354,14 +435,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
-        studentSessionConfirmedAt:
-          course.student_session_confirmed_at as string | null,
-        providerSessionConfirmedAt:
-          course.provider_session_confirmed_at as string | null,
-        sessionConfirmationCompletedAt:
-          course.session_confirmation_completed_at as string | null,
-        sessionDisputeStatus:
-          course.session_dispute_status as string | null,
+        ...sessionFieldsFromCourse(row),
       });
     }
 
@@ -381,28 +455,17 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     const ratingsByCourseId = await loadRatingsByCourseIds(teacherCourseIds);
     attachRatingsToEvents(events, ratingsByCourseId, {});
   } else {
-    let coursesQuery = supabaseAdmin
-      .from("courses")
-      .select(
-        `
-        id, title, subject, status, scheduled_at, slot_id, provider_id,
-        student_confirmed_at, provider_confirmed_at,
-        student_session_confirmed_at, provider_session_confirmed_at,
-        session_confirmation_completed_at, session_dispute_status,
-        provider:provider_id ( first_name, last_name ),
-        slot:slot_id ( starts_at, ends_at )
-      `,
-      )
-      .eq("client_id", userId)
-      .not("scheduled_at", "is", null)
-      .neq("status", "cancelled")
-      .neq("status", "payment_pending")
-      .order("scheduled_at");
-
-    if (from) coursesQuery = coursesQuery.gte("scheduled_at", from);
-    if (to) coursesQuery = coursesQuery.lte("scheduled_at", to);
-
-    const { data: courses, error: coursesError } = await coursesQuery;
+    const { data: courses, error: coursesError } =
+      await queryCoursesWithSessionFallback({
+        selectWithSession: STUDENT_COURSE_SELECT_WITH_SESSION,
+        selectLegacy: STUDENT_COURSE_SELECT_LEGACY,
+        roleField: "client_id",
+        userId,
+        from,
+        to,
+        includeCancelled: false,
+        excludePaymentPending: true,
+      });
 
     if (coursesError) {
       res.status(500).json({ error: coursesError.message });
@@ -413,6 +476,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     const summaryMetaByCourseId = await loadSummaryMetaByCourseId(courseIds);
 
     for (const course of courses ?? []) {
+      const row = course as Record<string, unknown>;
       const provider = profileName(course.provider);
       const slot = pickOne<{ starts_at: string; ends_at: string }>(course.slot);
       const scheduledAt = course.scheduled_at as string;
@@ -439,14 +503,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
-        studentSessionConfirmedAt:
-          course.student_session_confirmed_at as string | null,
-        providerSessionConfirmedAt:
-          course.provider_session_confirmed_at as string | null,
-        sessionConfirmationCompletedAt:
-          course.session_confirmation_completed_at as string | null,
-        sessionDisputeStatus:
-          course.session_dispute_status as string | null,
+        ...sessionFieldsFromCourse(row),
       });
     }
 

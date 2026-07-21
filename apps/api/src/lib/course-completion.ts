@@ -15,10 +15,23 @@ export async function markPastCoursesCompleted(): Promise<void> {
 
   const ids = pastCourses.map((c) => c.id as string);
 
-  await supabaseAdmin
+  const { error: statusError } = await supabaseAdmin
     .from("courses")
     .update({ status: "awaiting_session_confirmation" })
     .in("id", ids);
+
+  // Migration 030 pas encore appliquée : revenir au comportement legacy.
+  if (statusError) {
+    console.warn(
+      "[course-completion] awaiting_session_confirmation indisponible — fallback completed:",
+      statusError.message,
+    );
+    await supabaseAdmin
+      .from("courses")
+      .update({ status: "completed" })
+      .in("id", ids);
+    return;
+  }
 
   for (const course of pastCourses) {
     if (!course.campus_id || !course.client_id || !course.provider_id) continue;
