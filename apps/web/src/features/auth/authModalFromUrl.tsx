@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { AUTH_REDIRECT_KEY } from "./authStorage";
 import { useAuthModal } from "./authModalContext";
 import type { AuthModalMode, AuthModalRole } from "./authModalContext";
+import { isUsableAuthRedirect } from "./resolvePostLoginPath";
 
 function parseAuthMode(value: string | null): AuthModalMode | null {
   if (value === "login" || value === "signup") return value;
@@ -36,10 +37,10 @@ export function AuthModalFromUrl() {
       location.state as { from?: { pathname: string; search?: string } } | null
     )?.from;
     if (from?.pathname) {
-      sessionStorage.setItem(
-        AUTH_REDIRECT_KEY,
-        `${from.pathname}${from.search ?? ""}`,
-      );
+      const redirect = `${from.pathname}${from.search ?? ""}`;
+      if (isUsableAuthRedirect(redirect)) {
+        sessionStorage.setItem(AUTH_REDIRECT_KEY, redirect);
+      }
     }
 
     openAuthModal({ mode: auth, role: parseAuthRole(intent) });

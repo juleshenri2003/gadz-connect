@@ -7,6 +7,20 @@ export function setAuthRedirect(path: string): void {
   sessionStorage.setItem(AUTH_REDIRECT_KEY, path);
 }
 
+export function clearAuthRedirect(): void {
+  sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+}
+
+/** Efface un redirect RH stale quand on ouvre la connexion élève/prof. */
+export function clearStaleAdminRedirect(): void {
+  const stored = sessionStorage.getItem(AUTH_REDIRECT_KEY);
+  if (!stored) return;
+  const path = stored.split("?")[0] ?? stored;
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+  }
+}
+
 export function setAuthIntent(intent: AuthIntent): void {
   sessionStorage.setItem(AUTH_INTENT_KEY, intent);
 }

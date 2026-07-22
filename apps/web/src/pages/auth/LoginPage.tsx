@@ -26,7 +26,10 @@ import {
 } from "@/features/campus/campusLabels";
 import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
+import {
+  isUsableAuthRedirect,
+  resolvePostLoginPath,
+} from "@/features/auth/resolvePostLoginPath";
 import { AppLogo } from "@/features/layout/AppLogo";
 import { apiFetch } from "@/lib/api";
 
@@ -217,7 +220,10 @@ export function LoginPage() {
       return;
     }
     setSent(true);
-    sessionStorage.setItem(AUTH_REDIRECT_KEY, redirectTarget);
+    const safeRedirect = isUsableAuthRedirect(redirectTarget)
+      ? redirectTarget
+      : "/app";
+    sessionStorage.setItem(AUTH_REDIRECT_KEY, safeRedirect);
   }
 
   const helpAside = (

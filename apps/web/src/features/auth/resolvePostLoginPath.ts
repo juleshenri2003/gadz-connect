@@ -13,6 +13,11 @@ interface ProfileMe {
   student_onboarding_complete?: boolean;
 }
 
+function clearAuthSessionKeys(): void {
+  sessionStorage.removeItem(AUTH_REDIRECT_KEY);
+  sessionStorage.removeItem(AUTH_INTENT_KEY);
+}
+
 /** Convertit une URL publique en route app connectée. */
 export function normalizeAuthRedirect(stored: string): string {
   try {
@@ -32,13 +37,37 @@ export function normalizeAuthRedirect(stored: string): string {
   return stored;
 }
 
+/**
+ * Redirects post-login sûrs pour élève/prof.
+ * Ignore `/`, `/admin`, `/rh`, `/auth` — évite les rebonds accueil / RH.
+ */
+export function isUsableAuthRedirect(stored: string): boolean {
+  const normalized = normalizeAuthRedirect(stored.trim());
+  if (!normalized.startsWith("/")) return false;
+
+  let pathname = normalized;
+  try {
+    pathname = new URL(normalized, "http://local").pathname;
+  } catch {
+    const q = normalized.indexOf("?");
+    pathname = q >= 0 ? normalized.slice(0, q) : normalized;
+  }
+
+  if (pathname === "/" || pathname === "") return false;
+  if (pathname.startsWith("/admin")) return false;
+  if (pathname.startsWith("/rh")) return false;
+  if (pathname.startsWith("/auth")) return false;
+  if (pathname.startsWith("/connexion")) return false;
+
+  return pathname.startsWith("/app");
+}
+
 export async function resolvePostLoginPath(
   accessToken: string,
 ): Promise<string> {
   try {
     await apiFetch("/api/admin/me", { token: accessToken });
-    sessionStorage.removeItem(AUTH_REDIRECT_KEY);
-    sessionStorage.removeItem(AUTH_INTENT_KEY);
+    clearAuthSessionKeys();
     return "/admin";
   } catch {
     try {
@@ -51,6 +80,7 @@ export async function resolvePostLoginPath(
         PROVIDER_ROLES.includes(profile.role) &&
         !profile.profile_setup_complete
       ) {
+        clearAuthSessionKeys();
         return "/app/setup";
       }
 
@@ -59,6 +89,7 @@ export async function resolvePostLoginPath(
         profile.profile_setup_complete &&
         profile.student_onboarding_complete === false
       ) {
+        clearAuthSessionKeys();
         return "/app/onboarding";
       }
     } catch {
@@ -66,9 +97,9 @@ export async function resolvePostLoginPath(
     }
 
     const stored = sessionStorage.getItem(AUTH_REDIRECT_KEY);
-    if (stored) {
-      sessionStorage.removeItem(AUTH_REDIRECT_KEY);
-      sessionStorage.removeItem(AUTH_INTENT_KEY);
+    clearAuthSessionKeys();
+
+    if (stored && isUsableAuthRedirect(stored)) {
       return normalizeAuthRedirect(stored);
     }
 

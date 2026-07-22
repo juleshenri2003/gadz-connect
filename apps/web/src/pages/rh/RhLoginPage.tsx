@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { setAuthRedirect } from "@/features/auth/authStorage";
 import { apiFetch } from "@/lib/api";
 
 const RH_EMAIL = "jules.henri@ensam.eu";
@@ -64,7 +65,7 @@ export function RhLoginPage() {
   async function onMagicLinkSubmit({ email }: MagicLinkForm) {
     setServerError(null);
     const redirectTo = `${window.location.origin}/auth/callback`;
-    sessionStorage.setItem("gadz_auth_redirect", "/admin");
+    setAuthRedirect("/admin");
 
     try {
       await apiFetch<{ data: { sent: boolean } }>("/api/auth/magic-link", {

@@ -30,14 +30,21 @@ import {
 } from "@/features/campus/campusLabels";
 import { useCampusOptions } from "@/features/campus/useCampusOptions";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { setAuthIntent, AUTH_REDIRECT_KEY } from "@/features/auth/authStorage";
+import {
+  clearStaleAdminRedirect,
+  setAuthIntent,
+  AUTH_REDIRECT_KEY,
+} from "@/features/auth/authStorage";
 import {
   AuthModalContext,
   type AuthModalOptions,
   type AuthModalRole,
   type AuthModalView,
 } from "@/features/auth/authModalContext";
-import { resolvePostLoginPath } from "@/features/auth/resolvePostLoginPath";
+import {
+  isUsableAuthRedirect,
+  resolvePostLoginPath,
+} from "@/features/auth/resolvePostLoginPath";
 
 export type { AuthModalMode, AuthModalRole, AuthModalView } from "@/features/auth/authModalContext";
 
@@ -264,10 +271,15 @@ function AuthModalPanel({
       persistCampusId(values.campusId);
     }
     setAuthIntent(view.role);
-    sessionStorage.setItem(
-      AUTH_REDIRECT_KEY,
-      `${window.location.pathname}${window.location.search}`,
-    );
+    // Ne pas écraser un redirect utile (/app, booking…) avec `/` (page d'accueil).
+    const existing = sessionStorage.getItem(AUTH_REDIRECT_KEY);
+    if (!existing || !isUsableAuthRedirect(existing)) {
+      const current = `${window.location.pathname}${window.location.search}`;
+      sessionStorage.setItem(
+        AUTH_REDIRECT_KEY,
+        isUsableAuthRedirect(current) ? current : "/app",
+      );
+    }
     const { error } = await signInWithMagicLink(values.email);
     if (error) {
       setServerError(error);
@@ -482,6 +494,8 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   });
 
   const openAuthModal = useCallback((options?: AuthModalOptions) => {
+    // Une tentative RH précédente ne doit pas renvoyer vers /admin après login élève/prof.
+    clearStaleAdminRedirect();
     setView({
       mode: options?.mode ?? "signup",
       role: options?.role ?? "student",
