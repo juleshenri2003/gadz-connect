@@ -11,6 +11,14 @@ async function main() {
   console.log(`Rappels 24 h envoyés : ${stats.remindersSent}`);
   console.log(`Escalades admin       : ${stats.escalationsSent}`);
   console.log(`Remboursements auto   : ${stats.replacementsRefunded}`);
+  console.log(`Rappels post-séance   : ${stats.postSessionRemindersSent}`);
+  console.log(`Litiges ouverts       : ${stats.sessionDisputesOpened}`);
+  if (stats.warnings.length > 0) {
+    console.warn("Avertissements :");
+    for (const warning of stats.warnings) {
+      console.warn(`  - ${warning}`);
+    }
+  }
   if (stats.errors.length > 0) {
     console.error("Erreurs :");
     for (const err of stats.errors) {
