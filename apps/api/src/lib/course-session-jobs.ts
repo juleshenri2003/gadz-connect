@@ -23,7 +23,24 @@ export interface CourseSessionJobStats {
   replacementsRefunded: number;
   postSessionRemindersSent: number;
   sessionDisputesOpened: number;
+  /** Infos non bloquantes (ex. migration 030 absente). */
+  warnings: string[];
   errors: string[];
+}
+
+/** Schéma post-séance (migration 030) pas encore appliqué. */
+function isPostSessionSchemaMissing(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("student_session_confirmed_at") ||
+    lower.includes("provider_session_confirmed_at") ||
+    lower.includes("session_confirm_reminder") ||
+    lower.includes("session_dispute_status") ||
+    lower.includes("awaiting_session_confirmation") ||
+    (lower.includes("column") && lower.includes("does not exist")) ||
+    lower.includes("invalid input value for enum")
+  );
 }
 
 type CourseRow = {
@@ -55,6 +72,7 @@ export async function runCourseSessionJobs(
     replacementsRefunded: 0,
     postSessionRemindersSent: 0,
     sessionDisputesOpened: 0,
+    warnings: [],
     errors: [],
   };
 
@@ -225,6 +243,12 @@ async function processPostSessionReminders(
     .not("scheduled_at", "is", null);
 
   if (error) {
+    if (isPostSessionSchemaMissing(error.message)) {
+      stats.warnings.push(
+        "postSessionReminders: migration 030 absente — étape ignorée (appliquez supabase/migrations/030_post_session_confirmation.sql)",
+      );
+      return;
+    }
     stats.errors.push(`postSessionReminders: ${error.message}`);
     return;
   }
@@ -283,6 +307,12 @@ async function processSessionConfirmationDisputes(
     .not("scheduled_at", "is", null);
 
   if (error) {
+    if (isPostSessionSchemaMissing(error.message)) {
+      stats.warnings.push(
+        "sessionDisputes: migration 030 absente — étape ignorée (appliquez supabase/migrations/030_post_session_confirmation.sql)",
+      );
+      return;
+    }
     stats.errors.push(`sessionDisputes: ${error.message}`);
     return;
   }
