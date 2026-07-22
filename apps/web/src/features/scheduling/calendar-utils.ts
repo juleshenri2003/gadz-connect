@@ -119,7 +119,7 @@ export const COURSE_VISUAL_META: Record<
   { label: string; classes: string; swatch: string }
 > = {
   pending: {
-    label: "En attente",
+    label: "À venir",
     classes: "border-brand-100 bg-brand-50 text-brand-800",
     swatch: "border-brand-100 bg-brand-50",
   },

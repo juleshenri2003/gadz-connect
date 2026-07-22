@@ -11,6 +11,8 @@ interface DashboardActionInboxProps {
   maxItems?: number;
   /** Ouvre le détail cours (confirmations inline). */
   onOpenCourse?: (courseId: string) => void;
+  /** Masque complètement la section s'il n'y a rien à faire. */
+  hideWhenEmpty?: boolean;
 }
 
 const KIND_ORDER: DashboardTaskKind[] = [
@@ -135,6 +137,7 @@ export function DashboardActionInbox({
   emptyMessage = "Rien à traiter — vous êtes à jour.",
   maxItems = 6,
   onOpenCourse,
+  hideWhenEmpty = false,
 }: DashboardActionInboxProps) {
   const todos = tasks.filter((t) => t.status === "todo").slice(0, maxItems);
   const groups = groupTodos(todos);
@@ -149,11 +152,13 @@ export function DashboardActionInbox({
   }
 
   if (todos.length === 0) {
+    if (hideWhenEmpty) return null;
     return (
-      <section className="rounded-md border border-line bg-surface p-4">
-        <h3 className="font-semibold text-ink-900">{title}</h3>
-        <p className="mt-1 text-sm text-ink-600">{emptyMessage}</p>
-      </section>
+      <p className="text-sm text-ink-500">
+        <span className="font-medium text-ink-700">{title}</span>
+        {" — "}
+        {emptyMessage}
+      </p>
     );
   }
 

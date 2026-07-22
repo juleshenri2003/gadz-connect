@@ -60,9 +60,15 @@ export function StudentCockpit({
     );
 
   const agendaEvents = useMemo(() => {
-    if (!selectedDayIso) return courseEvents;
-    return eventsForDayIso(courseEvents, selectedDayIso);
-  }, [courseEvents, selectedDayIso]);
+    const base = selectedDayIso
+      ? eventsForDayIso(courseEvents, selectedDayIso)
+      : courseEvents;
+    // Le prochain cours est déjà dans le hero — on évite le doublon dans la liste.
+    if (!selectedDayIso && nextCourse) {
+      return base.filter((e) => e.id !== nextCourse.id);
+    }
+    return base;
+  }, [courseEvents, selectedDayIso, nextCourse]);
 
   const weekStartIso = toDayIso(
     startOfWeek(
@@ -79,7 +85,7 @@ export function StudentCockpit({
           month: "long",
         },
       )}`
-    : "Mes prochains cours";
+    : "Autres cours à venir";
 
   function openCourseFromInbox(courseId: string) {
     const event = findCourseEvent(events, courseId);
@@ -108,12 +114,15 @@ export function StudentCockpit({
             ? "Traitez d’abord ces actions — le reste est en retrait"
             : "Confirmations, alertes et prochaines étapes"
         }
+        hideWhenEmpty
         onOpenCourse={openCourseFromInbox}
       />
 
       {!focusMode ? <StudentUrgentBanners tutorCount={tutorCount} /> : null}
 
       <StudentNextCourseHero course={nextCourse} />
+
+      {!focusMode ? <StudentStatsRow stats={stats} /> : null}
 
       <div
         className={cn(
@@ -137,7 +146,11 @@ export function StudentCockpit({
             headerDescription={
               selectedDayIso
                 ? "Séances du jour sélectionné — cliquez pour le détail."
-                : "Vos sessions de tutorat confirmées — cliquez pour le détail."
+                : agendaEvents.length > 0
+                  ? "Les séances suivantes — cliquez pour le détail."
+                  : nextCourse
+                    ? "Pas d’autre séance planifiée pour l’instant."
+                    : "Réservez un créneau pour voir vos prochains cours ici."
             }
             showHistory={Boolean(selectedDayIso)}
             onEventClick={setDetailEvent}
@@ -159,7 +172,6 @@ export function StudentCockpit({
 
         {!focusMode ? (
           <div className="space-y-6">
-            <StudentStatsRow stats={stats} />
             <StudentTutorsPanel tutorCount={tutorCount} />
           </div>
         ) : null}
