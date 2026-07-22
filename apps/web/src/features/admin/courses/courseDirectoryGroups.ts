@@ -32,10 +32,9 @@ const COURSE_GROUP_HINTS: Record<CourseVisualCategory, string> = {
 };
 
 function sortByScheduledDesc(a: AdminCourseRow, b: AdminCourseRow): number {
-  return (
-    new Date(b.scheduled_at || b.starts_at).getTime() -
-    new Date(a.scheduled_at || a.starts_at).getTime()
-  );
+  const aAt = a.scheduled_at ?? a.starts_at ?? "";
+  const bAt = b.scheduled_at ?? b.starts_at ?? "";
+  return new Date(bAt).getTime() - new Date(aAt).getTime();
 }
 
 export function groupCoursesByVisualCategory(
@@ -55,8 +54,8 @@ export function groupCoursesByVisualCategory(
     let category = getCourseVisualCategory(
       "course",
       course.status,
-      course.starts_at,
-      course.ends_at,
+      course.starts_at ?? undefined,
+      course.ends_at ?? undefined,
     );
     // CR manquant sur un cours terminé → traité comme données attendues
     if (category === "completed" && course.missing_summary) {

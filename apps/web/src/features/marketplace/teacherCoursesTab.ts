@@ -14,10 +14,7 @@ export function parseCoursesTab(value: string | null | undefined): CoursesTab {
   if (VALID_TABS.includes(value as CoursesTab)) {
     return value as CoursesTab;
   }
-  if (value in TAB_ALIASES) {
-    return TAB_ALIASES[value];
-  }
-  return "slots";
+  return TAB_ALIASES[value] ?? "slots";
 }
 
 export function coursesTabHref(tab: CoursesTab): string {
