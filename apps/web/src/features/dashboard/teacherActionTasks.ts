@@ -1,7 +1,15 @@
 import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
+import type { ScheduleEvent } from "@/features/scheduling/types";
 import type { DashboardProgress } from "./dashboardTypes";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
+import {
+  alertItemsToTasks,
+  dedupeConfirmTasks,
+  documentTasksFromEvents,
+  finalizeTaskProgress,
+  sessionConfirmTasksFromEvents,
+} from "./dashboardActionUtils";
 
 interface StripeStatus {
   onboardingComplete?: boolean;
@@ -20,17 +28,12 @@ export function computeTeacherActionTasks(
   stripe: StripeStatus | undefined,
   notifications: CampusNotificationItem[] | undefined,
   futureSlotCount: number,
+  events?: ScheduleEvent[],
 ): DashboardProgress {
   const tasks: DashboardProgress["tasks"] = [];
 
   if (profile.account_status !== "active") {
-    return {
-      tasks: [],
-      completedCount: 0,
-      totalCount: 0,
-      percent: 100,
-      isComplete: true,
-    };
+    return finalizeTaskProgress([]);
   }
 
   if (!stripe?.onboardingComplete) {
@@ -40,6 +43,7 @@ export function computeTeacherActionTasks(
       description: "Activez Stripe Connect pour recevoir vos virements",
       href: "/app/paiements",
       status: "todo",
+      kind: "payment",
     });
   }
 
@@ -57,6 +61,7 @@ export function computeTeacherActionTasks(
           : "Déclaration mensuelle — espace auto-entrepreneur URSSAF",
       href: "https://www.autoentrepreneur.urssaf.fr/portail/accueil.html",
       status: "todo",
+      kind: "payment",
     });
   }
 
@@ -67,31 +72,32 @@ export function computeTeacherActionTasks(
       description: "Ajoutez au moins un créneau à venir pour être réservable",
       href: coursesTabHref("slots"),
       status: "todo",
+      kind: "other",
     });
   }
 
-  const unreadOther = notifications?.filter((n) => !n.read_at) ?? [];
+  tasks.push(...sessionConfirmTasksFromEvents(events, "teacher"));
+  tasks.push(...documentTasksFromEvents(events));
 
-  if (unreadOther.length > 0) {
-    tasks.push({
-      id: "read-alerts",
-      title: `${unreadOther.length} alerte(s) à consulter`,
-      description: "Notifications campus non lues",
-      href: "/app/alertes",
-      status: "todo",
-    });
+  const alertTasks = alertItemsToTasks(notifications, 5, {
+    events,
+    audience: "teacher",
+  });
+  if (alertTasks.length > 0) {
+    tasks.push(...alertTasks);
+  } else {
+    const unreadOther = notifications?.filter((n) => !n.read_at) ?? [];
+    if (unreadOther.length > 0) {
+      tasks.push({
+        id: "read-alerts",
+        title: `${unreadOther.length} alerte(s) à consulter`,
+        description: "Notifications campus non lues",
+        href: "/app/alertes",
+        status: "todo",
+        kind: "alert",
+      });
+    }
   }
 
-  const completedCount = tasks.filter((t) => t.status === "done").length;
-  const totalCount = tasks.length;
-  const percent =
-    totalCount === 0 ? 100 : Math.round((completedCount / totalCount) * 100);
-
-  return {
-    tasks,
-    completedCount,
-    totalCount,
-    percent,
-    isComplete: tasks.length === 0,
-  };
+  return finalizeTaskProgress(dedupeConfirmTasks(tasks));
 }

@@ -49,81 +49,94 @@ export function TutorStudentLearningCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            Parcours
-          </p>
-          <p className="mt-1 text-ink-900">
-            {data.classYear}
-            {data.studyProgram ? ` · ${data.studyProgram}` : ""}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            Points forts
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-ink-700">
-            {data.strongPoints}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            Difficultés
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-ink-700">
-            {data.difficulties}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            Besoins spécifiques
-          </p>
-          <p className="mt-1 text-ink-700">{formatFlags(data)}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            Objectifs
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-ink-700">
-            {data.tutoringGoals}
-          </p>
-        </div>
+        <LearningProfileFields profile={data} />
       </CardContent>
     </Card>
   );
 }
 
+/** Affichage RH — utilise la fiche embarquée dans le détail admin si fournie. */
 export function AdminStudentLearningProfileSection({
   studentId,
+  profile: embeddedProfile,
+  isDetailLoading = false,
 }: {
   studentId: string;
+  profile?: StudentLearningProfile | null;
+  isDetailLoading?: boolean;
 }) {
-  const { data, isLoading, isError } =
-    useStudentLearningProfileForStudent(studentId);
+  const shouldFetch = embeddedProfile === undefined && !isDetailLoading;
+  const { data, isLoading, isError, error } =
+    useStudentLearningProfileForStudent(studentId, shouldFetch);
 
-  if (isLoading) {
+  const profile = embeddedProfile !== undefined ? embeddedProfile : data;
+  const loading = isDetailLoading || (shouldFetch && isLoading);
+
+  if (loading) {
     return <p className="text-sm text-ink-400">Chargement du profil pédagogique…</p>;
   }
 
-  if (isError || !data) {
+  if (shouldFetch && isError) {
+    const message =
+      error instanceof Error ? error.message : "Chargement impossible";
     return (
-      <p className="text-sm text-ink-500">
-        Aucun profil pédagogique complété pour cet élève.
+      <p className="text-sm text-danger">
+        Impossible d&apos;afficher le profil pédagogique ({message}).
       </p>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="rounded-md border border-dashed border-line bg-paper px-4 py-3 text-sm text-ink-500">
+        Aucun profil pédagogique complété pour cet élève.
+      </div>
     );
   }
 
   return (
     <div className="space-y-3 rounded-md border border-line bg-paper p-4 text-sm">
-      <Detail label="Classe / promo" value={data.classYear} />
-      {data.studyProgram ? (
-        <Detail label="Filière" value={data.studyProgram} />
+      <div className="flex flex-wrap items-center gap-2">
+        {profile.onboardingComplete ? (
+          <span className="rounded-full bg-success-bg px-2 py-0.5 text-xs font-medium text-success">
+            Complété
+          </span>
+        ) : (
+          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+            Brouillon
+          </span>
+        )}
+      </div>
+      {!profile.onboardingComplete ? (
+        <p className="rounded-md border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning">
+          Questionnaire incomplet — brouillon visible côté RH uniquement.
+        </p>
       ) : null}
-      <Detail label="Points forts" value={data.strongPoints} multiline />
-      <Detail label="Difficultés" value={data.difficulties} multiline />
-      <Detail label="Besoins spécifiques" value={formatFlags(data)} />
-      <Detail label="Objectifs" value={data.tutoringGoals} multiline />
+      <LearningProfileFields profile={profile} />
     </div>
+  );
+}
+
+function LearningProfileFields({
+  profile,
+}: {
+  profile: StudentLearningProfile;
+}) {
+  return (
+    <>
+      <Detail
+        label="Classe / promo"
+        value={
+          profile.studyProgram
+            ? `${profile.classYear} · ${profile.studyProgram}`
+            : profile.classYear
+        }
+      />
+      <Detail label="Points forts" value={profile.strongPoints} multiline />
+      <Detail label="Difficultés" value={profile.difficulties} multiline />
+      <Detail label="Besoins spécifiques" value={formatFlags(profile)} />
+      <Detail label="Objectifs" value={profile.tutoringGoals} multiline />
+    </>
   );
 }
 
@@ -138,8 +151,12 @@ function Detail({
 }) {
   return (
     <div>
-      <p className="text-xs text-ink-400">{label}</p>
-      <p className={`mt-0.5 text-ink-900 ${multiline ? "whitespace-pre-wrap" : ""}`}>
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+        {label}
+      </p>
+      <p
+        className={`mt-0.5 text-ink-900 ${multiline ? "whitespace-pre-wrap" : ""}`}
+      >
         {value}
       </p>
     </div>

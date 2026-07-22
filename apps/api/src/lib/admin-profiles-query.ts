@@ -1,6 +1,10 @@
 import type { AccountStatus, UserRole } from "@gadz-connect/types";
 import { supabaseAdmin } from "./supabase.js";
 import { fetchProfileByUserId } from "./profile-query.js";
+import {
+  fetchStudentLearningProfile,
+  mapStudentLearningProfile,
+} from "./student-learning-profile.js";
 
 export type AdminProfileFilter =
   | "verification_failed"
@@ -60,6 +64,8 @@ export interface AdminProfileDetail extends AdminProfileListRow {
   updated_at: string;
   coursesAsProvider: number;
   coursesAsClient: number;
+  /** Fiche pédagogique élève — null si absente ou non applicable. */
+  learning_profile: ReturnType<typeof mapStudentLearningProfile> | null;
 }
 
 const PROFILE_LIST_SELECT = `
@@ -303,17 +309,25 @@ export async function fetchAdminProfileDetail(
 
   const authMap = await buildAuthUserMap([profileId]);
 
-  const [{ count: coursesAsProvider }, { count: coursesAsClient }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("courses")
-        .select("id", { count: "exact", head: true })
-        .eq("provider_id", profileId),
-      supabaseAdmin
-        .from("courses")
-        .select("id", { count: "exact", head: true })
-        .eq("client_id", profileId),
-    ]);
+  const isStudent = profile.role === "student_provider";
+
+  const [
+    { count: coursesAsProvider },
+    { count: coursesAsClient },
+    learningResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", profileId),
+    supabaseAdmin
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", profileId),
+    isStudent
+      ? fetchStudentLearningProfile(profileId)
+      : Promise.resolve({ ok: true as const, data: null }),
+  ]);
 
   let siretIsDuplicate = false;
   if (profile.siret) {
@@ -327,6 +341,11 @@ export async function fetchAdminProfileDetail(
   const campus = pickCampus(
     profile.campus as RawProfileRow["campus"],
   );
+
+  const learning_profile =
+    isStudent && learningResult.ok && learningResult.data
+      ? mapStudentLearningProfile(learningResult.data)
+      : null;
 
   return {
     id: profile.id as string,
@@ -367,5 +386,6 @@ export async function fetchAdminProfileDetail(
     updated_at: profile.updated_at as string,
     coursesAsProvider: coursesAsProvider ?? 0,
     coursesAsClient: coursesAsClient ?? 0,
+    learning_profile,
   };
 }

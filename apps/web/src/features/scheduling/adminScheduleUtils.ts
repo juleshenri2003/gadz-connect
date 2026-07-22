@@ -9,9 +9,48 @@ import type { ScheduleEvent } from "./types";
 export type AdminScheduleViewMode = "week" | "list" | "month";
 
 export type AdminScheduleStatusFilter =
-  | "scheduled"
+  | "pending"
+  | "awaiting_data"
   | "completed"
-  | "cancelled";
+  | "replaced"
+  | "cancelled"
+  /** Anciens paramètres URL (compat). */
+  | "scheduled";
+
+/** Mappe les chips UI vers les statuts API. */
+export const STATUS_FILTER_TO_API: Record<
+  AdminScheduleStatusFilter,
+  string[]
+> = {
+  pending: ["scheduled", "payment_pending"],
+  awaiting_data: ["awaiting_session_confirmation"],
+  completed: ["completed"],
+  replaced: ["awaiting_replacement"],
+  cancelled: ["cancelled"],
+  scheduled: ["scheduled", "payment_pending"],
+};
+
+const KNOWN_STATUS_FILTERS = new Set<string>([
+  "pending",
+  "awaiting_data",
+  "completed",
+  "replaced",
+  "cancelled",
+  "scheduled",
+]);
+
+export function expandStatusFiltersToApi(
+  selected: AdminScheduleStatusFilter[],
+): string[] | undefined {
+  if (selected.length === 0) return undefined;
+  const expanded = new Set<string>();
+  for (const filter of selected) {
+    for (const status of STATUS_FILTER_TO_API[filter] ?? [filter]) {
+      expanded.add(status);
+    }
+  }
+  return [...expanded];
+}
 
 export interface AdminScheduleUrlState {
   week?: string;
@@ -102,7 +141,8 @@ export function buildAdminPlanningHref(
   if (params.campusId) search.set("campus", params.campusId);
   if (params.status?.length) search.set("status", params.status.join(","));
   if (params.search) search.set("q", params.search);
-  if (params.showHistory) search.set("history", "1");
+  if (params.showHistory === false) search.set("history", "0");
+  else if (params.showHistory) search.delete("history");
   if (params.view && params.view !== "week") search.set("view", params.view);
   const qs = search.toString();
   return qs ? `/admin/planning?${qs}` : "/admin/planning";
@@ -118,8 +158,11 @@ export function parseAdminScheduleUrl(
 ): AdminScheduleUrlState {
   const statusRaw = searchParams.get("status");
   const viewRaw = searchParams.get("view");
+  const historyRaw = searchParams.get("history");
   const status = statusRaw
-    ? (statusRaw.split(",").filter(Boolean) as AdminScheduleStatusFilter[])
+    ? (statusRaw
+        .split(",")
+        .filter((value) => KNOWN_STATUS_FILTERS.has(value)) as AdminScheduleStatusFilter[])
     : undefined;
 
   return {
@@ -128,7 +171,8 @@ export function parseAdminScheduleUrl(
     campusId: searchParams.get("campus") ?? undefined,
     status: status?.length ? status : undefined,
     search: searchParams.get("q") ?? undefined,
-    showHistory: searchParams.get("history") === "1",
+    // Par défaut : tout afficher. history=0 pour masquer l'historique.
+    showHistory: historyRaw !== "0",
     view:
       viewRaw === "list" || viewRaw === "month" || viewRaw === "week"
         ? viewRaw

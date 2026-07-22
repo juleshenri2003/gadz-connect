@@ -196,6 +196,29 @@ export function UserDetailDrawer({
               </div>
             </div>
 
+            {profile.role === "student_provider" ? (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-ink-900">
+                    Fiche pédagogique
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs text-ink-500">
+                  Remplie par l&apos;élève — visible ici pour le suivi RH et les
+                  tuteurs après réservation.
+                </p>
+                <div className="mt-3">
+                  <AdminStudentLearningProfileSection
+                    studentId={profile.id}
+                    profile={
+                      detail ? (detail.learning_profile ?? null) : undefined
+                    }
+                    isDetailLoading={isLoading && !detail}
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {profile.role === "teacher" ? (
               <div>
                 <h3 className="text-sm font-semibold text-ink-900">
@@ -263,17 +286,6 @@ export function UserDetailDrawer({
                     value={maskStripeAccountId(profile.stripe_connect_account_id)}
                   />
                 </dl>
-              </div>
-            ) : null}
-
-            {profile.role === "student_provider" ? (
-              <div>
-                <h3 className="text-sm font-semibold text-ink-900">
-                  Profil pédagogique
-                </h3>
-                <div className="mt-3">
-                  <AdminStudentLearningProfileSection studentId={profile.id} />
-                </div>
               </div>
             ) : null}
 

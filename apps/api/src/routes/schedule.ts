@@ -86,7 +86,10 @@ async function queryCoursesWithSessionFallback(input: {
   to?: string;
   includeCancelled?: boolean;
   excludePaymentPending?: boolean;
-}) {
+}): Promise<{
+  data: Record<string, unknown>[] | null;
+  error: { message: string } | null;
+}> {
   const build = (select: string) => {
     let q = supabaseAdmin
       .from("courses")
@@ -102,19 +105,53 @@ async function queryCoursesWithSessionFallback(input: {
   };
 
   const first = await build(input.selectWithSession);
-  if (!first.error) return first;
+  if (!first.error) {
+    return {
+      data: (first.data as unknown as Record<string, unknown>[] | null) ?? null,
+      error: null,
+    };
+  }
 
   if (isMissingColumnError(first.error.message)) {
     console.warn(
       "[schedule] colonnes post-séance absentes — fallback legacy (appliquez migration 030)",
     );
-    return build(input.selectLegacy);
+    const legacy = await build(input.selectLegacy);
+    return {
+      data: (legacy.data as unknown as Record<string, unknown>[] | null) ?? null,
+      error: legacy.error,
+    };
   }
 
-  return first;
+  return { data: null, error: first.error };
 }
 
 function sessionFieldsFromCourse(course: Record<string, unknown>) {
+  const hasSessionCols = Object.prototype.hasOwnProperty.call(
+    course,
+    "student_session_confirmed_at",
+  );
+  const status = course.status as string;
+  const scheduledAt = course.scheduled_at as string | null | undefined;
+  const isPastForLegacy =
+    status === "completed" ||
+    status === "awaiting_session_confirmation" ||
+    (Boolean(scheduledAt) && new Date(scheduledAt!).getTime() < Date.now());
+
+  if (!hasSessionCols && isPastForLegacy) {
+    const student =
+      (course.student_confirmed_at as string | null | undefined) ?? null;
+    const provider =
+      (course.provider_confirmed_at as string | null | undefined) ?? null;
+    return {
+      studentSessionConfirmedAt: student,
+      providerSessionConfirmedAt: provider,
+      sessionConfirmationCompletedAt:
+        student && provider ? (student > provider ? student : provider) : null,
+      sessionDisputeStatus: null,
+    };
+  }
+
   return {
     studentSessionConfirmedAt:
       (course.student_session_confirmed_at as string | null | undefined) ?? null,
@@ -230,7 +267,7 @@ function pickOne<T>(value: unknown): T | null {
 /**
  * GET /api/schedule/me
  * Emploi du temps personnel (élève ou professeur).
- * Query: from, to (ISO), includeCancelled (teacher courses only)
+ * Query: from, to (ISO), includeCancelled
  */
 scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.id;
@@ -406,7 +443,6 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     const slotIds = new Set((slots ?? []).map((s) => s.id as string));
     for (const course of courses ?? []) {
       if (course.slot_id && slotIds.has(course.slot_id as string)) continue;
-      const row = course as Record<string, unknown>;
       const client = profileName(course.client);
       const slot = pickOne<{ starts_at: string; ends_at: string }>(course.slot);
       const scheduledAt = course.scheduled_at as string;
@@ -435,7 +471,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
-        ...sessionFieldsFromCourse(row),
+        ...sessionFieldsFromCourse(course),
       });
     }
 
@@ -463,7 +499,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
         userId,
         from,
         to,
-        includeCancelled: false,
+        includeCancelled,
         excludePaymentPending: true,
       });
 
@@ -476,7 +512,6 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
     const summaryMetaByCourseId = await loadSummaryMetaByCourseId(courseIds);
 
     for (const course of courses ?? []) {
-      const row = course as Record<string, unknown>;
       const provider = profileName(course.provider);
       const slot = pickOne<{ starts_at: string; ends_at: string }>(course.slot);
       const scheduledAt = course.scheduled_at as string;
@@ -503,7 +538,7 @@ scheduleRouter.get("/me", async (req: AuthenticatedRequest, res) => {
           : undefined,
         studentConfirmedAt: course.student_confirmed_at as string | null,
         providerConfirmedAt: course.provider_confirmed_at as string | null,
-        ...sessionFieldsFromCourse(row),
+        ...sessionFieldsFromCourse(course),
       });
     }
 

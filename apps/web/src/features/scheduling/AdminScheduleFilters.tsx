@@ -1,13 +1,24 @@
-import { Button } from "@gadz-connect/ui";
+import { Button, cn } from "@gadz-connect/ui";
+import {
+  COURSE_VISUAL_META,
+  type CourseVisualCategory,
+} from "@/features/scheduling/calendar-utils";
 import type { AdminScheduleStatusFilter } from "@/features/scheduling/adminScheduleUtils";
 
 const STATUS_OPTIONS: Array<{
   value: AdminScheduleStatusFilter;
   label: string;
+  category: CourseVisualCategory;
 }> = [
-  { value: "scheduled", label: "Planifié" },
-  { value: "completed", label: "Terminé" },
-  { value: "cancelled", label: "Annulé" },
+  { value: "pending", label: "En attente", category: "pending" },
+  {
+    value: "awaiting_data",
+    label: "Données attendues",
+    category: "awaiting_data",
+  },
+  { value: "completed", label: "Cours donné", category: "completed" },
+  { value: "replaced", label: "Remplacé", category: "replaced" },
+  { value: "cancelled", label: "Annulé / renoncé", category: "cancelled" },
 ];
 
 interface AdminScheduleFiltersProps {
@@ -17,6 +28,8 @@ interface AdminScheduleFiltersProps {
   selectedStatus: AdminScheduleStatusFilter[];
   showHistory: boolean;
   showCampusFilter: boolean;
+  focusActive?: boolean;
+  focusMatchCount?: number;
   onCampusChange: (campusId: string | undefined) => void;
   onSearchChange: (value: string) => void;
   onStatusToggle: (status: AdminScheduleStatusFilter) => void;
@@ -32,6 +45,8 @@ export function AdminScheduleFilters({
   selectedStatus,
   showHistory,
   showCampusFilter,
+  focusActive,
+  focusMatchCount,
   onCampusChange,
   onSearchChange,
   onStatusToggle,
@@ -54,9 +69,7 @@ export function AdminScheduleFilters({
               id="admin-planning-campus"
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
               value={campusId ?? ""}
-              onChange={(e) =>
-                onCampusChange(e.target.value || undefined)
-              }
+              onChange={(e) => onCampusChange(e.target.value || undefined)}
             >
               <option value="">Tous les campus</option>
               {campuses.map((campus) => (
@@ -73,16 +86,25 @@ export function AdminScheduleFilters({
             htmlFor="admin-planning-search"
             className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-400"
           >
-            Recherche
+            Personne (prof ou élève)
           </label>
           <input
             id="admin-planning-search"
             type="search"
-            placeholder="Prof, élève, matière…"
+            placeholder="Ex. Martin — les autres cours s’estompent…"
             className="w-full rounded-lg border border-line px-3 py-2 text-sm"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
+          {focusActive ? (
+            <p className="mt-1 text-xs text-ink-500">
+              Focus actif
+              {focusMatchCount != null
+                ? ` — ${focusMatchCount} session${focusMatchCount > 1 ? "s" : ""} mise${focusMatchCount > 1 ? "s" : ""} en avant`
+                : ""}
+              . Les autres restent visibles en fond.
+            </p>
+          ) : null}
         </div>
 
         {onExport ? (
@@ -104,15 +126,17 @@ export function AdminScheduleFilters({
         </span>
         {STATUS_OPTIONS.map((option) => {
           const active = selectedStatus.includes(option.value);
+          const meta = COURSE_VISUAL_META[option.category];
           return (
             <button
               key={option.value}
               type="button"
-              className={
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition",
                 active
-                  ? "rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"
-                  : "rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink-600 hover:border-line"
-              }
+                  ? `${meta.classes} ring-2 ring-offset-1`
+                  : "border-line bg-surface text-ink-600 hover:border-line",
+              )}
               onClick={() => onStatusToggle(option.value)}
             >
               {option.label}
@@ -128,7 +152,7 @@ export function AdminScheduleFilters({
           checked={showHistory}
           onChange={(e) => onShowHistoryChange(e.target.checked)}
         />
-        Afficher l&apos;historique et les annulés
+        Afficher tous les cours (passés, terminés, annulés)
       </label>
     </div>
   );

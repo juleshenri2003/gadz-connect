@@ -21,7 +21,7 @@ export function computeAdminPilotageTasks(
       id: "siret-verification-failed",
       title: `${verificationFailed.length} vérification(s) SIRET en échec`,
       description: "Dossiers à contrôler manuellement dans Utilisateurs",
-      href: "/admin/utilisateurs?filter=verification_failed",
+      href: "/admin/utilisateurs/profs?filter=verification_failed",
       status: "todo",
     });
   }
@@ -37,7 +37,7 @@ export function computeAdminPilotageTasks(
       id: "duplicate-siret",
       title: `${duplicateCount} SIRET en doublon`,
       description: "Résoudre les conflits d'attribution SIRET",
-      href: "/admin/utilisateurs?filter=duplicates",
+      href: "/admin/utilisateurs/profs?filter=duplicates",
       status: "todo",
     });
   }
@@ -93,6 +93,8 @@ const ADMIN_NAV_PATHS = [
   "/admin/planning",
   "/admin/alertes",
   "/admin/utilisateurs",
+  "/admin/utilisateurs/eleves",
+  "/admin/utilisateurs/profs",
   "/admin/budgets",
   "/admin/cours",
 ] as const;
@@ -103,6 +105,7 @@ export function computeAdminNavBadgeCounts(
     | Array<{
         account_status: string;
         siret_verification_failed?: boolean;
+        role?: string;
       }>
     | undefined,
   notifications: CampusNotificationItem[] | undefined,
@@ -116,9 +119,16 @@ export function computeAdminNavBadgeCounts(
     profiles?.filter((p) => p.account_status === "pending_siret").length ?? 0;
   const verificationFailed =
     profiles?.filter((p) => p.siret_verification_failed).length ?? 0;
+  const teacherIssues =
+    profiles?.filter(
+      (p) =>
+        p.role === "teacher" &&
+        (p.account_status === "pending_siret" || p.siret_verification_failed),
+    ).length ?? 0;
 
   counts["/admin/utilisateurs"] =
     pendingMembers + suspendedCount + verificationFailed;
+  counts["/admin/utilisateurs/profs"] = teacherIssues + suspendedCount;
 
   counts["/admin/alertes"] =
     notifications?.filter((n) => !n.read_at).length ?? 0;

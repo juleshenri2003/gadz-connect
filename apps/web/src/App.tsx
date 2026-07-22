@@ -116,7 +116,15 @@ export default function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="planning" element={<AdminSchedulePage />} />
         <Route path="alertes" element={<NotificationsPage />} />
-        <Route path="utilisateurs" element={<AdminUsersPage />} />
+        <Route path="utilisateurs" element={<AdminUsersPage directory="all" />} />
+        <Route
+          path="utilisateurs/eleves"
+          element={<AdminUsersPage directory="students" />}
+        />
+        <Route
+          path="utilisateurs/profs"
+          element={<AdminUsersPage directory="teachers" />}
+        />
         <Route path="membres" element={<AdminMembersRedirect />} />
         <Route path="budgets" element={<AdminBudgetsPage />} />
         <Route path="cours" element={<AdminCoursesPage />} />

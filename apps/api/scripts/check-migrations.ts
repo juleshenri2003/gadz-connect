@@ -147,6 +147,11 @@ function buildProbes(sb: ReturnType<typeof createClient>): Probe[] {
         (await columnExists(sb, "courses", "student_session_confirmed_at")) &&
         (await columnExists(sb, "courses", "session_dispute_status")),
     },
+    {
+      id: "031",
+      label: "Parents déclarés sur profil élève",
+      run: async () => columnExists(sb, "profiles", "parents"),
+    },
   ];
 }
 
@@ -159,7 +164,7 @@ async function main() {
   const probes = buildProbes(sb);
   const missing: Probe[] = [];
 
-  console.log("\n=== Vérification migrations Supabase (008, 015–028, 030) ===\n");
+  console.log("\n=== Vérification migrations Supabase (008, 015–028, 030–031) ===\n");
 
   for (const probe of probes) {
     const ok = await probe.run();
@@ -168,7 +173,7 @@ async function main() {
   }
 
   if (missing.length === 0) {
-    console.log("\nToutes les migrations 008, 015–028 et 030 sont appliquées.\n");
+    console.log("\nToutes les migrations 008, 015–028 et 030–031 sont appliquées.\n");
     return;
   }
 

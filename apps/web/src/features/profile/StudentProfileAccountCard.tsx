@@ -5,6 +5,7 @@ import type { MyProfile } from "@/features/auth/useMyProfile";
 import { campusDisplayName } from "@/features/campus/campusLabels";
 import { ProviderProfileIdentityForm } from "@/features/profile/ProviderProfileIdentityForm";
 import { StudentLearningProfileEditor } from "@/features/profile/StudentLearningProfileEditor";
+import { StudentParentsEditor } from "@/features/profile/StudentParentsEditor";
 
 interface FieldRowProps {
   label: string;
@@ -73,6 +74,8 @@ export function StudentProfileAccountCard({
             ) : null}
           </dl>
         </section>
+
+        <StudentParentsEditor parents={profile.parents ?? []} />
 
         <StudentLearningProfileEditor />
       </CardContent>

@@ -36,6 +36,10 @@ import {
   acreStartDateSchema,
   acreUpdateSchema,
 } from "../lib/acre-validation.js";
+import {
+  normalizeParents,
+  studentParentsListSchema,
+} from "../lib/student-parents.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 export const profileRouter = Router();
@@ -128,6 +132,7 @@ profileRouter.get("/me", async (req: AuthenticatedRequest, res) => {
   res.json({
     data: {
       ...profile,
+      parents: normalizeParents(profile.parents),
       avatar_url: getProfilePhotoPublicUrl(
         profile.avatar_path as string | null | undefined,
       ),
@@ -806,6 +811,81 @@ profileRouter.patch(
     }
 
     res.json({ data: updated });
+  },
+);
+
+const parentsUpdateSchema = z.object({
+  parents: studentParentsListSchema,
+});
+
+/**
+ * PATCH /api/profile/parents
+ * Remplace la liste des parents déclarés (élèves uniquement, max 4).
+ */
+profileRouter.patch(
+  "/parents",
+  loadAccountStatus,
+  rejectSuspended,
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = parentsUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.flatten().formErrors[0] ?? "Validation failed",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    const user = req.user!;
+
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (fetchError || !existing) {
+      res.status(404).json({ error: "Profil introuvable" });
+      return;
+    }
+
+    if (existing.role !== "student_provider") {
+      res.status(403).json({ error: "Réservé aux comptes élève" });
+      return;
+    }
+
+    const parents = parsed.data.parents;
+
+    const { data: updated, error } = await supabaseAdmin
+      .from("profiles")
+      .update({ parents })
+      .eq("id", user.id)
+      .select("id, parents")
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "42703" || error.message.includes("parents")) {
+        res.status(503).json({
+          error:
+            "La déclaration des parents n'est pas encore disponible — appliquez la migration 031",
+        });
+        return;
+      }
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    if (!updated) {
+      res.status(500).json({ error: "Mise à jour impossible" });
+      return;
+    }
+
+    res.json({
+      data: {
+        id: updated.id,
+        parents: normalizeParents(updated.parents),
+      },
+    });
   },
 );
 

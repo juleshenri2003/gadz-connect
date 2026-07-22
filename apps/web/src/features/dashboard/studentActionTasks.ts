@@ -2,13 +2,19 @@ import type { MyProfile } from "@/features/auth/useMyProfile";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import type { DashboardProgress } from "./dashboardTypes";
+import {
+  alertItemsToTasks,
+  dedupeConfirmTasks,
+  finalizeTaskProgress,
+  sessionConfirmTasksFromEvents,
+} from "./dashboardActionUtils";
 import { computeStudentDashboardProgress } from "./studentDashboardTasks";
 
 export function computeStudentActionTasks(
   profile: MyProfile,
   events: ScheduleEvent[] | undefined,
   campusTutorCount: number,
-  _notifications: CampusNotificationItem[] | undefined,
+  notifications: CampusNotificationItem[] | undefined,
 ): DashboardProgress {
   const tasks: DashboardProgress["tasks"] = [];
 
@@ -19,20 +25,17 @@ export function computeStudentActionTasks(
   );
   for (const task of onboarding.tasks) {
     if (task.status === "todo") {
-      tasks.push({ ...task });
+      tasks.push({ ...task, kind: task.kind ?? "onboarding" });
     }
   }
 
-  const completedCount = tasks.filter((t) => t.status === "done").length;
-  const totalCount = tasks.length;
-  const percent =
-    totalCount === 0 ? 100 : Math.round((completedCount / totalCount) * 100);
+  tasks.push(...sessionConfirmTasksFromEvents(events, "student"));
+  tasks.push(
+    ...alertItemsToTasks(notifications, 5, {
+      events,
+      audience: "student",
+    }),
+  );
 
-  return {
-    tasks,
-    completedCount,
-    totalCount,
-    percent,
-    isComplete: tasks.length === 0,
-  };
+  return finalizeTaskProgress(dedupeConfirmTasks(tasks));
 }

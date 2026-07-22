@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { StudentLearningProfileForm } from "@/features/onboarding/StudentLearningProfileForm";
 import { useSaveStudentLearningProfile } from "@/features/onboarding/useStudentLearningProfile";
 
 export function StudentOnboardingPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const saveProfile = useSaveStudentLearningProfile();
 
   return (
@@ -22,6 +24,8 @@ export function StudentOnboardingPage() {
         showIntro
         onSubmit={async (values) => {
           await saveProfile.mutateAsync(values);
+          await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
+          await queryClient.refetchQueries({ queryKey: ["profile-me"] });
           navigate("/app", { replace: true });
         }}
       />

@@ -1,6 +1,43 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { apiFetch } from "@/lib/api";
+import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
+import type { ScheduleEvent } from "@/features/scheduling/types";
+
+const CONFIRM_ALERT_KINDS = new Set([
+  "course_confirmation_reminder",
+  "course_confirmation_escalation",
+  "session_confirm_reminder",
+]);
+
+function patchScheduleEventAfterAttendance(
+  events: ScheduleEvent[],
+  courseId: string,
+  data: {
+    student_session_confirmed_at: string | null;
+    provider_session_confirmed_at: string | null;
+    session_confirmation_completed_at: string | null;
+  },
+): ScheduleEvent[] {
+  return events.map((event) => {
+    if (event.courseId !== courseId) return event;
+    return {
+      ...event,
+      studentSessionConfirmedAt: data.student_session_confirmed_at,
+      providerSessionConfirmedAt: data.provider_session_confirmed_at,
+      sessionConfirmationCompletedAt: data.session_confirmation_completed_at,
+      studentConfirmedAt:
+        data.student_session_confirmed_at ?? event.studentConfirmedAt,
+      providerConfirmedAt:
+        data.provider_session_confirmed_at ?? event.providerConfirmedAt,
+      status: data.session_confirmation_completed_at
+        ? "completed"
+        : event.status === "scheduled"
+          ? "awaiting_session_confirmation"
+          : event.status,
+    };
+  });
+}
 
 export function useConfirmSession() {
   const { getAccessToken } = useAuth();
@@ -44,7 +81,11 @@ export function useConfirmAttendance() {
           provider_session_confirmed_at: string | null;
           session_confirmation_completed_at: string | null;
           session_dispute_status?: string | null;
-          payout?: { ok?: boolean; error?: string; alreadyCompleted?: boolean } | null;
+          payout?: {
+            ok?: boolean;
+            error?: string;
+            alreadyCompleted?: boolean;
+          } | null;
         };
       }>(`/api/courses/${courseId}/confirm-attendance`, {
         method: "POST",
@@ -52,10 +93,61 @@ export function useConfirmAttendance() {
       });
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data, courseId) => {
+      // Mise à jour immédiate : l'inbox « À faire » disparaît sans attendre le refetch.
+      queryClient.setQueriesData<{ role?: string; events: ScheduleEvent[] }>(
+        { queryKey: ["schedule-me"] },
+        (old) => {
+          if (!old?.events) return old;
+          return {
+            ...old,
+            events: patchScheduleEventAfterAttendance(old.events, courseId, data),
+          };
+        },
+      );
+
+      const notifications = queryClient.getQueryData<CampusNotificationItem[]>([
+        "notifications",
+      ]);
+      const toMark =
+        notifications?.filter(
+          (item) =>
+            !item.read_at &&
+            item.notification?.course_id === courseId &&
+            item.notification?.kind &&
+            CONFIRM_ALERT_KINDS.has(item.notification.kind),
+        ) ?? [];
+
+      if (toMark.length > 0) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<CampusNotificationItem[]>(
+          ["notifications"],
+          (old) =>
+            old?.map((item) =>
+              toMark.some((m) => m.id === item.id)
+                ? { ...item, read_at: now }
+                : item,
+            ) ?? old,
+        );
+        const token = getAccessToken();
+        if (token) {
+          for (const item of toMark) {
+            void apiFetch(`/api/notifications/${item.id}/read`, {
+              method: "PATCH",
+              token,
+            }).catch(() => {
+              /* refetch will reconcile */
+            });
+          }
+        }
+      }
+
       void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      void queryClient.invalidateQueries({ queryKey: ["tutors-me-transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications-unread"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["tutors-me-transactions"],
+      });
     },
   });
 }

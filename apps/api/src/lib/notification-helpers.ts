@@ -307,14 +307,29 @@ export async function notifySessionConfirmReminder(params: {
   providerId: string;
   subject: string;
   declaredBy: string;
+  scheduledAt?: string | null;
 }): Promise<void> {
-  await notifyUsers([params.clientId, params.providerId], {
+  const payload = {
     campusId: params.campusId,
     courseId: params.courseId,
-    kind: "session_confirm_reminder",
     title: "Confirmez que le cours a eu lieu",
     message: `Pour « ${params.subject} », élève et professeur doivent confirmer la séance afin de débloquer le paiement au professeur.`,
     declaredBy: params.declaredBy,
+    scheduledAt: params.scheduledAt ?? null,
+  };
+
+  const primary = await notifyUsers([params.clientId, params.providerId], {
+    ...payload,
+    kind: "session_confirm_reminder",
+  });
+  if (primary) return;
+
+  // Migration 030 pas encore appliquée : réutiliser le kind existant.
+  await notifyUsers([params.clientId, params.providerId], {
+    ...payload,
+    kind: "course_confirmation_reminder",
+    title: "Confirmez que le cours a eu lieu",
+    message: `La séance « ${params.subject} » est terminée. Confirmez qu'elle a bien eu lieu pour débloquer le paiement au professeur.`,
   });
 }
 
@@ -327,13 +342,25 @@ export async function notifySessionBothConfirmed(params: {
   subject: string;
   declaredBy: string;
 }): Promise<void> {
-  await notifyUsers([params.clientId, params.providerId], {
+  const payload = {
     campusId: params.campusId,
     courseId: params.courseId,
-    kind: "session_both_confirmed",
     title: "Séance confirmée par les deux parties",
     message: `« ${params.subject} » est validée. Le reversement au professeur est en cours de traitement.`,
     declaredBy: params.declaredBy,
+  };
+
+  const primary = await notifyUsers([params.clientId, params.providerId], {
+    ...payload,
+    kind: "session_both_confirmed",
+  });
+  if (primary) return;
+
+  // Migration 030 pas encore appliquée.
+  await notifyUsers([params.clientId, params.providerId], {
+    ...payload,
+    kind: "payment_received",
+    title: "Séance confirmée — paiement en cours",
   });
 }
 

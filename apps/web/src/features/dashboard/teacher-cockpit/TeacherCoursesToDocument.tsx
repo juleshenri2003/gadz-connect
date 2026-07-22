@@ -1,5 +1,7 @@
 import { Button, Input, Label, cn } from "@gadz-connect/ui";
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
 import {
   useCoursesToDocument,
   useSubmitCourseSummary,
@@ -188,8 +190,14 @@ export function TeacherCoursesToDocument({
       {variant === "compact" && courses && courses.length > 4 ? (
         <p className="mt-3 text-xs text-ink-400">
           {courses.length - 4} autre{courses.length - 4 > 1 ? "s" : ""} séance
-          {courses.length - 4 > 1 ? "s" : ""} — voir l&apos;onglet Documentation
-          sur Mes cours.
+          {courses.length - 4 > 1 ? "s" : ""} —{" "}
+          <Link
+            to={coursesTabHref("history")}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            voir tous les cours passés
+          </Link>
+          .
         </p>
       ) : null}
     </>

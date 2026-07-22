@@ -1,6 +1,6 @@
 import type { AccountStatus } from "@gadz-connect/types";
 import { Button } from "@gadz-connect/ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Modal } from "@/components/Modal";
 import { Toast } from "@/components/Toast";
@@ -13,9 +13,22 @@ import {
   useUpdateProfileStatus,
 } from "@/features/admin/useAdmin";
 import { UserDetailDrawer } from "@/features/admin/users/UserDetailDrawer";
-import { UsersFilterBar } from "@/features/admin/users/UsersFilterBar";
+import {
+  UsersFilterBar,
+  type TeacherQuickFilter,
+} from "@/features/admin/users/UsersFilterBar";
 import { UsersKpiStrip } from "@/features/admin/users/UsersKpiStrip";
+import {
+  classifyTeacherReadiness,
+  countTeacherReadiness,
+} from "@/features/admin/users/teacherDirectoryGroups";
 import { UsersTable } from "@/features/admin/users/UsersTable";
+import {
+  directoryForcedRole,
+  directoryPageCopy,
+  UsersDirectoryTabs,
+  type MembersDirectory,
+} from "@/features/admin/users/UsersDirectoryTabs";
 import {
   filtersFromSearchParams,
   filtersToQueryParams,
@@ -24,8 +37,13 @@ import {
 } from "@/features/admin/users/userFilters";
 
 const PAGE_SIZE = 50;
+const TEACHERS_PAGE_SIZE = 500;
 
-function filtersToApiParams(filters: UserFiltersState, page: number) {
+function filtersToApiParams(
+  filters: UserFiltersState,
+  page: number,
+  pageSize: number,
+) {
   return {
     search: filters.search.trim() || undefined,
     role: filters.role !== "all" ? filters.role : undefined,
@@ -36,11 +54,15 @@ function filtersToApiParams(filters: UserFiltersState, page: number) {
     campus_id: filters.campusId !== "all" ? filters.campusId : undefined,
     filter: filters.preset ?? undefined,
     page,
-    limit: PAGE_SIZE,
+    limit: pageSize,
   };
 }
 
-export function AdminUsersPage() {
+interface AdminUsersPageProps {
+  directory?: MembersDirectory;
+}
+
+export function AdminUsersPage({ directory = "all" }: AdminUsersPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     null,
@@ -56,23 +78,57 @@ export function AdminUsersPage() {
     variant: "success" | "error";
   } | null>(null);
   const [page, setPage] = useState(1);
+  const [teacherQuickFilter, setTeacherQuickFilter] =
+    useState<TeacherQuickFilter | null>(null);
 
-  const filters = useMemo(
-    () => filtersFromSearchParams(searchParams),
-    [searchParams],
-  );
+  const forcedRole = directoryForcedRole(directory);
+  const pageCopy = directoryPageCopy(directory);
+  const pageSize =
+    directory === "teachers" ? TEACHERS_PAGE_SIZE : PAGE_SIZE;
+
+  const filters = useMemo(() => {
+    const fromUrl = filtersFromSearchParams(searchParams);
+    if (!forcedRole) return fromUrl;
+    // Répertoires dédiés : pas de filtre statut URL parasite (SIRET etc.)
+    if (directory === "students" || directory === "teachers") {
+      return {
+        ...fromUrl,
+        role: forcedRole,
+        accountStatus: "all" as const,
+        preset: null,
+      };
+    }
+    return { ...fromUrl, role: forcedRole };
+  }, [searchParams, forcedRole, directory]);
 
   const { data: me } = useAdminMe();
   const { data: dashboard } = useAdminDashboard();
   const { data: campuses = [] } = useAdminCampuses();
   const apiParams = useMemo(
-    () => filtersToApiParams(filters, page),
-    [filters, page],
+    () => filtersToApiParams(filters, page, pageSize),
+    [filters, page, pageSize],
   );
   const { data, isLoading, isError, error } = useAdminProfiles(apiParams);
   const updateStatus = useUpdateProfileStatus();
 
   const profiles = data?.profiles ?? [];
+  const teacherCounts = useMemo(() => {
+    const readiness = countTeacherReadiness(profiles);
+    return {
+      ...readiness,
+      suspended: profiles.filter((p) => p.account_status === "suspended")
+        .length,
+    };
+  }, [profiles]);
+  const displayedProfiles = useMemo(() => {
+    if (directory !== "teachers" || !teacherQuickFilter) return profiles;
+    if (teacherQuickFilter === "suspended") {
+      return profiles.filter((p) => p.account_status === "suspended");
+    }
+    return profiles.filter(
+      (profile) => classifyTeacherReadiness(profile) === teacherQuickFilter,
+    );
+  }, [directory, profiles, teacherQuickFilter]);
   const meta = data?.meta;
   const showCampusFilter = me?.role === "admin_general";
   const showCampusColumn = showCampusFilter;
@@ -83,21 +139,66 @@ export function AdminUsersPage() {
   const updateFilters = useCallback(
     (next: UserFiltersState) => {
       setPage(1);
-      setSearchParams(filtersToQueryParams(next), { replace: true });
+      const payload = forcedRole ? { ...next, role: forcedRole } : next;
+      setSearchParams(filtersToQueryParams(payload), { replace: true });
     },
-    [setSearchParams],
+    [forcedRole, setSearchParams],
   );
 
   const resetFilters = useCallback(() => {
     setPage(1);
+    setTeacherQuickFilter(null);
+    if (forcedRole) {
+      setSearchParams(
+        filtersToQueryParams({
+          search: "",
+          role: forcedRole,
+          accountStatus: "all",
+          campusId: "all",
+          preset: null,
+        }),
+        { replace: true },
+      );
+      return;
+    }
     setSearchParams(new URLSearchParams(), { replace: true });
-  }, [setSearchParams]);
+  }, [forcedRole, setSearchParams]);
+
+  // Sync URL role when entering a dedicated directory.
+  useEffect(() => {
+    if (!forcedRole) return;
+    if (searchParams.get("role") === forcedRole) return;
+    const next = filtersFromSearchParams(searchParams);
+    setSearchParams(
+      filtersToQueryParams({ ...next, role: forcedRole }),
+      { replace: true },
+    );
+  }, [forcedRole, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    setTeacherQuickFilter(null);
+    setPage(1);
+  }, [directory]);
 
   const handlePresetChange = useCallback(
     (preset: UserPresetFilter | null) => {
       updateFilters({ ...filters, preset });
     },
     [filters, updateFilters],
+  );
+
+  const handleTeacherQuickFilter = useCallback(
+    (next: TeacherQuickFilter | null) => {
+      setTeacherQuickFilter(next);
+      if (next && next !== "suspended") {
+        requestAnimationFrame(() => {
+          document
+            .getElementById(`teachers-${next}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    },
+    [],
   );
 
   async function runStatusUpdate(
@@ -141,10 +242,8 @@ export function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-ink-900">Utilisateurs</h2>
-          <p className="mt-1 text-sm text-ink-600">
-            Supervision des comptes — dossiers SIRET, doublons, suspensions
-          </p>
+          <h2 className="text-2xl font-bold text-ink-900">{pageCopy.title}</h2>
+          <p className="mt-1 text-sm text-ink-600">{pageCopy.subtitle}</p>
           <p className="mt-1 text-xs text-ink-400">{scopeLabel}</p>
         </div>
         <Button type="button" variant="ghost" size="sm" asChild>
@@ -152,28 +251,42 @@ export function AdminUsersPage() {
         </Button>
       </div>
 
-      <UsersKpiStrip
-        total={kpiTotal}
-        pendingSiret={kpiPending}
-        verificationFailed={kpiVerificationFailed}
-        suspended={kpiSuspended}
-        activePreset={filters.preset}
-        onPresetChange={handlePresetChange}
-      />
+      <UsersDirectoryTabs active={directory} />
+
+      {directory === "all" ? (
+        <UsersKpiStrip
+          total={kpiTotal}
+          pendingSiret={kpiPending}
+          verificationFailed={kpiVerificationFailed}
+          suspended={kpiSuspended}
+          activePreset={filters.preset}
+          onPresetChange={handlePresetChange}
+        />
+      ) : null}
 
       <UsersFilterBar
         filters={filters}
         campuses={campuses}
         showCampusFilter={showCampusFilter}
+        directory={directory}
+        lockRole={Boolean(forcedRole)}
+        teacherQuickFilter={teacherQuickFilter}
+        teacherCounts={
+          directory === "teachers" ? teacherCounts : undefined
+        }
+        onTeacherQuickFilterChange={
+          directory === "teachers" ? handleTeacherQuickFilter : undefined
+        }
         onChange={updateFilters}
         onReset={resetFilters}
-        displayedCount={profiles.length}
+        displayedCount={displayedProfiles.length}
         totalCount={meta?.total ?? 0}
       />
 
       <UsersTable
-        profiles={profiles}
+        profiles={displayedProfiles}
         filters={filters}
+        directory={directory}
         showCampus={showCampusColumn}
         isLoading={isLoading}
         isError={isError}
@@ -193,7 +306,7 @@ export function AdminUsersPage() {
         }
       />
 
-      {meta && meta.total > meta.pageSize ? (
+      {directory !== "teachers" && meta && meta.total > meta.pageSize ? (
         <div className="flex items-center justify-between gap-3 text-sm">
           <p className="text-ink-600">
             Page {meta.page} sur {totalPages}

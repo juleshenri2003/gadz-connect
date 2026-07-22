@@ -14,6 +14,8 @@ import { UserStatusBadge } from "./UserStatusBadge";
 interface UserTableRowProps {
   profile: AdminProfileRow;
   showCampus: boolean;
+  showRole?: boolean;
+  showTeacherCols?: boolean;
   isMutating: boolean;
   onOpen: () => void;
   onValidate: () => void;
@@ -44,6 +46,8 @@ function StripeBadge({ profile }: { profile: AdminProfileRow }) {
 export function UserTableRow({
   profile,
   showCampus,
+  showRole = true,
+  showTeacherCols = true,
   isMutating,
   onOpen,
   onValidate,
@@ -70,53 +74,63 @@ export function UserTableRow({
       {showCampus ? (
         <td className="px-4 py-3">{profile.campus?.name ?? "—"}</td>
       ) : null}
-      <td className="px-4 py-3 text-sm">{ROLE_LABELS[profile.role]}</td>
+      {showRole ? (
+        <td className="px-4 py-3 text-sm">{ROLE_LABELS[profile.role]}</td>
+      ) : null}
       <td className="px-4 py-3 text-sm tabular-nums">
         {formatUserDate(profile.created_at)}
       </td>
-      <td className="px-4 py-3 text-xs text-ink-600">
-        {profile.role === "teacher" && registrationPath
-          ? REGISTRATION_PATH_SHORT[registrationPath]
-          : "—"}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {profile.siret ? (
-            <span className="font-mono text-xs">{profile.siret}</span>
-          ) : profile.account_status === "pending_siret" ? (
-            <span className="text-xs text-warning">Non soumis</span>
-          ) : (
-            <span className="text-xs text-ink-400">—</span>
-          )}
-          {profile.siret_is_duplicate ? (
-            <span className="rounded-full bg-danger-bg px-1.5 py-0.5 text-[10px] font-medium text-danger">
-              Doublon
-            </span>
-          ) : null}
-        </div>
-      </td>
+      {showTeacherCols ? (
+        <>
+          <td className="px-4 py-3 text-xs text-ink-600">
+            {profile.role === "teacher" && registrationPath
+              ? REGISTRATION_PATH_SHORT[registrationPath]
+              : "—"}
+          </td>
+          <td className="px-4 py-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {profile.siret ? (
+                <span className="font-mono text-xs">{profile.siret}</span>
+              ) : profile.account_status === "pending_siret" ? (
+                <span className="text-xs text-warning">Non soumis</span>
+              ) : (
+                <span className="text-xs text-ink-400">—</span>
+              )}
+              {profile.siret_is_duplicate ? (
+                <span className="rounded-full bg-danger-bg px-1.5 py-0.5 text-[10px] font-medium text-danger">
+                  Doublon
+                </span>
+              ) : null}
+            </div>
+          </td>
+        </>
+      ) : null}
       <td className="px-4 py-3">
         <UserStatusBadge status={profile.account_status} />
       </td>
-      <td className="px-4 py-3">
-        {profile.siret_verification_failed ? (
-          <span
-            className="inline-flex rounded-full bg-danger-bg px-2 py-0.5 text-xs font-medium text-danger"
-            title="Vérification SIRET en échec"
-          >
-            SIRET
-          </span>
-        ) : (
-          <span className="text-xs text-ink-400">—</span>
-        )}
-      </td>
-      <td className="px-4 py-3">
-        {profile.role === "teacher" ? (
-          <StripeBadge profile={profile} />
-        ) : (
-          <span className="text-xs text-ink-400">—</span>
-        )}
-      </td>
+      {showTeacherCols ? (
+        <>
+          <td className="px-4 py-3">
+            {profile.siret_verification_failed ? (
+              <span
+                className="inline-flex rounded-full bg-danger-bg px-2 py-0.5 text-xs font-medium text-danger"
+                title="Vérification SIRET en échec"
+              >
+                SIRET
+              </span>
+            ) : (
+              <span className="text-xs text-ink-400">—</span>
+            )}
+          </td>
+          <td className="px-4 py-3">
+            {profile.role === "teacher" ? (
+              <StripeBadge profile={profile} />
+            ) : (
+              <span className="text-xs text-ink-400">—</span>
+            )}
+          </td>
+        </>
+      ) : null}
       <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
         {profile.account_status === "pending_siret" ? (
           <div className="space-y-1">

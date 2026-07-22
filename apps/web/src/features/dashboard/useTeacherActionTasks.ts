@@ -1,6 +1,7 @@
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { useMySlots } from "@/features/marketplace/useTutors";
 import { useNotifications } from "@/features/notifications/useNotifications";
+import { useMySchedule } from "@/features/scheduling/useSchedule";
 import { useStripeConnectStatus } from "@/features/stripe/useStripeConnect";
 import { computeTeacherActionTasks } from "./teacherActionTasks";
 
@@ -15,6 +16,7 @@ export function useTeacherActionTasks() {
   const stripeQuery = useStripeConnectStatus();
   const slotsQuery = useMySlots();
   const notificationsQuery = useNotifications();
+  const scheduleQuery = useMySchedule({ includeCancelled: true });
 
   const profile = profileQuery.data;
   const progress =
@@ -24,6 +26,7 @@ export function useTeacherActionTasks() {
           stripeQuery.data,
           notificationsQuery.data,
           countFutureSlots(slotsQuery.data),
+          scheduleQuery.data?.events,
         )
       : {
           tasks: [],
@@ -37,7 +40,8 @@ export function useTeacherActionTasks() {
     profileQuery.isLoading ||
     stripeQuery.isLoading ||
     slotsQuery.isLoading ||
-    notificationsQuery.isLoading;
+    notificationsQuery.isLoading ||
+    scheduleQuery.isLoading;
 
   const isPendingRh =
     profile?.role === "teacher" && profile.account_status === "pending_siret";

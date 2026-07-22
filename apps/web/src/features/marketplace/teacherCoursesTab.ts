@@ -1,12 +1,21 @@
 import { marketplaceRoutes } from "./marketplaceRoutes";
 
-export type CoursesTab = "slots" | "profile" | "documentation";
+export type CoursesTab = "slots" | "profile" | "history";
 
-const VALID_TABS: CoursesTab[] = ["slots", "profile", "documentation"];
+const VALID_TABS: CoursesTab[] = ["slots", "profile", "history"];
+
+/** Ancien onglet « documentation » fusionné dans « history ». */
+const TAB_ALIASES: Record<string, CoursesTab> = {
+  documentation: "history",
+};
 
 export function parseCoursesTab(value: string | null | undefined): CoursesTab {
-  if (value && VALID_TABS.includes(value as CoursesTab)) {
+  if (!value) return "slots";
+  if (VALID_TABS.includes(value as CoursesTab)) {
     return value as CoursesTab;
+  }
+  if (value in TAB_ALIASES) {
+    return TAB_ALIASES[value];
   }
   return "slots";
 }

@@ -8,12 +8,15 @@ import type {
   AdminTransactionsQueryParams,
 } from "@/features/admin/types";
 
+export type BudgetWorkspaceTab = "facturation" | "cloture";
+
 export interface BudgetFiltersState {
   period: AdminBudgetPeriod;
   campusId: string;
   statusStripe: TransactionStripeStatus | "all";
   statusUrssaf: TransactionUrssafStatus | "all";
   search: string;
+  tab: BudgetWorkspaceTab;
 }
 
 export const DEFAULT_BUDGET_FILTERS: BudgetFiltersState = {
@@ -22,6 +25,7 @@ export const DEFAULT_BUDGET_FILTERS: BudgetFiltersState = {
   statusStripe: "all",
   statusUrssaf: "all",
   search: "",
+  tab: "facturation",
 };
 
 const PERIODS = new Set<AdminBudgetPeriod>(["month", "week", "30d", "all"]);
@@ -62,6 +66,8 @@ export function filtersFromSearchParams(
     statusStripe,
     statusUrssaf,
     search: params.get("search") ?? "",
+    tab:
+      params.get("tab") === "cloture" ? "cloture" : "facturation",
   };
 }
 
@@ -78,6 +84,7 @@ export function filtersToQueryParams(
     params.set("status_urssaf", filters.statusUrssaf);
   }
   if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (filters.tab !== "facturation") params.set("tab", filters.tab);
   return params;
 }
 

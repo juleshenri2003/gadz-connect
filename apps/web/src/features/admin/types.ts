@@ -1,6 +1,7 @@
 import type {
   AccountStatus,
   CourseRatingAdminView,
+  StudentLearningProfile,
   TransactionStripeStatus,
   TransactionUrssafStatus,
   UserRole,
@@ -44,6 +45,7 @@ export interface AdminProfileDetail extends AdminProfileRow {
   updated_at: string;
   coursesAsProvider: number;
   coursesAsClient: number;
+  learning_profile?: StudentLearningProfile | null;
 }
 
 export interface AdminProfilesQueryParams {

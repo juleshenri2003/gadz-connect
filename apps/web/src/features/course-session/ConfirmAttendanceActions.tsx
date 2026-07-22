@@ -10,6 +10,10 @@ interface ConfirmAttendanceActionsProps {
   sessionConfirmationCompletedAt?: string | null;
   sessionDisputeStatus?: string | null;
   compact?: boolean;
+  /** Libellé du bouton principal (alertes). */
+  confirmLabel?: string;
+  /** Appelé après confirmation réussie de mon côté. */
+  onConfirmed?: () => void;
 }
 
 export function ConfirmAttendanceActions({
@@ -20,6 +24,8 @@ export function ConfirmAttendanceActions({
   sessionConfirmationCompletedAt: completedProp,
   sessionDisputeStatus = "none",
   compact = false,
+  confirmLabel = "Je confirme que le cours a eu lieu",
+  onConfirmed,
 }: ConfirmAttendanceActionsProps) {
   const confirm = useConfirmAttendance();
   const [local, setLocal] = useState<{
@@ -27,6 +33,7 @@ export function ConfirmAttendanceActions({
     provider: string | null;
     completed: string | null;
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const studentAt = local?.student ?? studentProp ?? null;
   const providerAt = local?.provider ?? providerProp ?? null;
@@ -91,7 +98,11 @@ export function ConfirmAttendanceActions({
             Élève et professeur doivent valider pour débloquer le paiement.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <p className="text-xs font-medium text-ink-800">
+          Action requise : confirmer la séance
+        </p>
+      )}
       <div className="flex flex-wrap gap-2 text-xs">
         <span
           className={
@@ -117,28 +128,40 @@ export function ConfirmAttendanceActions({
           type="button"
           size="sm"
           disabled={confirm.isPending}
-          onClick={() =>
-            void confirm.mutateAsync(courseId).then((data) => {
-              setLocal({
-                student: data.student_session_confirmed_at,
-                provider: data.provider_session_confirmed_at,
-                completed: data.session_confirmation_completed_at,
+          onClick={() => {
+            setError(null);
+            void confirm
+              .mutateAsync(courseId)
+              .then((data) => {
+                setLocal({
+                  student: data.student_session_confirmed_at,
+                  provider: data.provider_session_confirmed_at,
+                  completed: data.session_confirmation_completed_at,
+                });
+                if (data.payout && data.payout.ok === false && data.payout.error) {
+                  setError(data.payout.error);
+                } else {
+                  onConfirmed?.();
+                }
+              })
+              .catch((err: unknown) => {
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : "Impossible de confirmer la séance",
+                );
               });
-            })
-          }
+          }}
         >
-          {confirm.isPending
-            ? "Confirmation…"
-            : "Je confirme que le cours a eu lieu"}
+          {confirm.isPending ? "Confirmation…" : confirmLabel}
         </Button>
       ) : (
         <p className="text-xs text-success">
           Vous avez confirmé.
-          {!otherConfirmed
-            ? " En attente de l'autre partie."
-            : ""}
+          {!otherConfirmed ? " En attente de l'autre partie." : ""}
         </p>
       )}
+      {error ? <p className="text-xs text-warning">{error}</p> : null}
     </div>
   );
 }

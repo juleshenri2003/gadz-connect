@@ -1,4 +1,5 @@
-import { Button } from "@gadz-connect/ui";
+import { Button, cn } from "@gadz-connect/ui";
+import { COURSE_VISUAL_META } from "@/features/scheduling/calendar-utils";
 import {
   getActiveFilterLabel,
   STATUS_FILTER_OPTIONS,
@@ -102,16 +103,18 @@ export function CoursesFilterBar({
       <div className="flex flex-wrap gap-2">
         {STATUS_FILTER_OPTIONS.map((option) => {
           const active = filters.statuses.includes(option.value);
+          const meta = COURSE_VISUAL_META[option.category];
           return (
             <button
               key={option.value}
               type="button"
               onClick={() => toggleStatus(option.value)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition",
                 active
-                  ? "border-brand-100 bg-brand-50 text-brand-700"
-                  : "border-line bg-surface text-ink-600 hover:border-line"
-              }`}
+                  ? `${meta.classes} ring-2 ring-offset-1`
+                  : "border-line bg-surface text-ink-600 hover:border-line",
+              )}
             >
               {option.label}
             </button>
@@ -121,7 +124,8 @@ export function CoursesFilterBar({
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <p className="text-ink-600">
-          {displayedCount} affiché{displayedCount > 1 ? "s" : ""} sur {totalCount}
+          {displayedCount} affiché{displayedCount > 1 ? "s" : ""} sur{" "}
+          {totalCount}
           {activeLabel ? (
             <span className="ml-2 text-ink-400">· {activeLabel}</span>
           ) : null}

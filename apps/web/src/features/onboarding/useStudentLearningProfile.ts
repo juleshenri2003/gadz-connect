@@ -32,11 +32,24 @@ export function useStudentLearningProfileForStudent(
     queryFn: async () => {
       const token = getAccessToken();
       if (!token || !studentId) throw new Error("Non authentifié");
-      const res = await apiFetch<{ data: StudentLearningProfile }>(
-        `/api/students/${studentId}/learning-profile`,
-        { token },
-      );
-      return res.data;
+      try {
+        const res = await apiFetch<{ data: StudentLearningProfile }>(
+          `/api/students/${studentId}/learning-profile`,
+          { token },
+        );
+        return res.data;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        // Absent = normal (élève n'a pas encore rempli).
+        if (
+          message.includes("introuvable") ||
+          message.includes("404") ||
+          message.toLowerCase().includes("not found")
+        ) {
+          return null;
+        }
+        throw error;
+      }
     },
     enabled: enabled && Boolean(studentId),
     retry: false,

@@ -1,9 +1,11 @@
 import type { AdminCoursePreset } from "@/features/admin/types";
+import {
+  expandStatusFiltersToApi,
+  type AdminScheduleStatusFilter,
+} from "@/features/scheduling/adminScheduleUtils";
+import { COURSE_VISUAL_META } from "@/features/scheduling/calendar-utils";
 
-export type CourseStatusFilter =
-  | "scheduled"
-  | "completed"
-  | "cancelled";
+export type CourseStatusFilter = AdminScheduleStatusFilter;
 
 export interface CourseFiltersState {
   search: string;
@@ -23,11 +25,26 @@ export const PRESET_FILTER_LABELS: Record<AdminCoursePreset, string> = {
 export const STATUS_FILTER_OPTIONS: Array<{
   value: CourseStatusFilter;
   label: string;
+  category: keyof typeof COURSE_VISUAL_META;
 }> = [
-  { value: "scheduled", label: "Planifié" },
-  { value: "completed", label: "Terminé" },
-  { value: "cancelled", label: "Annulé" },
+  { value: "pending", label: "En attente", category: "pending" },
+  {
+    value: "awaiting_data",
+    label: "Données attendues",
+    category: "awaiting_data",
+  },
+  { value: "completed", label: "Cours donné", category: "completed" },
+  { value: "replaced", label: "Remplacé", category: "replaced" },
+  { value: "cancelled", label: "Annulé / renoncé", category: "cancelled" },
 ];
+
+const KNOWN_STATUS = new Set(STATUS_FILTER_OPTIONS.map((o) => o.value));
+const LEGACY_STATUS_MAP: Record<string, CourseStatusFilter> = {
+  scheduled: "pending",
+  payment_pending: "pending",
+  awaiting_session_confirmation: "awaiting_data",
+  awaiting_replacement: "replaced",
+};
 
 export const DEFAULT_COURSE_FILTERS: CourseFiltersState = {
   search: "",
@@ -65,16 +82,22 @@ export function filtersFromSearchParams(
   params: URLSearchParams,
 ): CourseFiltersState {
   const statusRaw = params.get("status");
-  const statuses = statusRaw
-    ? (statusRaw.split(",").filter(Boolean) as CourseStatusFilter[])
-    : [];
+  const rawStatuses = statusRaw ? statusRaw.split(",").filter(Boolean) : [];
+  const statuses = [
+    ...new Set(
+      rawStatuses.map(
+        (s) =>
+          (KNOWN_STATUS.has(s as CourseStatusFilter)
+            ? s
+            : LEGACY_STATUS_MAP[s]) as CourseStatusFilter | undefined,
+      ),
+    ),
+  ].filter((s): s is CourseStatusFilter => Boolean(s));
 
   return {
     search: params.get("search") ?? "",
     campusId: params.get("campus_id") ?? "all",
-    statuses: statuses.filter((s) =>
-      STATUS_FILTER_OPTIONS.some((opt) => opt.value === s),
-    ),
+    statuses,
     from: params.get("from") ?? "",
     to: params.get("to") ?? "",
     preset: parseCoursePreset(params.get("preset")),
@@ -89,7 +112,14 @@ export function getActiveFilterLabel(
     parts.push(PRESET_FILTER_LABELS[filters.preset]);
   }
   if (filters.statuses.length > 0) {
-    parts.push(`${filters.statuses.length} statut(s) sélectionné(s)`);
+    parts.push(
+      filters.statuses
+        .map(
+          (s) =>
+            STATUS_FILTER_OPTIONS.find((o) => o.value === s)?.label ?? s,
+        )
+        .join(", "),
+    );
   }
   if (filters.campusId !== "all") {
     parts.push("Campus filtré");
@@ -137,10 +167,11 @@ export function filtersToApiParams(
     ? new Date(`${filters.to}T23:59:59.999`).toISOString()
     : undefined;
 
+  const expanded = expandStatusFiltersToApi(filters.statuses);
+
   return {
     search: filters.search.trim() || undefined,
-    status:
-      filters.statuses.length > 0 ? filters.statuses.join(",") : undefined,
+    status: expanded?.join(","),
     campus_id: filters.campusId !== "all" ? filters.campusId : undefined,
     from,
     to,

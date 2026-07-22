@@ -69,7 +69,10 @@ export function useAdminBudgets(params?: AdminBudgetQueryParams) {
   });
 }
 
-export function useAdminTransactions(params?: AdminTransactionsQueryParams) {
+export function useAdminTransactions(
+  params?: AdminTransactionsQueryParams,
+  options?: { enabled?: boolean },
+) {
   const { getAccessToken } = useAuth();
 
   const queryString = params
@@ -99,7 +102,7 @@ export function useAdminTransactions(params?: AdminTransactionsQueryParams) {
         },
       };
     },
-    enabled: Boolean(getAccessToken()),
+    enabled: Boolean(getAccessToken()) && (options?.enabled ?? true),
   });
 }
 

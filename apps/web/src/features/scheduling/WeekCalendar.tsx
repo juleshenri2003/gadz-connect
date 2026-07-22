@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
   countWeekSummary,
+  COURSE_VISUAL_META,
   eventKindLabel,
   eventStyles,
   eventsForDay,
@@ -24,12 +25,14 @@ interface WeekCalendarProps {
   loading?: boolean;
   teacherMode?: boolean;
   showLegend?: boolean;
-  legendVariant?: "teacher" | "student";
+  legendVariant?: "teacher" | "student" | "admin";
   showDuration?: boolean;
   emptyAction?: ReactNode;
   initialAnchor?: Date;
   onAnchorChange?: (anchor: Date) => void;
   onEventClick?: (event: ScheduleEvent) => void;
+  /** Soft focus : "fade" pour les non-matchs, "focus" pour la personne cherchée. */
+  getEventEmphasis?: (event: ScheduleEvent) => "focus" | "fade" | "normal";
   renderEventTitle?: (event: ScheduleEvent) => string;
   renderEventSubtitle?: (event: ScheduleEvent) => string | undefined;
   renderEventMeta?: (event: ScheduleEvent) => string | undefined;
@@ -109,6 +112,7 @@ function EventCard({
   event,
   teacherMode,
   showDuration,
+  emphasis = "normal",
   onEventClick,
   renderEventTitle,
   renderEventSubtitle,
@@ -119,6 +123,7 @@ function EventCard({
   event: ScheduleEvent;
   teacherMode?: boolean;
   showDuration?: boolean;
+  emphasis?: "focus" | "fade" | "normal";
   onEventClick?: (event: ScheduleEvent) => void;
   renderEventTitle?: (event: ScheduleEvent) => string;
   renderEventSubtitle?: (event: ScheduleEvent) => string | undefined;
@@ -150,6 +155,11 @@ function EventCard({
             Passé
           </span>
         ) : null}
+        {emphasis === "focus" ? (
+          <span className="rounded bg-ink-900 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+            Focus
+          </span>
+        ) : null}
       </div>
       {subtitle ? (
         <p className="mt-0.5 truncate text-xs opacity-80">{subtitle}</p>
@@ -172,12 +182,14 @@ function EventCard({
   );
 
   const className = cn(
-    "rounded-lg border p-2 text-left",
+    "rounded-lg border p-2 text-left transition",
     teacherMode ? "text-sm" : "text-xs",
     eventStyles(event.kind, event.status, event.startsAt, event.endsAt),
-    past && "opacity-60",
+    past && emphasis !== "focus" && "opacity-60",
+    emphasis === "fade" && "opacity-25 saturate-50",
+    emphasis === "focus" && "relative z-10 ring-2 ring-ink-900/20 shadow-surface",
     onEventClick &&
-      "cursor-pointer transition hover:border-brand-100 hover:shadow-surface",
+      "cursor-pointer hover:border-brand-100 hover:shadow-surface",
   );
 
   if (onEventClick) {
@@ -201,6 +213,7 @@ function MobileDayAccordion({
   today,
   teacherMode,
   showDuration,
+  getEventEmphasis,
   onEventClick,
   renderEventTitle,
   renderEventSubtitle,
@@ -213,6 +226,7 @@ function MobileDayAccordion({
   today: Date;
   teacherMode?: boolean;
   showDuration?: boolean;
+  getEventEmphasis?: (event: ScheduleEvent) => "focus" | "fade" | "normal";
   onEventClick?: (event: ScheduleEvent) => void;
   renderEventTitle?: (event: ScheduleEvent) => string;
   renderEventSubtitle?: (event: ScheduleEvent) => string | undefined;
@@ -268,6 +282,7 @@ function MobileDayAccordion({
                       event={event}
                       teacherMode={teacherMode}
                       showDuration={showDuration}
+                      emphasis={getEventEmphasis?.(event) ?? "normal"}
                       onEventClick={onEventClick}
                       renderEventTitle={renderEventTitle}
                       renderEventSubtitle={renderEventSubtitle}
@@ -299,6 +314,7 @@ export function WeekCalendar({
   initialAnchor,
   onAnchorChange,
   onEventClick,
+  getEventEmphasis,
   renderEventTitle,
   renderEventSubtitle,
   renderEventMeta,
@@ -417,6 +433,7 @@ export function WeekCalendar({
         today={today}
         teacherMode={teacherMode}
         showDuration={showDuration}
+        getEventEmphasis={getEventEmphasis}
         onEventClick={onEventClick}
         renderEventTitle={renderEventTitle}
         renderEventSubtitle={renderEventSubtitle}
@@ -462,6 +479,7 @@ export function WeekCalendar({
                         event={event}
                         teacherMode={teacherMode}
                         showDuration={showDuration}
+                        emphasis={getEventEmphasis?.(event) ?? "normal"}
                         onEventClick={onEventClick}
                         renderEventTitle={renderEventTitle}
                         renderEventSubtitle={renderEventSubtitle}
@@ -487,38 +505,87 @@ export function WeekCalendar({
 
       {showLegend ? (
         <div className="flex flex-wrap gap-3 text-xs text-ink-600">
-          {resolvedLegendVariant === "teacher" ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded border border-success/20 bg-success-bg" />
-              Créneau disponible
-            </span>
-          ) : null}
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-brand-100 bg-brand-50" />
-            {resolvedLegendVariant === "student"
-              ? "Session planifiée"
-              : "Session réservée"}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-warning/30 bg-warning-bg" />
-            Remplacement en cours
-          </span>
-          {resolvedLegendVariant === "teacher" ? (
+          {resolvedLegendVariant === "admin" ? (
             <>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded border border-line bg-paper" />
-                Terminé
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded border border-line bg-paper line-through" />
-                Annulé
-              </span>
+              {(
+                [
+                  "pending",
+                  "awaiting_data",
+                  "completed",
+                  "replaced",
+                  "cancelled",
+                ] as const
+              ).map((key) => (
+                <span key={key} className="inline-flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "h-3 w-3 rounded border",
+                      COURSE_VISUAL_META[key].swatch,
+                    )}
+                  />
+                  {COURSE_VISUAL_META[key].label}
+                </span>
+              ))}
             </>
           ) : (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded border border-line bg-paper opacity-60" />
-              Passé
-            </span>
+            <>
+              {resolvedLegendVariant === "teacher" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "h-3 w-3 rounded border",
+                      COURSE_VISUAL_META.slot.swatch,
+                    )}
+                  />
+                  Créneau disponible
+                </span>
+              ) : null}
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded border",
+                    COURSE_VISUAL_META.pending.swatch,
+                  )}
+                />
+                {COURSE_VISUAL_META.pending.label}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded border",
+                    COURSE_VISUAL_META.awaiting_data.swatch,
+                  )}
+                />
+                {COURSE_VISUAL_META.awaiting_data.label}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded border",
+                    COURSE_VISUAL_META.completed.swatch,
+                  )}
+                />
+                {COURSE_VISUAL_META.completed.label}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded border",
+                    COURSE_VISUAL_META.replaced.swatch,
+                  )}
+                />
+                {COURSE_VISUAL_META.replaced.label}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded border",
+                    COURSE_VISUAL_META.cancelled.swatch,
+                  )}
+                />
+                {COURSE_VISUAL_META.cancelled.label}
+              </span>
+            </>
           )}
         </div>
       ) : null}

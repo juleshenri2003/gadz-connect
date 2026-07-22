@@ -35,7 +35,12 @@ studentsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
         amount,
         created_at,
         transaction:transaction_id (
-          course:course_id ( subject, title, scheduled_at )
+          course:course_id (
+            subject,
+            title,
+            scheduled_at,
+            provider:provider_id ( first_name, last_name )
+          )
         )
       `,
       )
@@ -61,10 +66,12 @@ studentsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  type ProfileJoin = { first_name?: string; last_name?: string };
   type CourseJoin = {
     subject: string | null;
     title: string;
     scheduled_at: string | null;
+    provider?: ProfileJoin | ProfileJoin[] | null;
   };
 
   const courseRows = (courseInvoicesResult.data ?? []).map((row) => {
@@ -77,6 +84,12 @@ studentsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
         : transaction?.course
     ) as CourseJoin | null | undefined;
     const subject = course?.subject ?? course?.title ?? "Cours particulier";
+    const provider = Array.isArray(course?.provider)
+      ? course?.provider[0]
+      : course?.provider;
+    const profName = provider
+      ? `${provider.first_name ?? ""} ${provider.last_name ?? ""}`.trim()
+      : "";
 
     return {
       id: row.id as string,
@@ -87,6 +100,7 @@ studentsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
       course_subject: subject,
       course_title: subject,
       scheduled_at: (course?.scheduled_at as string | null) ?? null,
+      prof_name: profName || "Professeur",
       is_monthly: false,
       line_count: 1,
     };
@@ -110,6 +124,7 @@ studentsRouter.get("/me/invoices", async (req: AuthenticatedRequest, res) => {
       course_subject: label,
       course_title: label,
       scheduled_at: `${billingPeriod}T12:00:00.000Z`,
+      prof_name: "Relevé mensuel",
       is_monthly: true,
       line_count: lineCount,
     };
@@ -327,7 +342,7 @@ studentsRouter.post(
 
 /**
  * GET /api/students/:studentId/learning-profile
- * Tuteur (après réservation) ou admin_general uniquement.
+ * Tuteur (après réservation), admin_general ou admin_campus (même campus).
  */
 studentsRouter.get(
   "/:studentId/learning-profile",
@@ -346,9 +361,10 @@ studentsRouter.get(
       return;
     }
 
+    const viewerRole = viewer.role as string;
     const allowed = await canAccessStudentLearningProfile(
       viewerId,
-      viewer.role as string,
+      viewerRole,
       studentId,
     );
 
@@ -363,7 +379,16 @@ studentsRouter.get(
       return;
     }
 
-    if (!result.data || !result.data.onboarding_complete) {
+    if (!result.data) {
+      res.status(404).json({ error: "Fiche pédagogique introuvable" });
+      return;
+    }
+
+    // RH : afficher aussi un brouillon / fiche partielle.
+    // Tuteurs : uniquement si le questionnaire est terminé.
+    const isAdmin =
+      viewerRole === "admin_general" || viewerRole === "admin_campus";
+    if (!isAdmin && !result.data.onboarding_complete) {
       res.status(404).json({ error: "Fiche pédagogique introuvable" });
       return;
     }

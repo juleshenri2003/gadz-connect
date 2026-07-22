@@ -56,12 +56,70 @@ const NOTIFICATIONS_SELECT_WITH_CLIENT = `
       client_id,
       student_confirmed_at,
       provider_confirmed_at,
+      student_session_confirmed_at,
+      provider_session_confirmed_at,
+      client:client_id ( first_name, last_name )
+    )
+  )
+`;
+
+/** Repli si migration 030 non appliquée (colonnes post-séance absentes). */
+const NOTIFICATIONS_SELECT_WITH_CLIENT_LEGACY = `
+  id,
+  read_at,
+  created_at,
+  notification:campus_notifications (
+    id,
+    kind,
+    title,
+    message,
+    scheduled_at,
+    replacement_status,
+    reason,
+    created_at,
+    declared_by,
+    course_id,
+    campus:campus_id ( name ),
+    declarant:declared_by ( first_name, last_name, role ),
+    course:course_id (
+      subject,
+      client_id,
+      student_confirmed_at,
+      provider_confirmed_at,
       client:client_id ( first_name, last_name )
     )
   )
 `;
 
 const NOTIFICATIONS_SELECT_BASE = `
+  id,
+  read_at,
+  created_at,
+  notification:campus_notifications (
+    id,
+    kind,
+    title,
+    message,
+    scheduled_at,
+    replacement_status,
+    reason,
+    created_at,
+    declared_by,
+    course_id,
+    campus:campus_id ( name ),
+    declarant:declared_by ( first_name, last_name, role ),
+    course:course_id (
+      subject,
+      client_id,
+      student_confirmed_at,
+      provider_confirmed_at,
+      student_session_confirmed_at,
+      provider_session_confirmed_at
+    )
+  )
+`;
+
+const NOTIFICATIONS_SELECT_BASE_LEGACY = `
   id,
   read_at,
   created_at,
@@ -90,6 +148,16 @@ function isSchemaJoinError(message: string | undefined): boolean {
   );
 }
 
+function isMissingSessionColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("student_session_confirmed_at") ||
+    message.includes("provider_session_confirmed_at") ||
+    message.includes("session_confirmation_completed_at") ||
+    message.includes("session_dispute_status")
+  );
+}
+
 async function fetchNotificationRecipients(userId: string) {
   const withClient = await supabaseAdmin
     .from("notification_recipients")
@@ -100,6 +168,32 @@ async function fetchNotificationRecipients(userId: string) {
 
   if (!withClient.error) return withClient;
 
+  if (isMissingSessionColumnError(withClient.error.message)) {
+    console.warn(
+      "[notifications] colonnes post-séance absentes — fallback legacy (appliquez migration 030)",
+    );
+    const legacyWithClient = await supabaseAdmin
+      .from("notification_recipients")
+      .select(NOTIFICATIONS_SELECT_WITH_CLIENT_LEGACY)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (!legacyWithClient.error) return legacyWithClient;
+    if (!isSchemaJoinError(legacyWithClient.error.message)) {
+      return legacyWithClient;
+    }
+    console.warn(
+      "[notifications] jointure client indisponible — repli sans nom élève:",
+      legacyWithClient.error.message,
+    );
+    return supabaseAdmin
+      .from("notification_recipients")
+      .select(NOTIFICATIONS_SELECT_BASE_LEGACY)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+  }
+
   if (!isSchemaJoinError(withClient.error.message)) {
     return withClient;
   }
@@ -109,9 +203,23 @@ async function fetchNotificationRecipients(userId: string) {
     withClient.error.message,
   );
 
-  return supabaseAdmin
+  const base = await supabaseAdmin
     .from("notification_recipients")
     .select(NOTIFICATIONS_SELECT_BASE)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!base.error || !isMissingSessionColumnError(base.error.message)) {
+    return base;
+  }
+
+  console.warn(
+    "[notifications] colonnes post-séance absentes — fallback legacy (appliquez migration 030)",
+  );
+  return supabaseAdmin
+    .from("notification_recipients")
+    .select(NOTIFICATIONS_SELECT_BASE_LEGACY)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -143,6 +251,8 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
           client_id?: string | null;
           student_confirmed_at?: string | null;
           provider_confirmed_at?: string | null;
+          student_session_confirmed_at?: string | null;
+          provider_session_confirmed_at?: string | null;
           client?:
             | { first_name?: string | null; last_name?: string | null }
             | { first_name?: string | null; last_name?: string | null }[]
@@ -173,6 +283,10 @@ notificationsRouter.get("/", async (req: AuthenticatedRequest, res) => {
           clientRow?.first_name || clientRow?.last_name ? clientRow : null,
         studentConfirmedAt: courseRow?.student_confirmed_at ?? null,
         providerConfirmedAt: courseRow?.provider_confirmed_at ?? null,
+        studentSessionConfirmedAt:
+          courseRow?.student_session_confirmed_at ?? null,
+        providerSessionConfirmedAt:
+          courseRow?.provider_session_confirmed_at ?? null,
       },
     };
   });

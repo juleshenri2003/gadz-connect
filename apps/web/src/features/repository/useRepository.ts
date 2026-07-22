@@ -163,6 +163,7 @@ export function useSubmitCourseSummary() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses-to-document"] });
+      void queryClient.invalidateQueries({ queryKey: ["schedule-me"] });
       void queryClient.invalidateQueries({ queryKey: ["repository-folders"] });
       void queryClient.invalidateQueries({
         queryKey: ["repository-folder-summaries"],

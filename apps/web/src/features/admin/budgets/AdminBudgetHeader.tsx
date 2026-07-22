@@ -16,14 +16,13 @@ export function AdminBudgetHeader({ budget }: AdminBudgetHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h2 className="text-2xl font-bold text-ink-900">
-          Budgets & transactions
-        </h2>
+        <h2 className="text-2xl font-bold text-ink-900">Argent</h2>
         <p className="mt-1 text-sm text-ink-600">
-          Flux de paiement des cours de tutorat — {budget.periodLabel.toLowerCase()}
+          Cockpit cash — facturation, clôture &amp; URSSAF ·{" "}
+          {budget.periodLabel.toLowerCase()}
         </p>
         <p className="mt-1 text-xs text-ink-400">
-          Pilotage financier — {scopeLabel}
+          {scopeLabel}
           {" · "}
           <span className="capitalize">{formatTodayDate()}</span>
         </p>

@@ -2,14 +2,20 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   cn,
 } from "@gadz-connect/ui";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAdminDashboard } from "@/features/admin/useAdmin";
+import {
+  ConfirmAttendanceActions,
+} from "@/features/course-session/ConfirmAttendanceActions";
 import {
   ConfirmSessionActions,
 } from "@/features/course-session/ConfirmSessionActions";
@@ -18,10 +24,16 @@ import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
 import { formatEuro } from "@/features/admin/format";
 import {
+  ALERT_CATEGORY_META,
   buildMarketplaceSubjectHref,
   buildPlanningWeekHref,
+  countAlertsByCategory,
   formatClientName,
   formatNotificationDate,
+  getAlertCategory,
+  getAlertRowClasses,
+  getConfirmationMissingParties,
+  getCourseOutcomeMeta,
   getEmptyStateMessage,
   getFilterOptions,
   getKindBadgeClasses,
@@ -29,12 +41,13 @@ import {
   getPlanningPath,
   getStudentNotificationTitle,
   getUniqueCampusNames,
+  groupAlertsByCategory,
   isCancellationKind,
-  isValidAdminFilter,
+  isValidAlertFilter,
   KIND_LABELS,
   matchesCampusFilter,
   matchesFilter,
-  sortByScheduledAt,
+  type AlertCategory,
   type NotificationFilter,
 } from "@/features/notifications/notificationUtils";
 import {
@@ -42,6 +55,12 @@ import {
   useNotifications,
   type CampusNotificationItem,
 } from "@/features/notifications/useNotifications";
+
+function isPastScheduledAt(scheduledAt: string | null | undefined): boolean {
+  if (!scheduledAt) return false;
+  const t = new Date(scheduledAt).getTime();
+  return !Number.isNaN(t) && t < Date.now();
+}
 
 export function NotificationsPage() {
   const location = useLocation();
@@ -53,10 +72,9 @@ export function NotificationsPage() {
   const { data: adminDashboard } = useAdminDashboard(isAdminRoute);
   const { data, isLoading, isError } = useNotifications();
   const markRead = useMarkNotificationRead();
-  const initialFilter: NotificationFilter =
-    isAdminRoute && isValidAdminFilter(filterParam)
-      ? filterParam
-      : "all";
+  const initialFilter: NotificationFilter = isValidAlertFilter(filterParam)
+    ? filterParam
+    : "all";
   const [filter, setFilter] = useState<NotificationFilter>(initialFilter);
   const [campusFilter, setCampusFilter] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
@@ -69,23 +87,25 @@ export function NotificationsPage() {
   const items = scopeItems;
 
   useEffect(() => {
-    if (isAdminRoute && isValidAdminFilter(filterParam)) {
+    if (isValidAlertFilter(filterParam)) {
       setFilter(filterParam);
     }
-  }, [filterParam, isAdminRoute]);
+  }, [filterParam]);
 
   const filtered = items.filter((item) => matchesFilter(item, filter));
-
+  // Alertes = file d'actions : uniquement le non lu.
   const unread = filtered.filter((n) => !n.read_at);
-  const history = sortByScheduledAt(filtered.filter((n) => n.read_at));
+  const categoryCounts = useMemo(
+    () => countAlertsByCategory(unread),
+    [unread],
+  );
+  const groupedUnread = groupAlertsByCategory(unread);
 
-  const isEmpty = filtered.length === 0;
+  const isEmpty = unread.length === 0;
   const filterOptions = getFilterOptions(profile, isAdminRoute);
   const campusNames = isAdminGeneral ? getUniqueCampusNames(data ?? []) : [];
 
-  const markableUnreadIds = items
-    .filter((n) => !n.read_at)
-    .map((n) => n.id);
+  const markableUnreadIds = unread.map((n) => n.id);
 
   async function handleMarkAllRead() {
     if (markableUnreadIds.length === 0) return;
@@ -120,11 +140,17 @@ export function NotificationsPage() {
               ? "Voir l'emploi du temps campus →"
               : "Voir mon emploi du temps →"}
           </Link>
+          {isAdminRoute ? (
+            <Link
+              to="/admin/cours"
+              className="mt-1 block text-sm font-medium text-brand-700 hover:underline"
+            >
+              Registre des cours (historique classé) →
+            </Link>
+          ) : null}
         </div>
 
-        {!isLoading &&
-        !isError &&
-        markableUnreadIds.length > 0 ? (
+        {!isLoading && !isError && markableUnreadIds.length > 0 ? (
           <Button
             type="button"
             size="sm"
@@ -162,21 +188,45 @@ export function NotificationsPage() {
               ))}
             </div>
           ) : null}
-          {filterOptions.length > 1 ? (
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.map((option) => (
+
+          <div className="flex flex-wrap gap-2">
+            {filterOptions.map((option) => {
+              const count =
+                option.value === "all"
+                  ? unread.length
+                  : option.value === "student_unavailable"
+                    ? categoryCounts.cancelled
+                    : option.value in categoryCounts
+                      ? categoryCounts[option.value as AlertCategory]
+                      : 0;
+              const meta =
+                option.value !== "all" &&
+                option.value !== "student_unavailable" &&
+                option.value !== "other"
+                  ? ALERT_CATEGORY_META[option.value]
+                  : null;
+
+              return (
                 <Button
                   key={option.value}
                   type="button"
                   size="sm"
                   variant={filter === option.value ? "default" : "outline"}
+                  className={cn(
+                    filter !== option.value && meta
+                      ? `border-transparent ${meta.badge}`
+                      : undefined,
+                  )}
                   onClick={() => setFilter(option.value)}
                 >
                   {option.label}
+                  <span className="ml-1.5 tabular-nums opacity-80">
+                    ({count})
+                  </span>
                 </Button>
-              ))}
-            </div>
-          ) : null}
+              );
+            })}
+          </div>
         </>
       ) : null}
 
@@ -184,72 +234,108 @@ export function NotificationsPage() {
         <p className="text-sm text-ink-400">Chargement…</p>
       ) : isError ? (
         <p className="text-sm text-danger">Impossible de charger les alertes.</p>
+      ) : isEmpty ? (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <p className="text-sm text-ink-400">
+              {getEmptyStateMessage(profile)}
+            </p>
+            {isAdminRoute ? (
+              <Link
+                to="/admin/cours"
+                className="text-sm font-medium text-brand-700 hover:underline"
+              >
+                Voir le registre des cours →
+              </Link>
+            ) : (
+              <Link
+                to={planningPath}
+                className="text-sm font-medium text-brand-700 hover:underline"
+              >
+                Voir mon emploi du temps →
+              </Link>
+            )}
+          </CardContent>
+        </Card>
       ) : (
-        <>
-          {unread.length > 0 ? (
-            <Card className="border-warning/20">
-              <CardHeader>
-                <CardTitle className="text-base text-warning">
-                  Non lues ({unread.length})
-                </CardTitle>
-                <CardDescription>
-                  Alertes pas encore consultées
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {unread.map((item) => (
-                  <NotificationRow
-                    key={item.id}
-                    item={item}
-                    isAdminRoute={isAdminRoute}
-                    isFocused={item.id === focusId}
-                    onMarkRead={() => markRead.mutate(item.id)}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                {unread.length > 0 ? "Historique" : "Alertes"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {isEmpty ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-ink-400">
-                    {getEmptyStateMessage(profile)}
-                  </p>
-                  {!isAdminRoute ? (
-                    <Link
-                      to={planningPath}
-                      className="text-sm font-medium text-brand-700 hover:underline"
-                    >
-                      Voir mon emploi du temps →
-                    </Link>
-                  ) : null}
-                </div>
-              ) : history.length === 0 && unread.length > 0 ? (
-                <p className="text-sm text-ink-400">
-                  Aucune alerte archivée pour ce filtre.
-                </p>
-              ) : (
-                history.map((item) => (
-                  <NotificationRow
-                    key={item.id}
-                    item={item}
-                    isAdminRoute={isAdminRoute}
-                    isFocused={item.id === focusId}
-                  />
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-base font-semibold text-ink-900">
+              À traiter ({unread.length})
+            </h3>
+            <p className="text-sm text-ink-600">
+              Marquez comme lu une fois traité — l&apos;alerte quitte cette
+              liste
+            </p>
+          </div>
+          {groupedUnread.map((group) => (
+            <AlertCategorySection
+              key={`unread-${group.category}`}
+              category={group.category}
+              label={group.label}
+              hint={group.hint}
+              count={group.items.length}
+            >
+              {group.items.map((item) => (
+                <NotificationRow
+                  key={item.id}
+                  item={item}
+                  isAdminRoute={isAdminRoute}
+                  isFocused={item.id === focusId}
+                  onMarkRead={() => markRead.mutate(item.id)}
+                />
+              ))}
+            </AlertCategorySection>
+          ))}
+        </div>
       )}
     </div>
+  );
+}
+
+function AlertCategorySection({
+  category,
+  label,
+  hint,
+  count,
+  children,
+}: {
+  category: AlertCategory;
+  label: string;
+  hint: string;
+  count: number;
+  children: ReactNode;
+}) {
+  const meta = ALERT_CATEGORY_META[category];
+
+  return (
+    <section
+      className={cn(
+        "overflow-hidden rounded-md border border-line border-l-4 bg-surface",
+        meta.accent,
+      )}
+    >
+      <header
+        className={cn(
+          "flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3",
+          meta.header,
+        )}
+      >
+        <div>
+          <h4 className="text-sm font-semibold text-ink-900">{label}</h4>
+          <p className="mt-0.5 text-xs text-ink-600">{hint}</p>
+        </div>
+        <span
+          className={cn(
+            "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+            meta.badge,
+          )}
+        >
+          {count}
+        </span>
+      </header>
+      <div className="space-y-3 p-3">{children}</div>
+    </section>
   );
 }
 
@@ -273,6 +359,7 @@ function NotificationRow({
   const student = profile?.role ? isStudent(profile.role) : false;
   const isSiteAdmin =
     profile?.role === "admin_general" || profile?.role === "admin_campus";
+  const category = getAlertCategory(n.kind);
 
   useEffect(() => {
     if (isFocused && rowRef.current) {
@@ -293,8 +380,7 @@ function NotificationRow({
 
   const clientName = formatClientName(n.client);
   const subject =
-    n.subject ??
-    n.title.replace(/^Séance annulée — /, "");
+    n.subject ?? n.title.replace(/^Séance annulée — /, "");
   const displayTitle = student
     ? getStudentNotificationTitle(n.kind, subject, declarant)
     : n.title;
@@ -305,10 +391,19 @@ function NotificationRow({
     student && !isAdminRoute && n.kind === "course_follow_up";
   const showSuiviCta =
     student && !isAdminRoute && n.kind === "course_follow_up" && n.course_id;
-  const showConfirmCta =
+  const pastSession = isPastScheduledAt(n.scheduled_at);
+  const showPostSessionConfirmCta =
+    !isAdminRoute &&
+    Boolean(n.course_id) &&
+    (n.kind === "session_confirm_reminder" ||
+      ((n.kind === "course_confirmation_reminder" ||
+        n.kind === "course_confirmation_escalation") &&
+        pastSession));
+  const showPreSessionConfirmCta =
     !isAdminRoute &&
     n.kind === "course_confirmation_reminder" &&
-    Boolean(n.course_id);
+    Boolean(n.course_id) &&
+    !pastSession;
   const showReplacementActions =
     !isAdminRoute &&
     (n.kind === "replacement_offer" || n.kind === "replacement_candidate");
@@ -318,15 +413,22 @@ function NotificationRow({
     isCancellationKind(n.kind) &&
     n.kind === "prof_unavailable";
 
+  const confirmationParties =
+    category === "confirmation"
+      ? getConfirmationMissingParties(item)
+      : null;
+  const outcomeMeta =
+    category === "completed"
+      ? getCourseOutcomeMeta(n.kind, n.message)
+      : null;
+
   return (
     <div
       ref={rowRef}
       id={`alert-${item.id}`}
       className={cn(
         "rounded-lg border p-4 text-sm transition-shadow",
-        item.read_at
-          ? "border-line bg-paper/50"
-          : "border-warning/30 bg-warning-bg",
+        getAlertRowClasses(n.kind, !item.read_at),
         isFocused && "ring-2 ring-accent-600 ring-offset-2",
       )}
     >
@@ -342,9 +444,38 @@ function NotificationRow({
               {KIND_LABELS[n.kind] ?? n.kind}
             </span>
             {!item.read_at ? (
-              <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+              <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-ink-600">
                 Non lu
               </span>
+            ) : null}
+            {confirmationParties ? (
+              <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+                {confirmationParties.label}
+              </span>
+            ) : null}
+            {outcomeMeta ? (
+              <>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
+                    outcomeMeta.hasRating
+                      ? "bg-success-bg text-success"
+                      : "bg-paper text-ink-600",
+                  )}
+                >
+                  {outcomeMeta.ratingLabel}
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
+                    outcomeMeta.hasComment
+                      ? "bg-success-bg text-success"
+                      : "bg-paper text-ink-600",
+                  )}
+                >
+                  {outcomeMeta.commentLabel}
+                </span>
+              </>
             ) : null}
           </div>
 
@@ -396,7 +527,7 @@ function NotificationRow({
       )}
 
       {n.kind === "refund_processed" && n.refundAmount != null ? (
-        <div className="mt-3 rounded-md border border-line bg-paper px-3 py-2">
+        <div className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2">
           <p className="text-sm font-semibold text-ink-900">
             Montant remboursé : {formatEuro(n.refundAmount)}
           </p>
@@ -418,13 +549,25 @@ function NotificationRow({
       ) : null}
 
       {n.reason ? (
-        <p className="mt-2 text-xs text-ink-400">
-          Motif : « {n.reason} »
-        </p>
+        <p className="mt-2 text-xs text-ink-400">Motif : « {n.reason} »</p>
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-3">
-        {showConfirmCta && n.course_id ? (
+        {showPostSessionConfirmCta && n.course_id ? (
+          <ConfirmAttendanceActions
+            courseId={n.course_id}
+            audience={student ? "student" : "teacher"}
+            studentSessionConfirmedAt={
+              n.studentSessionConfirmedAt ?? n.studentConfirmedAt
+            }
+            providerSessionConfirmedAt={
+              n.providerSessionConfirmedAt ?? n.providerConfirmedAt
+            }
+            compact
+            confirmLabel="Confirmer que le cours a eu lieu"
+          />
+        ) : null}
+        {showPreSessionConfirmCta && n.course_id ? (
           <ConfirmSessionActions
             courseId={n.course_id}
             audience={student ? "student" : "teacher"}

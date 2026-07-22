@@ -242,7 +242,7 @@ export function useBookSlot() {
       slotId: string;
       subject?: string;
       payerName?: string;
-      beneficiaryName?: string;
+      payerParentId?: string;
       sessionType?: "standard" | "trial";
       isHomeVisit?: boolean;
     }) => {

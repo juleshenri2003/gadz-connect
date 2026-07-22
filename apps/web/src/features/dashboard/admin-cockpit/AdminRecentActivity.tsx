@@ -87,7 +87,7 @@ export function AdminRecentActivity({ dashboard }: AdminRecentActivityProps) {
             </p>
           )}
           <Button className="mt-4" size="sm" variant="outline" asChild>
-            <Link to="/admin/utilisateurs">Gérer les utilisateurs →</Link>
+            <Link to="/admin/utilisateurs">Gérer les membres →</Link>
           </Button>
         </div>
       </div>

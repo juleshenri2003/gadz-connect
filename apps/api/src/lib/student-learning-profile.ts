@@ -131,7 +131,17 @@ export async function upsertStudentLearningProfile(
       .eq("role", "student_provider");
 
     if (profileError) {
-      return { ok: false as const, error: profileError.message };
+      // Colonne absente (migration 027) : la fiche est quand même enregistrée.
+      const missingColumn =
+        profileError.message.includes("student_onboarding_complete") ||
+        profileError.code === "42703" ||
+        profileError.message.includes("schema cache");
+      if (!missingColumn) {
+        return { ok: false as const, error: profileError.message };
+      }
+      console.warn(
+        "[student-learning-profile] student_onboarding_complete absent — appliquez migration 027",
+      );
     }
   }
 
@@ -143,6 +153,7 @@ const ACTIVE_COURSE_STATUSES = [
   "completed",
   "payment_pending",
   "awaiting_replacement",
+  "awaiting_session_confirmation",
 ] as const;
 
 export async function canAccessStudentLearningProfile(
@@ -151,7 +162,28 @@ export async function canAccessStudentLearningProfile(
   studentId: string,
 ): Promise<boolean> {
   if (viewerId === studentId) return true;
+
   if (viewerRole === "admin_general") return true;
+
+  if (viewerRole === "admin_campus") {
+    const [{ data: viewer }, { data: student }] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("campus_id")
+        .eq("id", viewerId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("profiles")
+        .select("campus_id")
+        .eq("id", studentId)
+        .maybeSingle(),
+    ]);
+    return Boolean(
+      viewer?.campus_id &&
+        student?.campus_id &&
+        viewer.campus_id === student.campus_id,
+    );
+  }
 
   if (viewerRole === "teacher") {
     const { count, error } = await supabaseAdmin
@@ -161,12 +193,36 @@ export async function canAccessStudentLearningProfile(
       .eq("provider_id", viewerId)
       .in("status", [...ACTIVE_COURSE_STATUSES]);
 
-    if (error) return false;
+    if (error) {
+      // Enum awaiting_session_confirmation absent (migration 030).
+      const { count: legacyCount, error: legacyError } = await supabaseAdmin
+        .from("courses")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", studentId)
+        .eq("provider_id", viewerId)
+        .in("status", [
+          "scheduled",
+          "completed",
+          "payment_pending",
+          "awaiting_replacement",
+        ]);
+      if (legacyError) return false;
+      return (legacyCount ?? 0) > 0;
+    }
     return (count ?? 0) > 0;
   }
 
   return false;
 }
+
+/** Statuts qui comptent comme « déjà eu un cours » avec ce tuteur (plus d'essai). */
+const PRIOR_COURSE_STATUSES = [
+  "scheduled",
+  "completed",
+  "payment_pending",
+  "awaiting_replacement",
+  "awaiting_session_confirmation",
+] as const;
 
 export async function isTrialEligible(
   studentId: string,
@@ -187,6 +243,51 @@ export async function isTrialEligible(
     return {
       eligible: false,
       reason: "Vous avez déjà utilisé votre séance d'essai avec ce tuteur",
+    };
+  }
+
+  // Filet de sécurité : tout cours déjà pris avec ce tuteur (même sans ligne
+  // student_tutor_trials) consomme l'essai gratuit.
+  const { count, error: coursesError } = await supabaseAdmin
+    .from("courses")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", studentId)
+    .eq("provider_id", providerId)
+    .in("status", [...PRIOR_COURSE_STATUSES]);
+
+  if (coursesError) {
+    // Si le statut awaiting_session_confirmation n'existe pas encore (migration 030),
+    // retenter sans lui.
+    const { count: legacyCount, error: legacyError } = await supabaseAdmin
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", studentId)
+      .eq("provider_id", providerId)
+      .in("status", [
+        "scheduled",
+        "completed",
+        "payment_pending",
+        "awaiting_replacement",
+      ]);
+
+    if (legacyError) {
+      return { eligible: false, reason: "Impossible de vérifier l'éligibilité" };
+    }
+
+    if ((legacyCount ?? 0) > 0) {
+      return {
+        eligible: false,
+        reason: "Vous avez déjà suivi un cours avec ce tuteur",
+      };
+    }
+
+    return { eligible: true };
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      eligible: false,
+      reason: "Vous avez déjà suivi un cours avec ce tuteur",
     };
   }
 

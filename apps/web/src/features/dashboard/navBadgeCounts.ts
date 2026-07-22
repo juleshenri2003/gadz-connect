@@ -51,6 +51,8 @@ export function computeNavBadgeCounts(
 
   for (const task of tasks) {
     if (task.status !== "todo" || task.readOnly || !task.href) continue;
+    // Onboarding = guide séquentiel, pas un badge nav (évite faux « 1 » sur Suivi / Profil).
+    if (task.kind === "onboarding") continue;
     const path = resolveNavPathForTaskHref(task.href, navPaths);
     if (path && path in counts) {
       counts[path] = (counts[path] ?? 0) + 1;

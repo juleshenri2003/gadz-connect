@@ -19,25 +19,80 @@ async function getProfile(userId: string) {
   return data;
 }
 
+function isMissingColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("does not exist") ||
+    message.includes("Could not find the") ||
+    message.includes("schema cache")
+  );
+}
+
+const COURSE_SELECT_WITH_SESSION =
+  "id, status, scheduled_at, campus_id, client_id, provider_id, subject, title, student_confirmed_at, provider_confirmed_at, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status";
+
+const COURSE_SELECT_LEGACY =
+  "id, status, scheduled_at, campus_id, client_id, provider_id, subject, title, student_confirmed_at, provider_confirmed_at";
+
 async function loadCourseForParticipant(courseId: string, userId: string) {
-  const { data: course, error } = await supabaseAdmin
+  let course: Record<string, unknown> | null = null;
+  let legacySessionStorage = false;
+
+  const withSession = await supabaseAdmin
     .from("courses")
-    .select(
-      "id, status, scheduled_at, campus_id, client_id, provider_id, subject, title, student_confirmed_at, provider_confirmed_at, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status",
-    )
+    .select(COURSE_SELECT_WITH_SESSION)
     .eq("id", courseId)
     .maybeSingle();
 
-  if (error || !course) return null;
+  if (withSession.error && isMissingColumnError(withSession.error.message)) {
+    console.warn(
+      "[courses] colonnes post-séance absentes — fallback legacy (appliquez migration 030)",
+    );
+    const legacy = await supabaseAdmin
+      .from("courses")
+      .select(COURSE_SELECT_LEGACY)
+      .eq("id", courseId)
+      .maybeSingle();
+    if (legacy.error || !legacy.data) return null;
+    course = legacy.data as Record<string, unknown>;
+    legacySessionStorage = true;
+  } else if (withSession.error || !withSession.data) {
+    return null;
+  } else {
+    course = withSession.data as Record<string, unknown>;
+  }
+
   const isClient = course.client_id === userId;
   const isProvider = course.provider_id === userId;
   if (!isClient && !isProvider) return null;
-  return { course, isClient, isProvider };
+  return { course, isClient, isProvider, legacySessionStorage };
 }
 
 function isPastScheduled(scheduledAt: string | null): boolean {
   if (!scheduledAt) return false;
   return new Date(scheduledAt).getTime() < Date.now();
+}
+
+/** Lit les timestamps de confirmation post-séance (ou legacy pré-séance si 030 absente). */
+function readSessionConfirmState(
+  course: Record<string, unknown>,
+  legacySessionStorage: boolean,
+) {
+  if (legacySessionStorage) {
+    return {
+      studentAt: (course.student_confirmed_at as string | null) ?? null,
+      providerAt: (course.provider_confirmed_at as string | null) ?? null,
+      completedAt: null as string | null,
+      disputeStatus: "none" as string | null,
+    };
+  }
+  return {
+    studentAt: (course.student_session_confirmed_at as string | null) ?? null,
+    providerAt: (course.provider_session_confirmed_at as string | null) ?? null,
+    completedAt:
+      (course.session_confirmation_completed_at as string | null) ?? null,
+    disputeStatus: (course.session_dispute_status as string | null) ?? "none",
+  };
 }
 
 /**
@@ -104,12 +159,13 @@ coursesRouter.post(
       return;
     }
 
-    const { course, isClient, isProvider } = access;
+    const { course, isClient, isProvider, legacySessionStorage } = access;
+    const status = course.status as string;
     const eligibleStatus =
-      course.status === "awaiting_session_confirmation" ||
-      (course.status === "scheduled" &&
+      status === "awaiting_session_confirmation" ||
+      (status === "scheduled" &&
         isPastScheduled(course.scheduled_at as string | null)) ||
-      course.status === "completed";
+      status === "completed";
 
     if (!eligibleStatus) {
       res.status(400).json({
@@ -119,14 +175,16 @@ coursesRouter.post(
       return;
     }
 
-    if (course.session_confirmation_completed_at) {
+    const state = readSessionConfirmState(course, legacySessionStorage);
+
+    if (state.completedAt || (state.studentAt && state.providerAt)) {
       res.json({
         data: {
           id: course.id,
-          student_session_confirmed_at: course.student_session_confirmed_at,
-          provider_session_confirmed_at: course.provider_session_confirmed_at,
-          session_confirmation_completed_at:
-            course.session_confirmation_completed_at,
+          student_session_confirmed_at: state.studentAt,
+          provider_session_confirmed_at: state.providerAt,
+          session_confirmation_completed_at: state.completedAt ?? state.studentAt,
+          session_dispute_status: state.disputeStatus,
           payout: { alreadyCompleted: true },
         },
       });
@@ -136,61 +194,126 @@ coursesRouter.post(
     const now = new Date().toISOString();
     const update: Record<string, unknown> = {};
     if (isClient) {
-      if (course.student_session_confirmed_at) {
+      if (state.studentAt) {
         res.status(400).json({ error: "Vous avez déjà confirmé cette séance" });
         return;
       }
-      update.student_session_confirmed_at = now;
+      if (legacySessionStorage) update.student_confirmed_at = now;
+      else update.student_session_confirmed_at = now;
     }
     if (isProvider) {
-      if (course.provider_session_confirmed_at) {
+      if (state.providerAt) {
         res.status(400).json({ error: "Vous avez déjà confirmé cette séance" });
         return;
       }
-      update.provider_session_confirmed_at = now;
+      if (legacySessionStorage) update.provider_confirmed_at = now;
+      else update.provider_session_confirmed_at = now;
     }
 
-    if (course.status === "scheduled") {
+    if (!legacySessionStorage && status === "scheduled") {
       update.status = "awaiting_session_confirmation";
     }
 
-    const studentAt = isClient
-      ? now
-      : (course.student_session_confirmed_at as string | null);
-    const providerAt = isProvider
-      ? now
-      : (course.provider_session_confirmed_at as string | null);
+    const studentAt = isClient ? now : state.studentAt;
+    const providerAt = isProvider ? now : state.providerAt;
     const bothConfirmed = Boolean(studentAt && providerAt);
 
     if (bothConfirmed) {
-      update.session_confirmation_completed_at = now;
+      if (!legacySessionStorage) {
+        update.session_confirmation_completed_at = now;
+        update.session_dispute_status = "none";
+      }
       update.status = "completed";
-      update.session_dispute_status = "none";
     }
 
-    const { data: updated, error } = await supabaseAdmin
+    const selectCols = legacySessionStorage
+      ? "id, status, student_confirmed_at, provider_confirmed_at"
+      : "id, status, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status";
+
+    let { data: updated, error } = await supabaseAdmin
       .from("courses")
       .update(update)
-      .eq("id", course.id)
-      .select(
-        "id, status, student_session_confirmed_at, provider_session_confirmed_at, session_confirmation_completed_at, session_dispute_status",
-      )
+      .eq("id", course.id as string)
+      .select(selectCols)
       .single();
+
+    // Enum awaiting_session_confirmation absent (migration 030).
+    if (
+      error &&
+      update.status === "awaiting_session_confirmation" &&
+      (error.message.includes("invalid input value for enum") ||
+        error.message.includes("awaiting_session_confirmation"))
+    ) {
+      const retryUpdate: Record<string, unknown> = { ...update };
+      if (bothConfirmed) retryUpdate.status = "completed";
+      else delete retryUpdate.status;
+      const retry = await supabaseAdmin
+        .from("courses")
+        .update(retryUpdate)
+        .eq("id", course.id as string)
+        .select(selectCols)
+        .single();
+      updated = retry.data;
+      error = retry.error;
+    }
 
     if (error || !updated) {
       res.status(500).json({ error: error?.message ?? "Erreur serveur" });
       return;
     }
 
+    const updatedRow = updated as unknown as Record<string, unknown>;
+    const useLegacyResponse =
+      legacySessionStorage ||
+      !("student_session_confirmed_at" in updatedRow);
+    const responsePayload = useLegacyResponse
+      ? {
+          id: updatedRow.id,
+          status: updatedRow.status,
+          student_session_confirmed_at:
+            (updatedRow.student_confirmed_at as string | null) ??
+            (updatedRow.student_session_confirmed_at as string | null) ??
+            null,
+          provider_session_confirmed_at:
+            (updatedRow.provider_confirmed_at as string | null) ??
+            (updatedRow.provider_session_confirmed_at as string | null) ??
+            null,
+          session_confirmation_completed_at: bothConfirmed ? now : null,
+          session_dispute_status: "none",
+        }
+      : {
+          id: updatedRow.id,
+          status: updatedRow.status,
+          student_session_confirmed_at:
+            updatedRow.student_session_confirmed_at ?? null,
+          provider_session_confirmed_at:
+            updatedRow.provider_session_confirmed_at ?? null,
+          session_confirmation_completed_at:
+            updatedRow.session_confirmation_completed_at ?? null,
+          session_dispute_status: updatedRow.session_dispute_status ?? "none",
+        };
+
     let payout: { ok: boolean; error?: string; channel?: string } | null = null;
     if (bothConfirmed) {
-      const result = await payoutAfterSessionConfirmation(course.id as string);
-      payout = result.ok
-        ? { ok: true, channel: result.channel }
-        : { ok: false, error: result.error };
+      try {
+        const result = await payoutAfterSessionConfirmation(
+          course.id as string,
+          {
+            allowLegacyConfirmFields: useLegacyResponse,
+          },
+        );
+        payout = result.ok
+          ? { ok: true, channel: result.channel }
+          : { ok: false, error: result.error };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Échec du reversement";
+        console.error("[courses] confirm-attendance payout:", message);
+        payout = { ok: false, error: message };
+      }
     }
 
-    res.json({ data: { ...updated, payout } });
+    res.json({ data: { ...responsePayload, payout } });
   },
 );
 

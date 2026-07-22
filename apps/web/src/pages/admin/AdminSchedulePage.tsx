@@ -21,11 +21,13 @@ import {
   parseAdminScheduleUrl,
   parseMonthParam,
   parseWeekParam,
+  expandStatusFiltersToApi,
   type AdminScheduleStatusFilter,
   type AdminScheduleViewMode,
 } from "@/features/scheduling/adminScheduleUtils";
 import {
   courseStatusLabel,
+  eventMatchesPersonFocus,
   isEventPast,
 } from "@/features/scheduling/calendar-utils";
 import { filterScheduleEvents } from "@/features/scheduling/scheduleFilters";
@@ -82,9 +84,10 @@ export function AdminSchedulePage() {
     [urlState.month, urlState.week],
   );
 
-  const showHistory = urlState.showHistory ?? false;
+  const showHistory = urlState.showHistory ?? true;
   const campusId = urlState.campusId;
   const selectedStatus = urlState.status ?? [];
+  const personFocus = (urlState.search ?? "").trim();
   const isGlobalScope = me?.role === "admin_general";
 
   const range = useMemo(
@@ -92,23 +95,23 @@ export function AdminSchedulePage() {
     [view, weekAnchor, monthAnchor],
   );
 
+  const apiStatus = useMemo(
+    () => expandStatusFiltersToApi(selectedStatus),
+    [selectedStatus],
+  );
+
   const scheduleParams = useMemo(
     () => ({
       from: range.from,
       to: range.to,
       campusId,
-      status: selectedStatus.length > 0 ? selectedStatus : undefined,
-      includeCancelled: showHistory,
-      search: urlState.search,
+      status: apiStatus,
+      // Toujours charger les annulés ; le masquage historique est côté client.
+      includeCancelled: true,
+      // Soft focus personne : ne pas filtrer côté API.
+      search: undefined as string | undefined,
     }),
-    [
-      range.from,
-      range.to,
-      campusId,
-      selectedStatus,
-      showHistory,
-      urlState.search,
-    ],
+    [range.from, range.to, campusId, apiStatus],
   );
 
   const { data, isLoading, isError } = useAdminSchedule(scheduleParams);
@@ -123,6 +126,18 @@ export function AdminSchedulePage() {
     () => filterScheduleEvents(rawEvents, showHistory),
     [rawEvents, showHistory],
   );
+
+  const focusMatchCount = useMemo(() => {
+    if (!personFocus) return 0;
+    return events.filter((event) =>
+      eventMatchesPersonFocus(event, personFocus),
+    ).length;
+  }, [events, personFocus]);
+
+  function getEventEmphasis(event: ScheduleEvent): "focus" | "fade" | "normal" {
+    if (!personFocus) return "normal";
+    return eventMatchesPersonFocus(event, personFocus) ? "focus" : "fade";
+  }
 
   function patchParams(
     patch: Record<string, string | undefined>,
@@ -184,7 +199,8 @@ export function AdminSchedulePage() {
   }
 
   function handleShowHistoryChange(value: boolean) {
-    patchParams({ history: value ? "1" : undefined });
+    // history=0 masque ; absence = tout afficher (défaut)
+    patchParams({ history: value ? undefined : "0" });
   }
 
   function renderMeta(event: ScheduleEvent): string | undefined {
@@ -251,7 +267,7 @@ export function AdminSchedulePage() {
   }
 
   const emptyLabel =
-    campusId || urlState.search || selectedStatus.length > 0
+    campusId || personFocus || selectedStatus.length > 0
       ? "Aucune session ne correspond à vos filtres."
       : "Aucun cours planifié sur cette période.";
 
@@ -260,7 +276,8 @@ export function AdminSchedulePage() {
       <div>
         <h2 className="text-2xl font-bold text-ink-900">Emploi du temps</h2>
         <p className="mt-1 text-sm text-ink-600">
-          Activité tutorat sur votre périmètre — vision globale multi-campus
+          Tous les cours du périmètre — filtrez une personne pour la mettre en
+          avant
         </p>
       </div>
 
@@ -278,6 +295,8 @@ export function AdminSchedulePage() {
         selectedStatus={selectedStatus}
         showHistory={showHistory}
         showCampusFilter={isGlobalScope}
+        focusActive={Boolean(personFocus)}
+        focusMatchCount={focusMatchCount}
         onCampusChange={handleCampusChange}
         onSearchChange={handleSearchChange}
         onStatusToggle={handleStatusToggle}
@@ -316,6 +335,9 @@ export function AdminSchedulePage() {
         <p className="text-sm text-ink-400">
           {events.length} session{events.length > 1 ? "s" : ""} affichée
           {events.length > 1 ? "s" : ""}
+          {personFocus && focusMatchCount > 0
+            ? ` · ${focusMatchCount} en focus`
+            : ""}
         </p>
       </div>
 
@@ -331,6 +353,7 @@ export function AdminSchedulePage() {
               loading={isLoading}
               onEventClick={setSelectedEvent}
               emptyLabel={emptyLabel}
+              getEventEmphasis={getEventEmphasis}
             />
           ) : view === "month" ? (
             <MonthCalendar
@@ -346,10 +369,11 @@ export function AdminSchedulePage() {
               loading={isLoading}
               showDuration
               showLegend
-              legendVariant="student"
+              legendVariant="admin"
               initialAnchor={weekAnchor}
               onAnchorChange={handleWeekAnchorChange}
               onEventClick={setSelectedEvent}
+              getEventEmphasis={getEventEmphasis}
               emptyLabel={emptyLabel}
               emptyLabelWeekOnly="Aucune session cette semaine — utilisez ← → pour parcourir les autres semaines."
               renderEventTitle={(event) => event.title}

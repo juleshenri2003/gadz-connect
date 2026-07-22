@@ -16,6 +16,7 @@ interface AdminAgendaListProps {
   loading?: boolean;
   onEventClick?: (event: ScheduleEvent) => void;
   emptyLabel?: string;
+  getEventEmphasis?: (event: ScheduleEvent) => "focus" | "fade" | "normal";
 }
 
 function ListSkeleton() {
@@ -34,9 +35,11 @@ function ListSkeleton() {
 function AdminAgendaListItem({
   event,
   onEventClick,
+  emphasis = "normal",
 }: {
   event: ScheduleEvent;
   onEventClick?: (event: ScheduleEvent) => void;
+  emphasis?: "focus" | "fade" | "normal";
 }) {
   const past = isEventPast(event.startsAt, event.endsAt);
   const duration = formatSessionDurationLabel(event.startsAt, event.endsAt);
@@ -58,6 +61,11 @@ function AdminAgendaListItem({
           {event.campusName ? (
             <span className="text-[10px] font-medium uppercase tracking-wide text-ink-400">
               {event.campusName}
+            </span>
+          ) : null}
+          {emphasis === "focus" ? (
+            <span className="rounded bg-ink-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              Focus
             </span>
           ) : null}
           {missingSummary ? (
@@ -89,6 +97,15 @@ function AdminAgendaListItem({
     </div>
   );
 
+  const emphasisClass =
+    emphasis === "fade"
+      ? "opacity-25 saturate-50"
+      : emphasis === "focus"
+        ? "ring-2 ring-ink-900/20 shadow-surface"
+        : past
+          ? "opacity-80"
+          : undefined;
+
   if (onEventClick) {
     return (
       <li>
@@ -97,7 +114,7 @@ function AdminAgendaListItem({
           className={cn(
             "w-full rounded-lg border p-4 text-left transition hover:border-brand-100 hover:bg-brand-50/30",
             eventStyles(event.kind, event.status, event.startsAt, event.endsAt),
-            past && "opacity-80",
+            emphasisClass,
           )}
           onClick={() => onEventClick(event)}
         >
@@ -112,6 +129,7 @@ function AdminAgendaListItem({
       className={cn(
         "rounded-lg border p-4",
         eventStyles(event.kind, event.status, event.startsAt, event.endsAt),
+        emphasisClass,
       )}
     >
       {inner}
@@ -124,6 +142,7 @@ export function AdminAgendaList({
   loading,
   onEventClick,
   emptyLabel = "Aucune session sur cette période.",
+  getEventEmphasis,
 }: AdminAgendaListProps) {
   if (loading) return <ListSkeleton />;
 
@@ -154,6 +173,7 @@ export function AdminAgendaList({
                 key={event.id}
                 event={event}
                 onEventClick={onEventClick}
+                emphasis={getEventEmphasis?.(event) ?? "normal"}
               />
             ))}
           </ul>

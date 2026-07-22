@@ -42,6 +42,26 @@ studentLearningProfileRouter.get(
       return;
     }
 
+    // Guérit les comptes bloqués sur /app/onboarding si la fiche est déjà complète
+    // mais le flag profil n'a pas été mis à jour.
+    if (result.data?.onboarding_complete) {
+      const { error: healError } = await supabaseAdmin
+        .from("profiles")
+        .update({ student_onboarding_complete: true })
+        .eq("id", userId)
+        .eq("role", "student_provider");
+      if (
+        healError &&
+        !healError.message.includes("student_onboarding_complete") &&
+        healError.code !== "42703"
+      ) {
+        console.warn(
+          "[student-learning-profile] heal flag:",
+          healError.message,
+        );
+      }
+    }
+
     res.json({
       data: result.data ? mapStudentLearningProfile(result.data) : null,
     });

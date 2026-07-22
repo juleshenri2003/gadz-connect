@@ -2,6 +2,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  GraduationCap,
   LayoutDashboard,
   Users,
   Wallet,
@@ -19,8 +20,9 @@ const NAV = [
   { to: "/admin", label: "Tableau de bord", shortLabel: "Accueil", end: true, icon: LayoutDashboard },
   { to: "/admin/planning", label: "Emploi du temps", shortLabel: "Planning", icon: Calendar },
   { to: "/admin/alertes", label: "Alertes", shortLabel: "Alertes", icon: Bell },
-  { to: "/admin/utilisateurs", label: "Utilisateurs", shortLabel: "Membres", icon: Users },
-  { to: "/admin/budgets", label: "Budgets", shortLabel: "Budgets", icon: Wallet },
+  { to: "/admin/utilisateurs/eleves", label: "Élèves", shortLabel: "Élèves", icon: GraduationCap },
+  { to: "/admin/utilisateurs/profs", label: "Professeurs", shortLabel: "Profs", icon: Users },
+  { to: "/admin/budgets", label: "Argent", shortLabel: "Argent", icon: Wallet },
   { to: "/admin/cours", label: "Cours", shortLabel: "Cours", icon: BookOpen },
 ] as const;
 

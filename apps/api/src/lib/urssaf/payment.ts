@@ -251,16 +251,25 @@ async function triggerProfPayoutAfterUrssaf(
   );
   if (amountCents <= 0) return false;
 
-  const transfer = await stripe.transfers.create({
-    amount: amountCents,
-    currency: "eur",
-    destination: accountId,
-    metadata: {
-      course_id: tx.course_id,
-      transaction_id: tx.id,
-      source: "urssaf_avance_immediate",
-    },
-  });
+  let transfer: { id: string };
+  try {
+    transfer = await stripe.transfers.create({
+      amount: amountCents,
+      currency: "eur",
+      destination: accountId,
+      metadata: {
+        course_id: tx.course_id,
+        transaction_id: tx.id,
+        source: "urssaf_avance_immediate",
+      },
+    });
+  } catch (err) {
+    console.error(
+      "[urssaf] Stripe transfer failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
 
   await supabaseAdmin
     .from("transactions")

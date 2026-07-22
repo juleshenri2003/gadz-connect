@@ -1,6 +1,5 @@
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
-import { ProviderTaskBanner } from "@/features/dashboard/ProviderTaskBanner";
 import { TeacherCockpit } from "@/features/dashboard/teacher-cockpit/TeacherCockpit";
 import { TeacherOnboardingDashboard } from "@/features/onboarding/progress/TeacherOnboardingDashboard";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
@@ -99,7 +98,6 @@ export function ProviderOverviewPage() {
     <TeacherOnboardingDashboard>
       <TeacherReturnBanner />
       <TeacherIncompleteBanner />
-      <ProviderTaskBanner />
       <TeacherCockpit />
     </TeacherOnboardingDashboard>
   );

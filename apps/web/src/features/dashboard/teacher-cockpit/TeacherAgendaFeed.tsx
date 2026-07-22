@@ -5,6 +5,10 @@ import { getUpcomingEvents, isConfirmedSession } from "./teacherCockpitUtils";
 
 interface TeacherAgendaFeedProps {
   events: ScheduleEvent[];
+  headerTitle?: string;
+  headerDescription?: string;
+  showHistory?: boolean;
+  onEventClick?: (event: ScheduleEvent) => void;
 }
 
 function planningWeekLink(events: ScheduleEvent[]): string {
@@ -16,18 +20,26 @@ function planningWeekLink(events: ScheduleEvent[]): string {
   return `/app/planning?week=${day}`;
 }
 
-export function TeacherAgendaFeed({ events }: TeacherAgendaFeedProps) {
+export function TeacherAgendaFeed({
+  events,
+  headerTitle = "Agenda à venir",
+  headerDescription = "Sessions confirmées et créneaux publiés.",
+  showHistory = false,
+  onEventClick,
+}: TeacherAgendaFeedProps) {
   return (
     <TeacherAgendaList
       events={events}
       variant="compact"
       showHeader
-      headerTitle="Agenda à venir"
-      headerDescription="Sessions confirmées et créneaux publiés."
+      showHistory={showHistory}
+      headerTitle={headerTitle}
+      headerDescription={headerDescription}
       headerLink={{
         label: "Calendrier →",
         to: planningWeekLink(events),
       }}
+      onEventClick={onEventClick}
       renderEventActions={(event) =>
         event.courseId && event.status === "scheduled" ? (
           <DeclareUnavailableButton

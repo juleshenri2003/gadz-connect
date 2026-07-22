@@ -27,7 +27,7 @@ export function AdminStudentsSnapshot({ dashboard }: AdminStudentsSnapshotProps)
           </p>
         </div>
         <Button size="sm" variant="outline" asChild>
-          <Link to="/admin/utilisateurs?role=student_provider">Utilisateurs →</Link>
+          <Link to="/admin/utilisateurs/eleves">Élèves →</Link>
         </Button>
       </div>
 

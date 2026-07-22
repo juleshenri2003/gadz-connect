@@ -14,7 +14,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Modal } from "@/components/Modal";
 import { isStudent } from "@/features/auth/roles";
 import { useMyProfile } from "@/features/auth/useMyProfile";
-import { TeacherCoursesToDocument } from "@/features/dashboard/teacher-cockpit/TeacherCoursesToDocument";
 import {
   MarketplaceVisibilityPill,
   TeacherMarketplaceVisibility,
@@ -37,11 +36,17 @@ import {
 import { TeacherPublicProfileForm } from "@/features/profile/TeacherPublicProfileForm";
 import { useProviderProgress } from "@/features/onboarding/progress/useProviderProgress";
 import { useCoursesToDocument } from "@/features/repository/useRepository";
+import {
+  getPastCourseEvents,
+  needsAttendanceConfirm,
+  PastCoursesPanel,
+} from "@/features/scheduling/PastCoursesPanel";
+import { useMySchedule } from "@/features/scheduling/useSchedule";
 
 const TAB_ITEMS: { id: CoursesTab; label: string }[] = [
   { id: "slots", label: "Créneaux" },
   { id: "profile", label: "Publication" },
-  { id: "documentation", label: "Documentation" },
+  { id: "history", label: "Cours passés" },
 ];
 
 function toDatetimeLocalValue(date: Date): string {
@@ -450,7 +455,12 @@ function TeacherCoursesTabs() {
   const { data: me } = useMyProfile();
   const { data: coursesToDocument } = useCoursesToDocument();
   const { data: tutorProfile } = useMyTutorProfile();
+  const { data: schedule } = useMySchedule({ includeCancelled: true });
   const docCount = coursesToDocument?.length ?? 0;
+  const pastConfirmCount = getPastCourseEvents(schedule?.events).filter(
+    needsAttendanceConfirm,
+  ).length;
+  const historyBadge = docCount + pastConfirmCount;
 
   function setActiveTab(tab: CoursesTab) {
     setSearchParams({ tab }, { replace: true });
@@ -476,9 +486,9 @@ function TeacherCoursesTabs() {
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
-            {tab.id === "documentation" && docCount > 0 ? (
+            {tab.id === "history" && historyBadge > 0 ? (
               <span className="rounded-full bg-warning-bg px-1.5 py-0.5 text-xs font-semibold text-warning">
-                {docCount}
+                {historyBadge}
               </span>
             ) : null}
           </button>
@@ -497,17 +507,10 @@ function TeacherCoursesTabs() {
       {activeTab === "profile" && me ? (
         <TeacherPublicProfileForm profile={me} variant="courses-tab" />
       ) : null}
-      {activeTab === "documentation" ? (
+      {activeTab === "history" ? (
         <Card className="border-line">
-          <CardHeader>
-            <CardTitle className="text-base">Séances à documenter</CardTitle>
-            <CardDescription>
-              Déposez un résumé après chaque cours — il sera classé dans le
-              répertoire matière de l&apos;élève.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TeacherCoursesToDocument variant="full" embedded />
+          <CardContent className="pt-6">
+            <PastCoursesPanel audience="teacher" />
           </CardContent>
         </Card>
       ) : null}
@@ -556,7 +559,10 @@ export function ProviderCoursesPage() {
       </div>
 
       {student ? (
-        <TutorList showFilters showGuideEmptyState />
+        <div className="space-y-6">
+          <TutorList showFilters showGuideEmptyState />
+          <PastCoursesPanel audience="student" collapsible />
+        </div>
       ) : tutorActive ? (
         <TeacherCoursesTabs />
       ) : (

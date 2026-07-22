@@ -22,12 +22,14 @@ interface StudentScheduleEventDetailProps {
   event: ScheduleEvent | null;
   open: boolean;
   onClose: () => void;
+  onAttendanceConfirmed?: () => void;
 }
 
 export function StudentScheduleEventDetail({
   event,
   open,
   onClose,
+  onAttendanceConfirmed,
 }: StudentScheduleEventDetailProps) {
   if (!event) return null;
 
@@ -112,6 +114,7 @@ export function StudentScheduleEventDetail({
               event.sessionConfirmationCompletedAt
             }
             sessionDisputeStatus={event.sessionDisputeStatus}
+            onConfirmed={onAttendanceConfirmed}
           />
         ) : null}
         {canDeclareUnavailable ? (

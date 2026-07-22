@@ -12,6 +12,10 @@ export interface CourseEvaluationListItem {
   clarificationsCount: number;
   messagesCount: number;
   lastMessageAt: string | null;
+  studentSessionConfirmedAt?: string | null;
+  providerSessionConfirmedAt?: string | null;
+  sessionConfirmationCompletedAt?: string | null;
+  bothConfirmed?: boolean;
 }
 
 export interface CourseEvaluationDetail {

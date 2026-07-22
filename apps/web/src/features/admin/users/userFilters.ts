@@ -119,7 +119,15 @@ export function getActiveFilterLabel(filters: UserFiltersState): string | null {
     parts.push(PRESET_FILTER_LABELS[filters.preset]);
   }
   if (filters.role !== "all") {
-    parts.push(`Rôle : ${filters.role}`);
+    const roleLabel =
+      filters.role === "student_provider"
+        ? "Élèves"
+        : filters.role === "teacher"
+          ? "Professeurs"
+          : filters.role === "admin"
+            ? "Admins"
+            : filters.role;
+    parts.push(`Rôle : ${roleLabel}`);
   }
   if (filters.accountStatus !== "all") {
     parts.push(`Statut : ${filters.accountStatus}`);
@@ -145,6 +153,16 @@ export function getEmptyStateMessage(filters: UserFiltersState): string {
   }
   if (filters.preset === "pending_siret") {
     return "Aucun profil en attente de SIRET.";
+  }
+  if (filters.role === "student_provider") {
+    return filters.search.trim()
+      ? `Aucun élève pour « ${filters.search.trim()} ».`
+      : "Aucun élève dans ce périmètre.";
+  }
+  if (filters.role === "teacher") {
+    return filters.search.trim()
+      ? `Aucun professeur pour « ${filters.search.trim()} ».`
+      : "Aucun professeur dans ce périmètre.";
   }
   if (filters.search.trim()) {
     return `Aucun résultat pour « ${filters.search.trim()} ».`;

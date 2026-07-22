@@ -21,3 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_courses_confirmation_reminder
 CREATE INDEX IF NOT EXISTS idx_courses_awaiting_replacement
   ON public.courses (replacement_expires_at)
   WHERE status = 'awaiting_replacement';
+

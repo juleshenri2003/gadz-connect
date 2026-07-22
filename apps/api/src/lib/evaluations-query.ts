@@ -15,6 +15,10 @@ export interface CourseEvaluationListItem {
   clarificationsCount: number;
   messagesCount: number;
   lastMessageAt: string | null;
+  studentSessionConfirmedAt: string | null;
+  providerSessionConfirmedAt: string | null;
+  sessionConfirmationCompletedAt: string | null;
+  bothConfirmed: boolean;
 }
 
 function profileFullName(
@@ -29,6 +33,63 @@ function pickOne<T>(value: unknown): T | null {
   return (Array.isArray(value) ? value[0] : value) as T;
 }
 
+function isMissingColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("does not exist") ||
+    message.includes("Could not find the") ||
+    message.includes("schema cache")
+  );
+}
+
+const COURSE_SELECT_WITH_SESSION = `
+  id, subject, title, status, scheduled_at, client_id, provider_id,
+  student_confirmed_at, provider_confirmed_at,
+  student_session_confirmed_at, provider_session_confirmed_at,
+  session_confirmation_completed_at,
+  client:client_id ( first_name, last_name ),
+  provider:provider_id ( first_name, last_name )
+`;
+
+const COURSE_SELECT_LEGACY = `
+  id, subject, title, status, scheduled_at, client_id, provider_id,
+  student_confirmed_at, provider_confirmed_at,
+  client:client_id ( first_name, last_name ),
+  provider:provider_id ( first_name, last_name )
+`;
+
+function confirmationFromCourse(course: Record<string, unknown>): {
+  studentSessionConfirmedAt: string | null;
+  providerSessionConfirmedAt: string | null;
+  sessionConfirmationCompletedAt: string | null;
+  bothConfirmed: boolean;
+} {
+  const hasSessionCols = Object.prototype.hasOwnProperty.call(
+    course,
+    "student_session_confirmed_at",
+  );
+  const student =
+    (hasSessionCols
+      ? ((course.student_session_confirmed_at as string | null) ?? null)
+      : null) ??
+    ((course.student_confirmed_at as string | null) ?? null);
+  const provider =
+    (hasSessionCols
+      ? ((course.provider_session_confirmed_at as string | null) ?? null)
+      : null) ??
+    ((course.provider_confirmed_at as string | null) ?? null);
+  const completed =
+    (course.session_confirmation_completed_at as string | null | undefined) ??
+    (student && provider ? student : null);
+
+  return {
+    studentSessionConfirmedAt: student,
+    providerSessionConfirmedAt: provider,
+    sessionConfirmationCompletedAt: completed,
+    bothConfirmed: Boolean(completed || (student && provider)),
+  };
+}
+
 export async function fetchCourseEvaluationsForUser(
   userId: string,
   role: string,
@@ -36,29 +97,94 @@ export async function fetchCourseEvaluationsForUser(
   await markPastCoursesCompleted();
 
   const isStudent = role === "student_provider";
-  let query = supabaseAdmin
-    .from("courses")
-    .select(
-      `
-      id, subject, title, status, scheduled_at, client_id, provider_id,
-      client:client_id ( first_name, last_name ),
-      provider:provider_id ( first_name, last_name )
-    `,
-    )
-    .eq("status", "completed")
-    .not("scheduled_at", "is", null)
-    .order("scheduled_at", { ascending: false });
+  const roleField = isStudent ? "client_id" : "provider_id";
 
-  query = isStudent
-    ? query.eq("client_id", userId)
-    : query.eq("provider_id", userId);
-
-  const { data: courses, error } = await query;
-  if (error) {
-    throw new Error(error.message);
+  async function runSelect(select: string) {
+    return supabaseAdmin
+      .from("courses")
+      .select(select)
+      .eq(roleField, userId)
+      .in("status", ["completed", "awaiting_session_confirmation", "scheduled"])
+      .not("scheduled_at", "is", null)
+      .order("scheduled_at", { ascending: false });
   }
 
-  const courseIds = (courses ?? []).map((c) => c.id as string);
+  let coursesRaw: Record<string, unknown>[] | null = null;
+  let queryError: { message: string } | null = null;
+
+  {
+    const first = await runSelect(COURSE_SELECT_WITH_SESSION);
+    if (first.error && isMissingColumnError(first.error.message)) {
+      const legacy = await runSelect(COURSE_SELECT_LEGACY);
+      if (
+        legacy.error &&
+        (legacy.error.message.includes("invalid input value for enum") ||
+          legacy.error.message.includes("awaiting_session_confirmation"))
+      ) {
+        const fallback = await supabaseAdmin
+          .from("courses")
+          .select(COURSE_SELECT_LEGACY)
+          .eq(roleField, userId)
+          .in("status", ["completed", "scheduled"])
+          .not("scheduled_at", "is", null)
+          .order("scheduled_at", { ascending: false });
+        coursesRaw = (fallback.data as unknown as Record<string, unknown>[]) ?? null;
+        queryError = fallback.error;
+      } else {
+        coursesRaw = (legacy.data as unknown as Record<string, unknown>[]) ?? null;
+        queryError = legacy.error;
+      }
+    } else if (
+      first.error &&
+      (first.error.message.includes("invalid input value for enum") ||
+        first.error.message.includes("awaiting_session_confirmation"))
+    ) {
+      const fallback = await supabaseAdmin
+        .from("courses")
+        .select(COURSE_SELECT_WITH_SESSION)
+        .eq(roleField, userId)
+        .in("status", ["completed", "scheduled"])
+        .not("scheduled_at", "is", null)
+        .order("scheduled_at", { ascending: false });
+      if (fallback.error && isMissingColumnError(fallback.error.message)) {
+        const legacy = await supabaseAdmin
+          .from("courses")
+          .select(COURSE_SELECT_LEGACY)
+          .eq(roleField, userId)
+          .in("status", ["completed", "scheduled"])
+          .not("scheduled_at", "is", null)
+          .order("scheduled_at", { ascending: false });
+        coursesRaw = (legacy.data as unknown as Record<string, unknown>[]) ?? null;
+        queryError = legacy.error;
+      } else {
+        coursesRaw = (fallback.data as unknown as Record<string, unknown>[]) ?? null;
+        queryError = fallback.error;
+      }
+    } else {
+      coursesRaw = (first.data as unknown as Record<string, unknown>[]) ?? null;
+      queryError = first.error;
+    }
+  }
+
+  if (queryError) {
+    throw new Error(queryError.message);
+  }
+
+  const now = Date.now();
+  const courses = (coursesRaw ?? []).filter((course) => {
+    const status = course.status as string;
+    if (status === "completed" || status === "awaiting_session_confirmation") {
+      return true;
+    }
+    const scheduledAt = course.scheduled_at as string | null;
+    return (
+      status === "scheduled" &&
+      scheduledAt != null &&
+      new Date(scheduledAt).getTime() < now
+    );
+  });
+
+  const courseIds = courses.map((c) => c.id as string);
   if (courseIds.length === 0) return [];
 
   const [ratingsResult, summariesResult, clarificationsResult, messagesResult] =
@@ -127,9 +253,7 @@ export async function fetchCourseEvaluationsForUser(
     }
   }
 
-  const now = Date.now();
-
-  return (courses ?? []).map((course) => {
+  return courses.map((course) => {
     const courseId = course.id as string;
     const subject =
       (course.subject as string) || (course.title as string) || "Cours";
@@ -144,6 +268,12 @@ export async function fetchCourseEvaluationsForUser(
     const scheduledAt = course.scheduled_at as string | null;
     const past =
       scheduledAt != null && new Date(scheduledAt).getTime() < now;
+    const confirmation = confirmationFromCourse(course);
+    const eligibleToRate =
+      isStudent &&
+      past &&
+      (course.status === "completed" || confirmation.bothConfirmed) &&
+      !rating;
 
     return {
       courseId,
@@ -154,13 +284,14 @@ export async function fetchCourseEvaluationsForUser(
         : profileFullName(client),
       status: course.status as string,
       rating: rating ? { stars: rating.stars } : null,
-      canRate: isStudent && past && course.status === "completed" && !rating,
+      canRate: eligibleToRate,
       hasSummary: Boolean(summary),
       summaryTitle: summary?.title ?? null,
       hasSummaryPdf: Boolean(summary?.pdf_path),
       clarificationsCount: clarificationsCountByCourse.get(courseId) ?? 0,
       messagesCount: messagesMetaByCourse.get(courseId)?.count ?? 0,
       lastMessageAt: messagesMetaByCourse.get(courseId)?.lastAt ?? null,
+      ...confirmation,
     };
   });
 }

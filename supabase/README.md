@@ -34,6 +34,7 @@ Dans **SQL Editor**, exécuter dans l'ordre :
 28. `migrations/028_urssaf_avance_immediate.sql` (avance immédiate URSSAF — clients, états paiement)
 29. `migrations/029_urssaf_notifications.sql` (kinds notification : actif / rejet / reversement bloqué)
 30. `migrations/030_post_session_confirmation.sql` (double confirmation post-séance avant paiement prof)
+31. `migrations/031_student_parents.sql` (parents / payeurs déclarés sur le profil élève)
 
 Guide détaillé Stripe : [`docs/STRIPE_SETUP.md`](../docs/STRIPE_SETUP.md)
 

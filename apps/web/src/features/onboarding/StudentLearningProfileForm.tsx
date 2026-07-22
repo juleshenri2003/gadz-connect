@@ -9,7 +9,7 @@ import {
   Label,
 } from "@gadz-connect/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { OnboardingProgressBar } from "@/features/onboarding/progress/OnboardingProgressBar";
@@ -52,6 +52,11 @@ interface StudentLearningProfileFormProps {
   submitLabel?: string;
   onSubmit: (values: StudentLearningProfileFormInput) => Promise<void>;
   showIntro?: boolean;
+  /** wizard = 1ère fois ; flat = édition profil déjà rempli */
+  variant?: "wizard" | "flat";
+  /** Pas de Card externe (déjà dans la page Profil) */
+  embedded?: boolean;
+  onCancel?: () => void;
 }
 
 const STEPS = [
@@ -69,12 +74,24 @@ const STEPS = [
   { id: 4, title: "Objectifs", fields: ["tutoringGoals"] as const },
 ];
 
+function FieldBlock({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return <div className="space-y-4">{children}</div>;
+}
+
 export function StudentLearningProfileForm({
   defaultValues,
   submitLabel = "Terminer mon profil",
   onSubmit,
   showIntro = true,
+  variant = "wizard",
+  embedded = false,
+  onCancel,
 }: StudentLearningProfileFormProps) {
+  const flat = variant === "flat";
   const [step, setStep] = useState(1);
 
   const {
@@ -129,6 +146,173 @@ export function StudentLearningProfileForm({
     });
   }
 
+  const showStep = (n: number) => flat || step === n;
+
+  const formBody = (
+    <form onSubmit={handleSubmit(submit)} className="space-y-5">
+      {showIntro && !flat && step === 1 ? (
+        <div className="rounded-lg border border-brand-100 bg-brand-50/60 p-4 text-sm text-ink-700">
+          Gadz&apos;Connect, c&apos;est plus que des cours : de l&apos;entraide,
+          de la méthode et un suivi personnalisé entre Gadz&apos;. Votre première
+          séance avec chaque tuteur est offerte pour faire connaissance, sans
+          engagement.
+        </div>
+      ) : null}
+
+      {showStep(1) ? (
+        <FieldBlock>
+          <div className="space-y-2">
+            <Label htmlFor="classYear">Classe / promo</Label>
+            <select
+              id="classYear"
+              className="flex h-10 w-full rounded-md border border-line bg-surface px-3 text-sm"
+              {...register("classYear")}
+            >
+              <option value="">Sélectionnez…</option>
+              {CLASS_YEAR_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            {errors.classYear ? (
+              <p className="text-sm text-red-600">{errors.classYear.message}</p>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="studyProgram">Filière / spécialité (optionnel)</Label>
+            <Input
+              id="studyProgram"
+              placeholder="Ex. Génie industriel, mécanique…"
+              {...register("studyProgram")}
+            />
+          </div>
+        </FieldBlock>
+      ) : null}
+
+      {showStep(2) ? (
+        <FieldBlock>
+          <div className="space-y-2">
+            <Label htmlFor="strongPoints">Vos points forts</Label>
+            <textarea
+              id="strongPoints"
+              rows={4}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+              placeholder="Matières où vous êtes à l'aise, méthodes qui marchent pour vous…"
+              {...register("strongPoints")}
+            />
+            {errors.strongPoints ? (
+              <p className="text-sm text-red-600">{errors.strongPoints.message}</p>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="difficulties">Vos difficultés</Label>
+            <textarea
+              id="difficulties"
+              rows={4}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+              placeholder="Matières bloquantes, type d'exercices difficiles, organisation…"
+              {...register("difficulties")}
+            />
+            {errors.difficulties ? (
+              <p className="text-sm text-red-600">{errors.difficulties.message}</p>
+            ) : null}
+          </div>
+        </FieldBlock>
+      ) : null}
+
+      {showStep(3) ? (
+        <FieldBlock>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-ink-900">
+              Besoins spécifiques (optionnel)
+            </legend>
+            <p className="text-xs text-ink-500">
+              Ces informations restent confidentielles et aident votre tuteur à
+              mieux vous accompagner.
+            </p>
+            <div className="mt-2 space-y-2">
+              {LEARNING_FLAG_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-sm has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/40"
+                >
+                  <input
+                    type="checkbox"
+                    checked={learningFlags.includes(option.value)}
+                    onChange={() => toggleFlag(option.value)}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {learningFlags.includes("autre") ? (
+            <div className="space-y-2">
+              <Label htmlFor="learningFlagsOther">Précisez</Label>
+              <Input id="learningFlagsOther" {...register("learningFlagsOther")} />
+              {errors.learningFlagsOther ? (
+                <p className="text-sm text-red-600">
+                  {errors.learningFlagsOther.message}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </FieldBlock>
+      ) : null}
+
+      {showStep(4) ? (
+        <FieldBlock>
+          <div className="space-y-2">
+            <Label htmlFor="tutoringGoals">
+              Qu&apos;attendez-vous du tutorat ?
+            </Label>
+            <textarea
+              id="tutoringGoals"
+              rows={5}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+              placeholder="Ex. reprendre confiance en maths, méthode de travail, préparation concours…"
+              {...register("tutoringGoals")}
+            />
+            {errors.tutoringGoals ? (
+              <p className="text-sm text-red-600">{errors.tutoringGoals.message}</p>
+            ) : null}
+          </div>
+        </FieldBlock>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2 pt-2">
+        {!flat && step > 1 ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStep((s) => s - 1)}
+          >
+            Retour
+          </Button>
+        ) : null}
+        {flat && onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Annuler
+          </Button>
+        ) : null}
+        {!flat && step < STEPS.length ? (
+          <Button type="button" onClick={() => void goNext()}>
+            Continuer
+          </Button>
+        ) : (
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Enregistrement…" : submitLabel}
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+
+  if (embedded || flat) {
+    return formBody;
+  }
+
   return (
     <Card className="border-line">
       <CardHeader>
@@ -138,174 +322,7 @@ export function StudentLearningProfileForm({
         </CardDescription>
         <OnboardingProgressBar progress={progress} />
       </CardHeader>
-      <CardContent>
-        {showIntro && step === 1 ? (
-          <div className="mb-6 rounded-lg border border-brand-100 bg-brand-50/60 p-4 text-sm text-ink-700">
-            Gadz&apos;Connect, c&apos;est plus que des cours : de l&apos;entraide,
-            de la méthode et un suivi personnalisé entre Gadz&apos;. Votre première
-            séance avec chaque tuteur est offerte pour faire connaissance, sans
-            engagement.
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit(submit)} className="space-y-4">
-          {step === 1 ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="classYear">Classe / promo</Label>
-                <select
-                  id="classYear"
-                  className="flex h-10 w-full rounded-md border border-line bg-surface px-3 text-sm"
-                  {...register("classYear")}
-                >
-                  <option value="">Sélectionnez…</option>
-                  {CLASS_YEAR_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                {errors.classYear ? (
-                  <p className="text-sm text-red-600">{errors.classYear.message}</p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="studyProgram">Filière / spécialité (optionnel)</Label>
-                <Input
-                  id="studyProgram"
-                  placeholder="Ex. Génie industriel, mécanique…"
-                  {...register("studyProgram")}
-                />
-              </div>
-            </>
-          ) : null}
-
-          {step === 2 ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="strongPoints">Vos points forts</Label>
-                <textarea
-                  id="strongPoints"
-                  rows={4}
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
-                  placeholder="Matières où vous êtes à l'aise, méthodes qui marchent pour vous…"
-                  {...register("strongPoints")}
-                />
-                {errors.strongPoints ? (
-                  <p className="text-sm text-red-600">
-                    {errors.strongPoints.message}
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="difficulties">Vos difficultés</Label>
-                <textarea
-                  id="difficulties"
-                  rows={4}
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
-                  placeholder="Matières bloquantes, type d'exercices difficiles, organisation…"
-                  {...register("difficulties")}
-                />
-                {errors.difficulties ? (
-                  <p className="text-sm text-red-600">
-                    {errors.difficulties.message}
-                  </p>
-                ) : null}
-              </div>
-            </>
-          ) : null}
-
-          {step === 3 ? (
-            <>
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium text-ink-900">
-                  Besoins spécifiques (optionnel)
-                </legend>
-                <p className="text-xs text-ink-500">
-                  Ces informations restent confidentielles et aident votre tuteur à
-                  mieux vous accompagner.
-                </p>
-                <div className="mt-2 space-y-2">
-                  {LEARNING_FLAG_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-sm has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/40"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={learningFlags.includes(option.value)}
-                        onChange={() => toggleFlag(option.value)}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              {learningFlags.includes("autre") ? (
-                <div className="space-y-2">
-                  <Label htmlFor="learningFlagsOther">Précisez</Label>
-                  <Input
-                    id="learningFlagsOther"
-                    {...register("learningFlagsOther")}
-                  />
-                  {errors.learningFlagsOther ? (
-                    <p className="text-sm text-red-600">
-                      {errors.learningFlagsOther.message}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {step === 4 ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="tutoringGoals">
-                  Qu&apos;attendez-vous du tutorat ?
-                </Label>
-                <textarea
-                  id="tutoringGoals"
-                  rows={5}
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
-                  placeholder="Ex. reprendre confiance en maths, méthode de travail, préparation concours…"
-                  {...register("tutoringGoals")}
-                />
-                {errors.tutoringGoals ? (
-                  <p className="text-sm text-red-600">
-                    {errors.tutoringGoals.message}
-                  </p>
-                ) : null}
-              </div>
-              <p className="text-xs text-ink-500">
-                Vous pourrez réserver une séance d&apos;essai gratuite (1 h max) avec
-                chaque tuteur avant de vous engager sur des cours payants.
-              </p>
-            </>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            {step > 1 ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStep((s) => s - 1)}
-              >
-                Retour
-              </Button>
-            ) : null}
-            {step < STEPS.length ? (
-              <Button type="button" onClick={() => void goNext()}>
-                Continuer
-              </Button>
-            ) : (
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Enregistrement…" : submitLabel}
-              </Button>
-            )}
-          </div>
-        </form>
-      </CardContent>
+      <CardContent>{formBody}</CardContent>
     </Card>
   );
 }

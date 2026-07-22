@@ -26,15 +26,15 @@ export function TeacherCoursesSummaryCards() {
       </section>
 
       <section className="rounded-md border border-line bg-surface p-5">
-        <h3 className="font-semibold text-ink-900">Documentation</h3>
+        <h3 className="font-semibold text-ink-900">Cours passés</h3>
         <p className="mt-1 text-sm text-ink-600">
           {docCount > 0
-            ? `${docCount} séance${docCount > 1 ? "s" : ""} en attente de résumé.`
-            : "Aucune séance à documenter pour le moment."}
+            ? `${docCount} séance${docCount > 1 ? "s" : ""} sans résumé — confirmez et documentez.`
+            : "Historique, confirmations et résumés élève."}
         </p>
         <Button className="mt-4" size="sm" variant="outline" asChild>
-          <Link to={coursesTabHref("documentation")}>
-            {docCount > 0 ? "Documenter →" : "Voir Mes cours →"}
+          <Link to={coursesTabHref("history")}>
+            {docCount > 0 ? "Voir les cours passés →" : "Historique →"}
           </Link>
         </Button>
       </section>

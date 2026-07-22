@@ -16,25 +16,63 @@ export type SessionPayoutResult =
  * - Stripe : Transfer Connect du montant prof (fonds déjà sur la plateforme)
  * - URSSAF : déclenche la demande de paiement (Transfer après statut paye)
  */
+function isMissingColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("does not exist") ||
+    message.includes("Could not find the") ||
+    message.includes("schema cache")
+  );
+}
+
 export async function payoutAfterSessionConfirmation(
   courseId: string,
+  options?: { allowLegacyConfirmFields?: boolean },
 ): Promise<SessionPayoutResult> {
-  const { data: course, error: courseError } = await supabaseAdmin
+  const allowLegacy = options?.allowLegacyConfirmFields === true;
+
+  let course: Record<string, unknown> | null = null;
+  const withSession = await supabaseAdmin
     .from("courses")
     .select(
-      "id, status, campus_id, client_id, provider_id, subject, title, payment_method, session_confirmation_completed_at, student_session_confirmed_at, provider_session_confirmed_at",
+      "id, status, campus_id, client_id, provider_id, subject, title, payment_method, session_confirmation_completed_at, student_session_confirmed_at, provider_session_confirmed_at, student_confirmed_at, provider_confirmed_at",
     )
     .eq("id", courseId)
     .maybeSingle();
 
-  if (courseError || !course) {
-    return { ok: false, error: courseError?.message ?? "Cours introuvable" };
+  if (withSession.error && isMissingColumnError(withSession.error.message)) {
+    const legacy = await supabaseAdmin
+      .from("courses")
+      .select(
+        "id, status, campus_id, client_id, provider_id, subject, title, payment_method, student_confirmed_at, provider_confirmed_at",
+      )
+      .eq("id", courseId)
+      .maybeSingle();
+    if (legacy.error || !legacy.data) {
+      return { ok: false, error: legacy.error?.message ?? "Cours introuvable" };
+    }
+    course = legacy.data as Record<string, unknown>;
+  } else if (withSession.error || !withSession.data) {
+    return {
+      ok: false,
+      error: withSession.error?.message ?? "Cours introuvable",
+    };
+  } else {
+    course = withSession.data as Record<string, unknown>;
   }
 
-  if (
-    !course.student_session_confirmed_at ||
-    !course.provider_session_confirmed_at
-  ) {
+  const studentAt =
+    (course.student_session_confirmed_at as string | null | undefined) ??
+    (allowLegacy || !("student_session_confirmed_at" in course)
+      ? ((course.student_confirmed_at as string | null | undefined) ?? null)
+      : null);
+  const providerAt =
+    (course.provider_session_confirmed_at as string | null | undefined) ??
+    (allowLegacy || !("provider_session_confirmed_at" in course)
+      ? ((course.provider_confirmed_at as string | null | undefined) ?? null)
+      : null);
+
+  if (!studentAt || !providerAt) {
     return {
       ok: false,
       error: "Les deux parties doivent confirmer que le cours a eu lieu",
@@ -59,7 +97,10 @@ export async function payoutAfterSessionConfirmation(
   }
 
   const now = new Date().toISOString();
-  if (!course.session_confirmation_completed_at) {
+  const completedAt =
+    (course.session_confirmation_completed_at as string | null | undefined) ??
+    null;
+  if (!completedAt && "session_confirmation_completed_at" in course) {
     await supabaseAdmin
       .from("courses")
       .update({
@@ -73,45 +114,67 @@ export async function payoutAfterSessionConfirmation(
       .from("courses")
       .update({ status: "completed", session_dispute_status: "none" })
       .eq("id", courseId);
+  } else if (course.status !== "completed") {
+    await supabaseAdmin
+      .from("courses")
+      .update({ status: "completed" })
+      .eq("id", courseId);
   }
 
-  const channel = (tx.payment_channel as string) ?? course.payment_method ?? "stripe";
+  const channel =
+    (tx.payment_channel as string) ??
+    (course.payment_method as string | null) ??
+    "stripe";
 
   if (course.campus_id && course.client_id && course.provider_id) {
-    await notifySessionBothConfirmed({
-      campusId: course.campus_id as string,
-      courseId,
-      clientId: course.client_id as string,
-      providerId: course.provider_id as string,
-      subject:
-        (course.subject as string | null) ??
-        (course.title as string | null) ??
-        "Cours",
-      declaredBy: course.provider_id as string,
-    });
-  }
-
-  if (channel === "urssaf") {
-    await supabaseAdmin
-      .from("transactions")
-      .update({ prof_payout_status: "pending_urssaf" })
-      .eq("id", tx.id);
-
-    const urssaf = await triggerUrssafPaymentForCourse(courseId);
-    if (!urssaf.ok) {
-      return { ok: false, error: urssaf.error ?? "Échec demande URSSAF" };
+    try {
+      await notifySessionBothConfirmed({
+        campusId: course.campus_id as string,
+        courseId,
+        clientId: course.client_id as string,
+        providerId: course.provider_id as string,
+        subject:
+          (course.subject as string | null) ??
+          (course.title as string | null) ??
+          "Cours",
+        declaredBy: course.provider_id as string,
+      });
+    } catch (err) {
+      console.error(
+        "[session-payout] notifySessionBothConfirmed:",
+        err instanceof Error ? err.message : err,
+      );
     }
-    return { ok: true, channel: "urssaf" };
   }
 
-  return transferStripePayoutToTeacher({
-    courseId,
-    transactionId: tx.id as string,
-    providerId: course.provider_id as string,
-    teacherGrossRevenue: Number(
-      tx.teacher_gross_revenue ?? tx.net_payout ?? 0,
-    ),
-  });
+  try {
+    if (channel === "urssaf") {
+      await supabaseAdmin
+        .from("transactions")
+        .update({ prof_payout_status: "pending_urssaf" })
+        .eq("id", tx.id);
+
+      const urssaf = await triggerUrssafPaymentForCourse(courseId);
+      if (!urssaf.ok) {
+        return { ok: false, error: urssaf.error ?? "Échec demande URSSAF" };
+      }
+      return { ok: true, channel: "urssaf" };
+    }
+
+    return await transferStripePayoutToTeacher({
+      courseId,
+      transactionId: tx.id as string,
+      providerId: course.provider_id as string,
+      teacherGrossRevenue: Number(
+        tx.teacher_gross_revenue ?? tx.net_payout ?? 0,
+      ),
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Échec du reversement";
+    console.error("[session-payout] unexpected:", message);
+    return { ok: false, error: message };
+  }
 }
 
 export async function transferStripePayoutToTeacher(input: {
@@ -146,16 +209,34 @@ export async function transferStripePayoutToTeacher(input: {
     return { ok: false, error: "Montant de reversement invalide" };
   }
 
-  const transfer = await stripe.transfers.create({
-    amount: amountCents,
-    currency: "eur",
-    destination: accountId,
-    metadata: {
-      course_id: input.courseId,
-      transaction_id: input.transactionId,
-      source: "session_confirmation",
-    },
-  });
+  let transfer: { id: string };
+  try {
+    transfer = await stripe.transfers.create({
+      amount: amountCents,
+      currency: "eur",
+      destination: accountId,
+      metadata: {
+        course_id: input.courseId,
+        transaction_id: input.transactionId,
+        source: "session_confirmation",
+      },
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Échec du transfert Stripe";
+    console.error("[session-payout] Stripe transfer failed:", message);
+    await supabaseAdmin
+      .from("transactions")
+      .update({ prof_payout_status: "pending_session_confirmation" })
+      .eq("id", input.transactionId);
+    return {
+      ok: false,
+      error:
+        message.includes("insufficient") || message.includes("available funds")
+          ? "Fonds Stripe insuffisants pour le reversement (compte test) — la confirmation est enregistrée, le paiement sera retenté"
+          : message,
+    };
+  }
 
   await supabaseAdmin
     .from("transactions")

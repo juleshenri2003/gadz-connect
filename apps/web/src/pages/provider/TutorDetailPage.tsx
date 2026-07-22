@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { Button, Input, Label } from "@gadz-connect/ui";
+import { Button, Input, Label, cn } from "@gadz-connect/ui";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Modal } from "@/components/Modal";
 import { markTutorProfileViewed } from "@/features/dashboard/studentDashboardTasks";
@@ -25,6 +25,7 @@ import {
   useTutorSlots,
   type TutorSlot,
 } from "@/features/marketplace/useTutors";
+import { useMyProfile } from "@/features/auth/useMyProfile";
 import { BookingPaymentForm } from "@/features/stripe/BookingPaymentForm";
 import { useStripeConfig } from "@/features/stripe/useStripeConfig";
 import { useUrssafStatus } from "@/features/urssaf/useUrssaf";
@@ -45,6 +46,7 @@ export function TutorDetailPage() {
   const { data: tutor, isLoading } = useTutor(id ?? "");
   const { data: slots } = useTutorSlots(id ?? "");
   const { data: trialEligibility } = useTutorTrialEligibility(id);
+  const { data: profile } = useMyProfile();
   const { data: cvPdfUrl } = useTutorCvPdfUrl(id ?? "", Boolean(tutor?.has_cv_pdf));
   const bookSlot = useBookSlot();
   const confirmPayment = useConfirmBookingPayment();
@@ -56,9 +58,8 @@ export function TutorDetailPage() {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [payForOther, setPayForOther] = useState(false);
-  const [payerName, setPayerName] = useState("");
-  const [beneficiaryName, setBeneficiaryName] = useState("");
+  const [parentPays, setParentPays] = useState(false);
+  const [selectedParentId, setSelectedParentId] = useState("");
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(
     null,
@@ -81,6 +82,12 @@ export function TutorDetailPage() {
     paymentMethod?: "stripe" | "urssaf";
     parentChargeEstimate?: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (trialEligibility && !trialEligibility.eligible && bookingMode === "trial") {
+      setBookingMode("standard");
+    }
+  }, [trialEligibility, bookingMode]);
 
   const visibleSlots = useMemo(() => {
     if (!slots) return [];
@@ -114,10 +121,24 @@ export function TutorDetailPage() {
     return selectedSubject.trim();
   }, [selectedSubject, customSubject]);
 
+  const declaredParents = profile?.parents ?? [];
+
+  useEffect(() => {
+    const parents = profile?.parents ?? [];
+    if (parents.length === 0) {
+      setSelectedParentId("");
+      return;
+    }
+    setSelectedParentId((current) =>
+      parents.some((p) => p.id === current) ? current : (parents[0]?.id ?? ""),
+    );
+  }, [profile?.parents]);
+
   const canConfirmBooking =
     Boolean(selectedSlot) &&
     (bookingMode === "trial" || Boolean(tutor?.hourly_rate)) &&
-    resolvedSubject.length > 0;
+    resolvedSubject.length > 0 &&
+    (!parentPays || Boolean(selectedParentId));
 
   useEffect(() => {
     if (
@@ -127,6 +148,12 @@ export function TutorDetailPage() {
       setSelectedSlot(null);
     }
   }, [selectedSlot, visibleSlots]);
+
+  useEffect(() => {
+    if (visibleSlots.length === 1 && !selectedSlot) {
+      setSelectedSlot(visibleSlots[0]!.id);
+    }
+  }, [visibleSlots, selectedSlot]);
 
   useEffect(() => {
     if (tutor?.subjects.length) {
@@ -151,16 +178,16 @@ export function TutorDetailPage() {
 
   async function handleBook() {
     if (!selectedSlot || !resolvedSubject) return;
+    if (parentPays && !selectedParentId) {
+      setBookingError("Choisissez un parent payeur ou ajoutez-en un dans Mon profil.");
+      return;
+    }
     setBookingError(null);
     try {
-      const trimmedPayer = payerName.trim();
-      const trimmedBeneficiary = beneficiaryName.trim();
       const result = await bookSlot.mutateAsync({
         slotId: selectedSlot,
         subject: resolvedSubject,
-        payerName: payForOther && trimmedPayer ? trimmedPayer : undefined,
-        beneficiaryName:
-          payForOther && trimmedBeneficiary ? trimmedBeneficiary : undefined,
+        payerParentId: parentPays ? selectedParentId : undefined,
         sessionType: bookingMode,
         isHomeVisit: bookingMode === "standard" ? isHomeVisit : false,
       });
@@ -376,8 +403,8 @@ export function TutorDetailPage() {
               </div>
             ) : trialEligibility && !trialEligibility.eligible ? (
               <p className="mt-4 text-xs text-ink-500">
-                Séance d&apos;essai déjà utilisée avec ce tuteur — réservation au
-                tarif habituel.
+                {trialEligibility.reason ??
+                  "Séance d'essai déjà utilisée avec ce tuteur — réservation au tarif habituel."}
               </p>
             ) : null}
 
@@ -452,6 +479,11 @@ export function TutorDetailPage() {
                   ? `Réserver — ${formatEuro(estimatedPrice)}`
                   : "Réserver ce créneau"}
           </Button>
+        ) : null}
+        {visibleSlots.length && !selectedSlot ? (
+          <p className="mt-2 text-xs text-ink-500">
+            Sélectionnez un créneau ci-dessus pour continuer.
+          </p>
         ) : null}
       </section>
 
@@ -531,39 +563,47 @@ export function TutorDetailPage() {
                 <label className="flex items-center gap-2 text-sm text-ink-700">
                   <input
                     type="checkbox"
-                    checked={payForOther}
-                    onChange={(event) => setPayForOther(event.target.checked)}
+                    checked={parentPays}
+                    onChange={(event) => setParentPays(event.target.checked)}
                   />
-                  Je paie pour quelqu&apos;un d&apos;autre
+                  Un parent paie pour moi
                 </label>
-                {payForOther ? (
+                {parentPays ? (
                   <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="booking-payer">Nom du payeur (facturé)</Label>
-                      <Input
-                        id="booking-payer"
-                        placeholder="Ex. Marie Dupont"
-                        value={payerName}
-                        onChange={(event) => setPayerName(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="booking-beneficiary">
-                        Nom de l&apos;élève bénéficiaire
-                      </Label>
-                      <Input
-                        id="booking-beneficiary"
-                        placeholder="Ex. Paul Dupont"
-                        value={beneficiaryName}
-                        onChange={(event) =>
-                          setBeneficiaryName(event.target.value)
-                        }
-                      />
-                    </div>
-                    <p className="text-xs text-ink-400">
-                      Ces noms apparaîtront sur la facture. Laissez vide pour
-                      facturer à votre nom.
-                    </p>
+                    {declaredParents.length > 0 ? (
+                      <div className="space-y-1">
+                        <Label htmlFor="booking-parent">Parent facturé</Label>
+                        <select
+                          id="booking-parent"
+                          className="flex h-10 w-full rounded-md border border-line bg-surface px-3 text-sm"
+                          value={selectedParentId}
+                          onChange={(event) =>
+                            setSelectedParentId(event.target.value)
+                          }
+                        >
+                          {declaredParents.map((parent) => (
+                            <option key={parent.id} value={parent.id}>
+                              {parent.first_name} {parent.last_name} (
+                              {parent.email})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-ink-400">
+                          Le cours reste à votre nom ; ce parent apparaîtra comme
+                          payeur sur la facture.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-ink-500">
+                        Aucun parent déclaré.{" "}
+                        <Link
+                          to="/app/profil"
+                          className="font-medium text-brand-700 underline"
+                        >
+                          Ajouter un parent dans Mon profil
+                        </Link>
+                      </p>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -573,7 +613,7 @@ export function TutorDetailPage() {
                 {canUseUrssaf
                   ? "Pas de paiement maintenant — l'URSSAF prélèvera votre part après le cours."
                   : stripeConfig?.configured
-                    ? "Le paiement par carte sera demandé à la confirmation."
+                    ? "Paiement carte, Apple Pay ou Google Pay à la confirmation."
                     : "Sans Stripe configuré, la réservation est enregistrée sans débit carte."}
               </p>
             ) : (
@@ -596,7 +636,7 @@ export function TutorDetailPage() {
           setPendingBooking(null);
         }}
         title="Paiement sécurisé"
-        description="Réglez votre cours pour confirmer la réservation."
+        description="Carte, Apple Pay ou Google Pay — confirmez la réservation en un geste."
       >
         {paymentClientSecret &&
         pendingBooking &&
@@ -639,15 +679,30 @@ function SlotOption({
 
   return (
     <li>
-      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-line px-4 py-3 hover:bg-paper has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition hover:bg-paper",
+          selected
+            ? "border-brand-600 bg-brand-50/50"
+            : "border-line",
+        )}
+      >
         <div className="flex items-center gap-3">
-          <input
-            type="radio"
-            name="slot"
-            value={slot.id}
-            checked={selected}
-            onChange={onSelect}
-          />
+          <span
+            className={cn(
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+              selected
+                ? "border-brand-600 bg-brand-600"
+                : "border-ink-400 bg-surface",
+            )}
+            aria-hidden
+          >
+            {selected ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-surface" />
+            ) : null}
+          </span>
           <span className="text-sm">
             {formatSlotRange(slot.starts_at, slot.ends_at)}
           </span>
@@ -655,7 +710,7 @@ function SlotOption({
         <span className="text-sm font-medium text-ink-600">
           {isTrial ? "Gratuit" : formatEuro(price)}
         </span>
-      </label>
+      </button>
     </li>
   );
 }

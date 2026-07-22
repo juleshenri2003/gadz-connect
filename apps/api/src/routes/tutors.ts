@@ -12,7 +12,7 @@ import { getProfilePhotoPublicUrl } from "../lib/profile-photo.js";
 import { createInvoiceSignedUrl } from "../lib/billing/invoice-storage.js";
 import {
   buildTransactionRevenueFromBooking,
-  toTransactionInsertRow,
+  insertTransactionRow,
 } from "../lib/billing/revenue-split.js";
 import {
   finalizeBookingSlot,
@@ -32,6 +32,10 @@ import {
   isCvComplete,
 } from "../lib/tutor-visibility.js";
 import { profileLinksSchema } from "../lib/profile-links.js";
+import {
+  normalizeParents,
+  parentDisplayName,
+} from "../lib/student-parents.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { aggregateTeacherFinancial } from "../lib/tutor-financial.js";
 import { mapRatingForProvider, type CourseRatingRow } from "../lib/course-ratings.js";
@@ -73,7 +77,7 @@ const bookingSchema = z.object({
   slotId: z.string().uuid(),
   subject: z.string().min(1).max(120).optional(),
   payerName: z.string().trim().min(1).max(120).optional(),
-  beneficiaryName: z.string().trim().min(1).max(120).optional(),
+  payerParentId: z.string().uuid().optional(),
   sessionType: z.enum(["standard", "trial"]).optional(),
   isHomeVisit: z.boolean().optional(),
 });
@@ -1097,9 +1101,33 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   }
 
   const { slot, client, tutor, subject, fiscal, isTrial } = prepared.data;
-  const payerName = parsed.data.payerName?.trim() || null;
-  const beneficiaryName = parsed.data.beneficiaryName?.trim() || null;
   const isHomeVisit = parsed.data.isHomeVisit === true;
+
+  const { data: clientProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("first_name, last_name, parents")
+    .eq("id", client.id)
+    .maybeSingle();
+
+  const beneficiaryName = clientProfile
+    ? `${clientProfile.first_name ?? ""} ${clientProfile.last_name ?? ""}`.trim() ||
+      null
+    : null;
+
+  let payerName: string | null = null;
+  if (parsed.data.payerParentId) {
+    const parents = normalizeParents(clientProfile?.parents);
+    const parent = parents.find((p) => p.id === parsed.data.payerParentId);
+    if (!parent) {
+      res.status(400).json({
+        error: "Parent introuvable — déclarez-le dans Mon profil",
+      });
+      return;
+    }
+    payerName = parentDisplayName(parent);
+  } else if (parsed.data.payerName?.trim()) {
+    payerName = parsed.data.payerName.trim();
+  }
 
   if (isTrial) {
     const { data: course, error: courseError } = await supabaseAdmin
@@ -1214,14 +1242,12 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
     }
 
     const revenue = buildTransactionRevenueFromBooking(fiscal);
-    const { error: txError } = await supabaseAdmin.from("transactions").insert(
-      toTransactionInsertRow(revenue, {
-        course_id: course.id,
-        payment_channel: "urssaf",
-        prof_payout_status: "pending_session_confirmation",
-        status_stripe: "pending",
-      }),
-    );
+    const { error: txError } = await insertTransactionRow(revenue, {
+      course_id: course.id,
+      payment_channel: "urssaf",
+      prof_payout_status: "pending_session_confirmation",
+      status_stripe: "pending",
+    });
 
     if (txError) {
       await supabaseAdmin.from("courses").delete().eq("id", course.id);
@@ -1303,16 +1329,12 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
       );
 
       const revenue = buildTransactionRevenueFromBooking(fiscal);
-      const { error: txError } = await supabaseAdmin
-        .from("transactions")
-        .insert(
-          toTransactionInsertRow(revenue, {
-            course_id: course.id,
-            stripe_payment_intent_id: paymentIntent.id,
-            payment_channel: "stripe",
-            prof_payout_status: "pending_session_confirmation",
-          }),
-        );
+      const { error: txError } = await insertTransactionRow(revenue, {
+        course_id: course.id,
+        stripe_payment_intent_id: paymentIntent.id,
+        payment_channel: "stripe",
+        prof_payout_status: "pending_session_confirmation",
+      });
 
       if (txError || !paymentIntent.client_secret) {
         await supabaseAdmin.from("courses").delete().eq("id", course.id);
@@ -1346,17 +1368,13 @@ tutorsRouter.post("/bookings", async (req: AuthenticatedRequest, res) => {
   }
 
   const revenue = buildTransactionRevenueFromBooking(fiscal);
-  const { error: txError } = await supabaseAdmin
-    .from("transactions")
-    .insert(
-      toTransactionInsertRow(revenue, {
-        course_id: course.id,
-        status_stripe: "succeeded",
-        status_urssaf: "pending",
-        payment_channel: "stripe",
-        prof_payout_status: "pending_session_confirmation",
-      }),
-    );
+  const { error: txError } = await insertTransactionRow(revenue, {
+    course_id: course.id,
+    status_stripe: "succeeded",
+    status_urssaf: "pending",
+    payment_channel: "stripe",
+    prof_payout_status: "pending_session_confirmation",
+  });
 
   if (txError) {
     await supabaseAdmin.from("courses").delete().eq("id", course.id);

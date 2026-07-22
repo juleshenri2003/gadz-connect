@@ -33,7 +33,7 @@ export function AdminTeachersOnboardingPanel({
           </p>
         </div>
         <Button size="sm" variant="outline" asChild>
-          <Link to="/admin/utilisateurs?role=teacher">Utilisateurs →</Link>
+          <Link to="/admin/utilisateurs/profs">Professeurs →</Link>
         </Button>
       </div>
 
@@ -87,7 +87,7 @@ export function AdminTeachersOnboardingPanel({
         <p className="mt-4 text-xs text-warning">
           {onboarding.verificationFailed} vérification(s) SIRET en échec —{" "}
           <Link
-            to="/admin/utilisateurs?filter=verification_failed"
+            to="/admin/utilisateurs/profs?filter=verification_failed"
             className="font-medium underline"
           >
             contrôler

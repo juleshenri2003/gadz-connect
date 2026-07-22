@@ -1,6 +1,7 @@
 import type { FiscalCalculateResult } from "@gadz-connect/types";
 import { calculateCommissionSasu } from "@gadz-connect/types";
 import { calculateFiscalBreakdown } from "../fiscal.js";
+import { supabaseAdmin } from "../supabase.js";
 
 /** Ventilation tripartite : Parent → Plateforme (3 €) → Prof auto-entrepreneur (CA brut). */
 export interface TripartiteRevenueSplit {
@@ -129,4 +130,41 @@ export function toTransactionInsertRow(
       ? { stripe_payment_intent_id: extras.stripe_payment_intent_id }
       : {}),
   };
+}
+
+function isMissingEnumValueError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("invalid input value for enum") ||
+    message.includes("pending_session_confirmation")
+  );
+}
+
+/**
+ * Insert transaction ; si l'enum `pending_session_confirmation` n'existe pas
+ * encore (migration 030), retente sans ce statut.
+ */
+export async function insertTransactionRow(
+  record: TransactionRevenueRecord,
+  extras: Parameters<typeof toTransactionInsertRow>[1],
+): Promise<{ error: { message: string } | null }> {
+  const row = toTransactionInsertRow(record, extras);
+  const first = await supabaseAdmin.from("transactions").insert(row);
+  if (!first.error) return { error: null };
+
+  if (
+    extras.prof_payout_status === "pending_session_confirmation" &&
+    isMissingEnumValueError(first.error.message)
+  ) {
+    console.warn(
+      "[transactions] pending_session_confirmation indisponible — insert sans statut (appliquez migration 030)",
+    );
+    const { prof_payout_status: _omit, ...restExtras } = extras;
+    const fallback = await supabaseAdmin
+      .from("transactions")
+      .insert(toTransactionInsertRow(record, restExtras));
+    return { error: fallback.error };
+  }
+
+  return { error: first.error };
 }

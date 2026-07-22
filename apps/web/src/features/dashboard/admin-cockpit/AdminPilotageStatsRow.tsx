@@ -28,7 +28,7 @@ export function AdminPilotageStatsRow({
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-      <Link to="/admin/utilisateurs?role=teacher" className="block transition hover:opacity-90">
+      <Link to="/admin/utilisateurs/profs" className="block transition hover:opacity-90">
         <StatCard
           accent="indigo"
           label="Profs actifs"
@@ -41,7 +41,7 @@ export function AdminPilotageStatsRow({
         />
       </Link>
       <Link
-        to="/admin/utilisateurs?filter=pending_siret&role=teacher"
+        to="/admin/utilisateurs/profs?filter=pending_siret"
         className="block transition hover:opacity-90"
       >
         <StatCard
@@ -56,7 +56,7 @@ export function AdminPilotageStatsRow({
         />
       </Link>
       <Link
-        to="/admin/utilisateurs?role=student_provider"
+        to="/admin/utilisateurs/eleves"
         className="block transition hover:opacity-90"
       >
         <StatCard

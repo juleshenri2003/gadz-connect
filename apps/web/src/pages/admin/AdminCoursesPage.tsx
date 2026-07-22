@@ -21,7 +21,7 @@ import {
 } from "@/features/admin/courses/courseFilters";
 import type { AdminCoursePreset } from "@/features/admin/types";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200;
 
 export function AdminCoursesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -99,7 +99,8 @@ export function AdminCoursesPage() {
         <div>
           <h2 className="text-2xl font-bold text-ink-900">Cours</h2>
           <p className="mt-1 text-sm text-ink-600">
-            Registre des sessions de tutorat — supervision et recherche
+            Registre classé des sessions — mêmes couleurs que l&apos;emploi du
+            temps (en attente, données, donné, remplacé, annulé)
           </p>
           <p className="mt-1 text-xs text-ink-400">{scopeLabel}</p>
         </div>

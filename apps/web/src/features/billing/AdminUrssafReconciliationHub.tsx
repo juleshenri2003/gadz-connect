@@ -86,6 +86,15 @@ function useUrssafReconciliation(anomaliesOnly: boolean) {
   });
 }
 
+/** Compteur d'anomalies pour le cockpit Argent (cache partagé). */
+export function useUrssafAnomaliesCount() {
+  const query = useUrssafReconciliation(true);
+  return {
+    count: query.data?.anomaliesCount ?? null,
+    isLoading: query.isLoading,
+  };
+}
+
 export function AdminUrssafReconciliationHub() {
   const [anomaliesOnly, setAnomaliesOnly] = useState(true);
   const { getAccessToken } = useAuth();

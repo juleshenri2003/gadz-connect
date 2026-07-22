@@ -8,8 +8,12 @@ const ADMIN_COMMANDS = [
   { label: "Tableau de bord", to: "/admin" },
   { label: "Emploi du temps", to: "/admin/planning" },
   { label: "Alertes", to: "/admin/alertes" },
-  { label: "Utilisateurs", to: "/admin/utilisateurs" },
-  { label: "Budgets", to: "/admin/budgets" },
+  { label: "Répertoire élèves", to: "/admin/utilisateurs/eleves" },
+  { label: "Répertoire professeurs", to: "/admin/utilisateurs/profs" },
+  { label: "Tous les utilisateurs", to: "/admin/utilisateurs" },
+  { label: "Argent", to: "/admin/budgets" },
+  { label: "Facturation", to: "/admin/budgets?tab=facturation" },
+  { label: "Clôture & URSSAF", to: "/admin/budgets?tab=cloture" },
   { label: "Cours", to: "/admin/cours" },
 ] as const;
 

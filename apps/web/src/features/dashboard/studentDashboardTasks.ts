@@ -32,24 +32,28 @@ const TASK_DEFINITIONS: Omit<DashboardTask, "status">[] = [
     title: "Profil complété",
     description: "Identité et campus",
     href: "/app/profil",
+    kind: "onboarding",
   },
   {
     id: "learning_profile",
     title: "Mon profil d'apprentissage",
     description: "Forces, difficultés et objectifs de tutorat",
     href: "/app/profil",
+    kind: "onboarding",
   },
   {
     id: "find_tutor",
     title: "Trouver un tuteur",
     description: "Parcourir les profils et réserver une séance d'essai ou un cours",
     href: "/app/cours",
+    kind: "onboarding",
   },
   {
     id: "follow_courses",
     title: "Suivi & entraide",
     description: "Emploi du temps, comptes-rendus et échanges",
     href: "/app/suivi-cours",
+    kind: "onboarding",
   },
 ];
 

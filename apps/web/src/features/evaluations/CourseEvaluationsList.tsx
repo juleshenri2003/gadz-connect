@@ -1,18 +1,91 @@
 import { Link } from "react-router-dom";
+import type { ReactNode } from "react";
 import { Button, cn } from "@gadz-connect/ui";
 import { StarRatingDisplay } from "@/features/ratings/StarRating";
 import { formatNotificationDate } from "@/features/notifications/notificationUtils";
 import { useMyCourseEvaluations } from "./useEvaluations";
 import type { CourseEvaluationListItem } from "./types";
 
+function isBothConfirmed(item: CourseEvaluationListItem): boolean {
+  if (item.bothConfirmed != null) return item.bothConfirmed;
+  return Boolean(
+    item.sessionConfirmationCompletedAt ||
+      (item.studentSessionConfirmedAt && item.providerSessionConfirmedAt),
+  );
+}
+
+function scheduledTime(item: CourseEvaluationListItem): number {
+  return item.scheduledAt ? new Date(item.scheduledAt).getTime() : 0;
+}
+
+/** Confirmations incomplètes : actions d’abord, puis date récente. */
+function sortIncomplete(a: CourseEvaluationListItem, b: CourseEvaluationListItem): number {
+  if (a.canRate !== b.canRate) return a.canRate ? -1 : 1;
+  if (a.hasSummary !== b.hasSummary) return a.hasSummary ? 1 : -1;
+  return scheduledTime(b) - scheduledTime(a);
+}
+
+/** Séances validées : note ↓, puis matière, puis date. */
+function sortConfirmed(a: CourseEvaluationListItem, b: CourseEvaluationListItem): number {
+  if (a.canRate !== b.canRate) return a.canRate ? -1 : 1;
+  const aStars = a.rating?.stars ?? -1;
+  const bStars = b.rating?.stars ?? -1;
+  if (aStars !== bStars) return bStars - aStars;
+  const bySubject = a.subject.localeCompare(b.subject, "fr", {
+    sensitivity: "base",
+  });
+  if (bySubject !== 0) return bySubject;
+  return scheduledTime(b) - scheduledTime(a);
+}
+
+/** Matériaux prof : CR manquant d’abord, puis date. */
+function sortTeacherMaterials(
+  a: CourseEvaluationListItem,
+  b: CourseEvaluationListItem,
+): number {
+  if (a.hasSummary !== b.hasSummary) return a.hasSummary ? 1 : -1;
+  return scheduledTime(b) - scheduledTime(a);
+}
+
+function ConfirmationChips({ item }: { item: CourseEvaluationListItem }) {
+  const studentOk = Boolean(item.studentSessionConfirmedAt);
+  const providerOk = Boolean(item.providerSessionConfirmedAt);
+  return (
+    <div className="flex flex-wrap gap-1.5 text-[11px]">
+      <span
+        className={cn(
+          "rounded-full px-2 py-0.5 font-medium",
+          providerOk
+            ? "bg-success-bg text-success"
+            : "bg-paper text-ink-500",
+        )}
+      >
+        Prof {providerOk ? "✓" : "—"}
+      </span>
+      <span
+        className={cn(
+          "rounded-full px-2 py-0.5 font-medium",
+          studentOk
+            ? "bg-success-bg text-success"
+            : "bg-paper text-ink-500",
+        )}
+      >
+        Élève {studentOk ? "✓" : "—"}
+      </span>
+    </div>
+  );
+}
+
 function EvaluationRow({
   item,
   onOpen,
   showRating = true,
+  showConfirmation = false,
 }: {
   item: CourseEvaluationListItem;
   onOpen: (courseId: string) => void;
   showRating?: boolean;
+  showConfirmation?: boolean;
 }) {
   return (
     <button
@@ -48,6 +121,11 @@ function EvaluationRow({
           </span>
         )}
       </div>
+      {showConfirmation ? (
+        <div className="mt-2">
+          <ConfirmationChips item={item} />
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-ink-500">
         {item.hasSummary ? (
           <span className="rounded bg-paper px-2 py-0.5">Compte-rendu</span>
@@ -71,6 +149,40 @@ function EvaluationRow({
   );
 }
 
+function EvaluationSection({
+  title,
+  hint,
+  count,
+  accent,
+  header,
+  children,
+}: {
+  title: string;
+  hint: string;
+  count: number;
+  accent: string;
+  header: string;
+  children: ReactNode;
+}) {
+  if (count === 0) return null;
+  return (
+    <section className={cn("overflow-hidden rounded-md border border-line", accent)}>
+      <header className={cn("border-b border-line px-4 py-3", header)}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
+            <p className="mt-0.5 text-xs text-ink-600">{hint}</p>
+          </div>
+          <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-ink-700">
+            {count}
+          </span>
+        </div>
+      </header>
+      <div className="space-y-2 bg-surface p-3">{children}</div>
+    </section>
+  );
+}
+
 interface CourseEvaluationsListProps {
   onOpenCourse: (courseId: string) => void;
   limit?: number;
@@ -85,16 +197,7 @@ export function CourseEvaluationsList({
   variant = "student",
 }: CourseEvaluationsListProps) {
   const { data, isLoading, isError } = useMyCourseEvaluations();
-  let items = data ?? [];
-  if (variant === "teacher-materials") {
-    items = [...items].sort((a, b) => {
-      if (a.hasSummary !== b.hasSummary) return a.hasSummary ? 1 : -1;
-      const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
-      const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
-      return bTime - aTime;
-    });
-  }
-  if (limit) items = items.slice(0, limit);
+  const raw = data ?? [];
 
   if (isLoading) {
     return (
@@ -111,7 +214,7 @@ export function CourseEvaluationsList({
     );
   }
 
-  if (!items.length) {
+  if (!raw.length) {
     return (
       <p className="text-sm text-ink-500">
         {variant === "teacher-materials"
@@ -121,16 +224,95 @@ export function CourseEvaluationsList({
     );
   }
 
+  if (variant === "teacher-materials") {
+    let items = [...raw].sort(sortTeacherMaterials);
+    if (limit) items = items.slice(0, limit);
+    const incomplete = items.filter((item) => !isBothConfirmed(item));
+    const confirmed = items.filter((item) => isBothConfirmed(item));
+
+    return (
+      <div className="space-y-4">
+        <EvaluationSection
+          title="Confirmations incomplètes"
+          hint="En attente élève et/ou prof — déposez le CR dès que possible"
+          count={incomplete.length}
+          accent="border-l-4 border-l-warning"
+          header="bg-warning-bg/50"
+        >
+          {incomplete.map((item) => (
+            <EvaluationRow
+              key={item.courseId}
+              item={item}
+              onOpen={onOpenCourse}
+              showRating={false}
+              showConfirmation
+            />
+          ))}
+        </EvaluationSection>
+        <EvaluationSection
+          title="Séances validées"
+          hint="Double confirmation OK — classés CR manquant d’abord, puis date"
+          count={confirmed.length}
+          accent="border-l-4 border-l-success"
+          header="bg-success-bg/40"
+        >
+          {confirmed.map((item) => (
+            <EvaluationRow
+              key={item.courseId}
+              item={item}
+              onOpen={onOpenCourse}
+              showRating={false}
+              showConfirmation
+            />
+          ))}
+        </EvaluationSection>
+      </div>
+    );
+  }
+
+  let incomplete = raw.filter((item) => !isBothConfirmed(item)).sort(sortIncomplete);
+  let confirmed = raw.filter((item) => isBothConfirmed(item)).sort(sortConfirmed);
+
+  if (limit) {
+    const budget = limit;
+    incomplete = incomplete.slice(0, budget);
+    confirmed = confirmed.slice(0, Math.max(0, budget - incomplete.length));
+  }
+
   return (
-    <div className="space-y-2">
-      {items.map((item) => (
-        <EvaluationRow
-          key={item.courseId}
-          item={item}
-          onOpen={onOpenCourse}
-          showRating={variant === "student"}
-        />
-      ))}
+    <div className="space-y-4">
+      <EvaluationSection
+        title="Confirmations incomplètes"
+        hint="Une ou deux parties n’ont pas encore validé la séance"
+        count={incomplete.length}
+        accent="border-l-4 border-l-warning"
+        header="bg-warning-bg/50"
+      >
+        {incomplete.map((item) => (
+          <EvaluationRow
+            key={item.courseId}
+            item={item}
+            onOpen={onOpenCourse}
+            showConfirmation
+          />
+        ))}
+      </EvaluationSection>
+      <EvaluationSection
+        title="Séances validées (double confirmation)"
+        hint="Classées par note, puis matière, puis date"
+        count={confirmed.length}
+        accent="border-l-4 border-l-success"
+        header="bg-success-bg/40"
+      >
+        {confirmed.map((item) => (
+          <EvaluationRow
+            key={item.courseId}
+            item={item}
+            onOpen={onOpenCourse}
+            showConfirmation
+          />
+        ))}
+      </EvaluationSection>
     </div>
   );
 }

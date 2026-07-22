@@ -6,6 +6,13 @@ import { apiFetch } from "@/lib/api";
 
 const ADMIN_ROLES: UserRole[] = ["admin_campus", "admin_general"];
 
+export interface StudentParent {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 export interface MyProfile {
   id: string;
   first_name: string;
@@ -34,6 +41,7 @@ export interface MyProfile {
   cv_complete: boolean;
   hourly_rate: number | null;
   subjects: string[];
+  parents?: StudentParent[];
   created_at?: string;
   updated_at: string;
   campus: { name: string } | null;
@@ -87,6 +95,29 @@ export function useUpdateProfileIdentity() {
       void queryClient.invalidateQueries({ queryKey: ["tutors"] });
       void queryClient.invalidateQueries({ queryKey: ["tutor-me"] });
       void queryClient.invalidateQueries({ queryKey: ["provider-progress"] });
+    },
+  });
+}
+
+export function useUpdateStudentParents() {
+  const { getAccessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (parents: StudentParent[]) => {
+      const token = getAccessToken();
+      if (!token) throw new Error("Non authentifié");
+      const res = await apiFetch<{
+        data: { id: string; parents: StudentParent[] };
+      }>("/api/profile/parents", {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ parents }),
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["profile-me"] });
     },
   });
 }

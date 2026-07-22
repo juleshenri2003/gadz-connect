@@ -63,7 +63,11 @@ export function isSameDay(a: Date, b: Date): boolean {
 }
 
 export function eventsForDay(events: ScheduleEvent[], day: Date): ScheduleEvent[] {
-  return events.filter((event) => isSameDay(new Date(event.startsAt), day));
+  return events
+    .filter((event) => isSameDay(new Date(event.startsAt), day))
+    .sort(
+      (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    );
 }
 
 export function formatEventTime(startsAt: string, endsAt: string): string {
@@ -93,10 +97,84 @@ export function formatSessionDurationLabel(
 
 export const COURSE_STATUS_LABELS: Record<string, string> = {
   scheduled: "Planifié",
+  payment_pending: "Paiement en attente",
+  awaiting_session_confirmation: "À confirmer",
   awaiting_replacement: "Remplacement en cours",
   completed: "Terminé",
   cancelled: "Annulé",
 };
+
+/** Catégories visuelles emploi du temps (alignées alertes). */
+export type CourseVisualCategory =
+  | "pending"
+  | "awaiting_data"
+  | "completed"
+  | "replaced"
+  | "cancelled"
+  | "slot"
+  | "other";
+
+export const COURSE_VISUAL_META: Record<
+  CourseVisualCategory,
+  { label: string; classes: string; swatch: string }
+> = {
+  pending: {
+    label: "En attente",
+    classes: "border-brand-100 bg-brand-50 text-brand-800",
+    swatch: "border-brand-100 bg-brand-50",
+  },
+  awaiting_data: {
+    label: "Données attendues",
+    classes: "border-warning/40 bg-warning-bg text-warning",
+    swatch: "border-warning/40 bg-warning-bg",
+  },
+  completed: {
+    label: "Cours donné",
+    classes: "border-success/30 bg-success-bg text-success",
+    swatch: "border-success/30 bg-success-bg",
+  },
+  replaced: {
+    label: "Remplacé",
+    classes: "border-violet-200 bg-violet-100 text-violet-900",
+    swatch: "border-violet-200 bg-violet-100",
+  },
+  cancelled: {
+    label: "Annulé / renoncé",
+    classes: "border-orange-200 bg-orange-100 text-orange-900 line-through",
+    swatch: "border-orange-200 bg-orange-100",
+  },
+  slot: {
+    label: "Créneau libre",
+    classes: "border-success/20 bg-success-bg text-success",
+    swatch: "border-success/20 bg-success-bg",
+  },
+  other: {
+    label: "Autre",
+    classes: "border-line bg-surface text-ink-900 shadow-surface",
+    swatch: "border-line bg-surface",
+  },
+};
+
+export function getCourseVisualCategory(
+  kind: ScheduleEvent["kind"],
+  status?: string,
+  startsAt?: string,
+  endsAt?: string,
+): CourseVisualCategory {
+  if (status === "cancelled") return "cancelled";
+  if (status === "completed") return "completed";
+  if (status === "awaiting_replacement") return "replaced";
+  if (status === "awaiting_session_confirmation") return "awaiting_data";
+  if (status === "payment_pending" || status === "scheduled") return "pending";
+  if (kind === "slot_available") {
+    if (startsAt && isExpiredAvailableSlot(kind, startsAt, endsAt)) {
+      return "other";
+    }
+    return "slot";
+  }
+  if (kind === "slot_booked") return "pending";
+  return "other";
+}
 
 export function courseStatusLabel(status?: string): string | undefined {
   if (!status) return undefined;
@@ -142,37 +220,30 @@ export function eventStyles(
   startsAt?: string,
   endsAt?: string,
 ): string {
-  if (status === "cancelled") {
-    return "border-line bg-paper text-ink-400 line-through";
-  }
-  if (status === "completed") {
-    return "border-line bg-paper text-ink-600";
-  }
+  const category = getCourseVisualCategory(kind, status, startsAt, endsAt);
   if (
+    category === "other" &&
     kind === "slot_available" &&
     startsAt &&
     isExpiredAvailableSlot(kind, startsAt, endsAt)
   ) {
     return "border-line bg-paper/80 text-ink-400 opacity-60";
   }
-  switch (kind) {
-    case "slot_available":
-      return "border-success/20 bg-success-bg text-success";
-    case "slot_booked":
-      return "border-brand-100 bg-brand-50 text-brand-700";
-    default:
-      return "border-line bg-surface text-ink-900 shadow-surface";
-  }
+  return COURSE_VISUAL_META[category].classes;
 }
 
 export function eventKindLabel(
   kind: ScheduleEvent["kind"],
   status?: string,
 ): string {
-  if (status === "completed") return "Terminé";
-  if (status === "cancelled") return "Annulé";
-  if (status === "scheduled" && (kind === "course" || kind === "slot_booked")) {
-    return "Planifié";
+  const category = getCourseVisualCategory(kind, status);
+  if (category === "completed") return COURSE_VISUAL_META.completed.label;
+  if (category === "cancelled") return COURSE_VISUAL_META.cancelled.label;
+  if (category === "replaced") return COURSE_VISUAL_META.replaced.label;
+  if (category === "awaiting_data") return COURSE_VISUAL_META.awaiting_data.label;
+  if (category === "pending" && (kind === "course" || kind === "slot_booked")) {
+    if (status === "payment_pending") return "Paiement en attente";
+    return COURSE_VISUAL_META.pending.label;
   }
   switch (kind) {
     case "slot_available":
@@ -182,4 +253,25 @@ export function eventKindLabel(
     default:
       return "Cours";
   }
+}
+
+/** Tri chronologique des événements d'un jour. */
+export function sortEventsByStart(events: ScheduleEvent[]): ScheduleEvent[] {
+  return [...events].sort(
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+  );
+}
+
+/** Recherche soft : le nom matche le prof (ou l'élève). */
+export function eventMatchesPersonFocus(
+  event: ScheduleEvent,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [event.providerName, event.clientName, event.counterpartName]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
 }

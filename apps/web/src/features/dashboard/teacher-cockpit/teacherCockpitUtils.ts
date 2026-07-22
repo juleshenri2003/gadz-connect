@@ -116,16 +116,30 @@ export function formatSessionWhen(startsAt: string, endsAt: string): string {
   return `${date} · ${formatEventTime(startsAt, endsAt)}`;
 }
 
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** Écart en jours calendaires locaux (0 = aujourd'hui, 1 = demain). */
+function calendarDaysFromToday(startsAt: Date, now = new Date()): number {
+  const startDay = startOfLocalDay(startsAt).getTime();
+  const today = startOfLocalDay(now).getTime();
+  return Math.round((startDay - today) / (1000 * 60 * 60 * 24));
+}
+
 export function formatRelativeWhen(startsAt: string): string {
   const start = new Date(startsAt);
   const now = new Date();
   const diffMs = start.getTime() - now.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffMs < 0) return "Passé";
-  if (diffHours < 1) return "Dans moins d'une heure";
-  if (diffHours < 24) return `Dans ${diffHours} h`;
+
+  const diffDays = calendarDaysFromToday(start, now);
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return "Dans moins d'une heure";
+    return `Dans ${diffHours} h`;
+  }
   if (diffDays === 1) return "Demain";
   if (diffDays < 7) return `Dans ${diffDays} jours`;
   return start.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });

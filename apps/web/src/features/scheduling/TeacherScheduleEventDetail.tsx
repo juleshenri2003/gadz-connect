@@ -30,6 +30,7 @@ interface TeacherScheduleEventDetailProps {
   hourlyRate: number | null;
   statusAcre: boolean;
   versementLiberatoire: boolean;
+  onAttendanceConfirmed?: () => void;
 }
 
 export function TeacherScheduleEventDetail({
@@ -39,6 +40,7 @@ export function TeacherScheduleEventDetail({
   hourlyRate,
   statusAcre,
   versementLiberatoire,
+  onAttendanceConfirmed,
 }: TeacherScheduleEventDetailProps) {
   const deleteSlot = useDeleteSlot();
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -172,6 +174,7 @@ export function TeacherScheduleEventDetail({
               event.sessionConfirmationCompletedAt
             }
             sessionDisputeStatus={event.sessionDisputeStatus}
+            onConfirmed={onAttendanceConfirmed}
           />
         </div>
       ) : null}
@@ -193,7 +196,7 @@ export function TeacherScheduleEventDetail({
             </Button>
             {!event.hasSummary ? (
               <Button size="sm" variant="outline" asChild>
-                <Link to={coursesTabHref("documentation")}>Documenter le cours</Link>
+                <Link to={coursesTabHref("history")}>Documenter le cours</Link>
               </Button>
             ) : null}
           </>
