@@ -2,7 +2,7 @@ import {
   buildPlanningWeekHref,
 } from "@/features/notifications/notificationUtils";
 import type { CampusNotificationItem } from "@/features/notifications/useNotifications";
-import type { DashboardTask } from "./dashboardTypes";
+import type { DashboardProgress, DashboardTask } from "./dashboardTypes";
 import type { ScheduleEvent } from "@/features/scheduling/types";
 import { needsOwnAttendanceConfirm } from "@/features/scheduling/PastCoursesPanel";
 import { coursesTabHref } from "@/features/marketplace/teacherCoursesTab";
@@ -171,7 +171,7 @@ export function dedupeConfirmTasks(tasks: DashboardTask[]): DashboardTask[] {
 
 export function finalizeTaskProgress(
   tasks: DashboardTask[],
-): import("./dashboardTypes").DashboardProgress {
+): DashboardProgress {
   const completedCount = tasks.filter((t) => t.status === "done").length;
   const totalCount = tasks.length;
   const percent =

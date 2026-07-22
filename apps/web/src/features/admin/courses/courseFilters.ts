@@ -3,7 +3,7 @@ import {
   expandStatusFiltersToApi,
   type AdminScheduleStatusFilter,
 } from "@/features/scheduling/adminScheduleUtils";
-import { COURSE_VISUAL_META } from "@/features/scheduling/calendar-utils";
+import type { CourseVisualCategory } from "@/features/scheduling/calendar-utils";
 
 export type CourseStatusFilter = AdminScheduleStatusFilter;
 
@@ -25,7 +25,7 @@ export const PRESET_FILTER_LABELS: Record<AdminCoursePreset, string> = {
 export const STATUS_FILTER_OPTIONS: Array<{
   value: CourseStatusFilter;
   label: string;
-  category: keyof typeof COURSE_VISUAL_META;
+  category: CourseVisualCategory;
 }> = [
   { value: "pending", label: "En attente", category: "pending" },
   {
